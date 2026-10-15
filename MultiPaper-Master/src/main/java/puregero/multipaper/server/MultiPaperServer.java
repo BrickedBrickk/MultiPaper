@@ -1,5 +1,6 @@
 package puregero.multipaper.server;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import puregero.multipaper.mastermessagingprotocol.MessageBootstrap;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundMessage;
@@ -11,6 +12,7 @@ import puregero.multipaper.server.util.LogToFile;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.net.InetSocketAddress;
 import java.util.UUID;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +79,8 @@ public class MultiPaperServer extends MessageBootstrap<MasterBoundMessage, Serve
         this(null, port);
     }
 
+    private volatile Channel serverChannel;
+
     public MultiPaperServer(String address, int port) {
         super(new MasterBoundProtocol(), new ServerBoundProtocol(), channel -> channel.pipeline().addLast(new ServerConnection(channel)));
 
@@ -87,6 +91,8 @@ public class MultiPaperServer extends MessageBootstrap<MasterBoundMessage, Serve
             future = this.listenOn(address, port);
         }
 
+        this.serverChannel = future.channel();
+
         future.addListener(f -> {
             if (f.cause() != null) {
                 f.cause().printStackTrace();
@@ -94,6 +100,14 @@ public class MultiPaperServer extends MessageBootstrap<MasterBoundMessage, Serve
                 System.out.println("[MultiPaperMaster] Listening on " + (address == null ? "0.0.0.0" : address) + ":" + port);
             }
         });
+    }
+
+    public int getLocalPort() {
+        return ((InetSocketAddress) serverChannel.localAddress()).getPort();
+    }
+
+    public void closeServerChannel() {
+        serverChannel.close();
     }
 
     private static void setupGracefulShutdown() {

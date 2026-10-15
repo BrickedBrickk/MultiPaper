@@ -5,14 +5,10 @@ plugins {
 
 version = "${properties["masterVersion"]}-${properties["mcVersion"]}"
 
-repositories {
-    maven {
-        url = uri("https://oss.sonatype.org/content/repositories/snapshots")
-    }
-}
-
 dependencies {
-    compileOnly("io.netty:netty-all:4.1.87.Final")
+    compileOnly("io.netty:netty-all:4.2.19.Final")
+
+    testImplementation("io.netty:netty-all:4.2.19.Final")
 }
 
 publishing {
@@ -20,4 +16,3 @@ publishing {
         artifact(tasks.jar)
     }
 }
-

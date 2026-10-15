@@ -139,7 +139,7 @@ public class CallDataStorageHandler {
 
             if (file.isFile()) {
                 try (FileInputStream in = new FileInputStream(file)) {
-                    yaml = new Yaml(new SafeConstructor()).load(in);
+                    yaml = new Yaml(new SafeConstructor(new org.yaml.snakeyaml.LoaderOptions())).load(in);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
