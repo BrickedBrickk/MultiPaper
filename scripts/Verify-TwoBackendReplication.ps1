@@ -102,6 +102,21 @@ try {
     Assert-Contains (Send-Rcon $Server1RconPort $block2) 'Index (1/25)' 'Server 1 did not receive Server 2 block changes.'
     Write-Output 'PASS: block changes replicate in both directions.'
 
+    $containerX = $x + 4
+    $containerCommand = "data get block $containerX 100 $z Items"
+    Send-Rcon $Server1RconPort "setblock $containerX 100 $z minecraft:chest" | Out-Null
+    Send-Rcon $Server1RconPort "item replace block $containerX 100 $z container.0 with minecraft:diamond 5" | Out-Null
+    Assert-Contains (Send-Rcon $Server1RconPort $containerCommand) 'minecraft:diamond' 'Server 1 could not read the container marker item.'
+    $containerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $containerItems2 = ''
+    do {
+        $containerItems2 = Send-Rcon $Server2RconPort $containerCommand
+        if ($containerItems2.IndexOf('minecraft:diamond', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $containerDeadline)
+    Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 did not receive the chest block entity contents from Server 1.'
+    Write-Output 'PASS: chest block entity contents replicate to Server 2.'
+
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
         Write-Output 'SKIP: pass -PlayerName for player inventory, entity, and dimension checks.'
         return

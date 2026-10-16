@@ -132,7 +132,7 @@
                  this.broadcast(players, packet);
              }
 +
-+            if (!broadcastingToPlayersOnly) puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(newChunkHolder, net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(blockEntity, BlockEntity::getUpdateTag, false)); // MultiPaper - sync the full block with external servers
++            if (!broadcastingToPlayersOnly) puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(newChunkHolder, net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(blockEntity, BlockEntity::saveWithFullMetadata, false)); // MultiPaper - sync the full block entity with external servers
          }
 +
      }
