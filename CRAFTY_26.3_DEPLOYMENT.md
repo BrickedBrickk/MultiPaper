@@ -31,12 +31,14 @@ Copy these built artifacts from the fork to the matching Crafty working director
 - PC1 Master: `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar`
 - PC1 Server 1 and PC2 Server 2: `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar`
 
-Use the same Paperclip build on both server PCs. The preserved build artifacts currently on disk have these SHA-256 hashes (the hashes identify the preserved artifacts; regenerate the Paperclip JAR from the now-repaired tracked patch before release):
+Use the same Paperclip build on both server PCs. The server artifacts below were freshly built from commit `f1980ce` after the tracked source patches were repaired. All four archives pass ZIP integrity checks, and the packaged server JAR contains the forwarding validator used by the regression tests.
 
-| Artifact | Size | SHA-256 |
-| --- | ---: | --- |
-| `multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | 66,656,002 bytes | `D4209836902E507A6DC73C6687FA1E543D56D914A29AC9ABB96BF15845CBE668` |
-| `multipaper-master-3.0.0.jar` | 19,151,848 bytes | `39B2098A13D000C3623D7C78A70CF4C02EBAEFDA77CFAD479DA861FED78F3A0C` |
+| Artifact path | Use | Size | SHA-256 |
+| --- | --- | ---: | --- |
+| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,656,021 bytes | `2F33514D293EB5B9B8478F8EC146CCB7F42255D949F0B0E156C593CB3D803263` |
+| `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,084,927 bytes | `7FD07335DBC66451F1876FF3CBFED89291DD930D8F3546190279B7D491955160` |
+| `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,685,715 bytes | `44EE4095DB8F42241AAA03027A526C77C266B8A020A9145365F4E9F0DDC40C35` |
+| `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,151,848 bytes | `39B2098A13D000C3623D7C78A70CF4C02EBAEFDA77CFAD479DA861FED78F3A0C` |
 
 Keep a separate backup copy of the original world before migrating it.
 
