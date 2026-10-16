@@ -20,8 +20,8 @@ public class PlayerFoodUpdatePacket extends ExternalServerPacket {
 
     public PlayerFoodUpdatePacket(Player player) {
         this.uuid = player.getUUID();
-        this.foodLevel = player.getFoodData().foodLevel;
-        this.saturationLevel = player.getFoodData().saturationLevel;
+        this.foodLevel = player.getFoodData().getFoodLevel();
+        this.saturationLevel = player.getFoodData().getSaturationLevel();
     }
 
     public PlayerFoodUpdatePacket(FriendlyByteBuf in) {
@@ -47,8 +47,8 @@ public class PlayerFoodUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
-            player.getFoodData().foodLevel = foodLevel;
-            player.getFoodData().saturationLevel = saturationLevel;
+            player.getFoodData().setFoodLevel(foodLevel);
+            player.getFoodData().setSaturation(saturationLevel);
         });
     }
 }

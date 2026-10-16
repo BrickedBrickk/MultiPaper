@@ -48,7 +48,7 @@ public class RemoveWhiteListedPlayerPacket extends ExternalServerPacket {
     public void handle(ExternalServerConnection connection) {
         MultiPaper.runSync(() -> {
             handlingPacket = true;
-            MinecraftServer.getServer().getPlayerList().getWhiteList().remove(new GameProfile(uuid, name));
+            MinecraftServer.getServer().getPlayerList().getWhiteList().remove(new net.minecraft.server.players.NameAndId(uuid, name));
             handlingPacket = false;
         });
     }

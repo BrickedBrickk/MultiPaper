@@ -105,10 +105,10 @@ public class SendChunkPacket extends ExternalServerPacket {
             CraftWorld craftWorld = ((CraftWorld) Bukkit.getWorld(world));
             if (craftWorld != null) {
                 ServerLevel level = craftWorld.getHandle();
-                NewChunkHolder holder = level.chunkTaskScheduler.chunkHolderManager.getChunkHolder(pos.asLong());
+                NewChunkHolder holder = MultiPaper.getChunkHolder(level, cx, cz);
 
                 if (holder != null) {
-                    level.chunkTaskScheduler.chunkHolderManager.unloadChunkNowNoSave(holder);
+                    ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.unloadChunkNowNoSave(holder);
                 }
             }
         });

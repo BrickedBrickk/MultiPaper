@@ -21,7 +21,7 @@ public class MultiPaperDirtyCraftPersistentDataContainer extends CraftPersistent
         for (MultiPaperDirtyCraftPersistentDataContainer container : dirtyContainers) {
             Entity entity = container.entity.getHandle();
 
-            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x, entity.chunkPosition().z);
+            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x(), entity.chunkPosition().z());
             if (newChunkHolder != null) {
                 MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityPersistentDataUpdatePacket(entity, container, container.modifiedKeys));
             }

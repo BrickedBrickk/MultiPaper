@@ -23,7 +23,7 @@ public class RaidJoinPacket extends ExternalServerPacket {
     public RaidJoinPacket(Entity entity, Raid raid) {
         this.world = entity.level().getWorld().getName();
         this.uuid = entity.getUUID();
-        this.raidId = raid.getId();
+        this.raidId = raid.idOrNegativeOne;
     }
 
     public RaidJoinPacket(FriendlyByteBuf in) {
@@ -56,7 +56,7 @@ public class RaidJoinPacket extends ExternalServerPacket {
                 Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
                 Raid raid = level.getRaids().get(raidId);
                 if (raid != null && entity instanceof Raider raider) {
-                    raid.joinRaid(raid.getGroupsSpawned(), raider, null, true);
+                    raid.joinRaid(level, raid.getGroupsSpawned(), raider, null, true);
                 }
             }
             handlingJoin = false;

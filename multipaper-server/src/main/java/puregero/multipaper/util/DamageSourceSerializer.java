@@ -21,7 +21,7 @@ public class DamageSourceSerializer {
     private static final Logger LOGGER = LogManager.getLogger(DamageSourceSerializer.class.getSimpleName());
 
     public static void serialize(DamageSource source, FriendlyByteBuf friendlyByteBuf) throws IOException {
-        friendlyByteBuf.writeUtf(source.typeHolder().unwrapKey().orElseThrow().location().getPath());
+        friendlyByteBuf.writeUtf(source.typeHolder().unwrapKey().orElseThrow().identifier().getPath());
 
         friendlyByteBuf.writeNullable(source.getEntity(), (byteBuf, causingEntity) -> {
             byteBuf.writeLong(causingEntity.getUUID().getMostSignificantBits());
@@ -39,9 +39,6 @@ public class DamageSourceSerializer {
             byteBuf.writeDouble(vec3.z);
         });
 
-        friendlyByteBuf.writeBoolean(source.isSweep());
-        friendlyByteBuf.writeBoolean(source.isMelting());
-        friendlyByteBuf.writeBoolean(source.isPoison());
         friendlyByteBuf.writeBoolean(source.isCritical());
     }
 
@@ -68,24 +65,12 @@ public class DamageSourceSerializer {
 
         Vec3 sourcePosition = friendlyByteBuf.readNullable(byteBuf -> new Vec3(byteBuf.readDouble(), byteBuf.readDouble(), byteBuf.readDouble()));
 
-        boolean sweep = friendlyByteBuf.readBoolean();
-        boolean melting = friendlyByteBuf.readBoolean();
-        boolean poison = friendlyByteBuf.readBoolean();
         boolean critical = friendlyByteBuf.readBoolean();
 
         ResourceKey<DamageType> resourceKey = ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.parse(msgId));
 
-        return createDamageSource(entity.damageSources().getDamageType(resourceKey), causingEntity, directEntity, sourcePosition, sweep, melting, poison, critical);
-    }
-
-    private static DamageSource createDamageSource(Holder<DamageType> damageType, Entity causingEntity, Entity directEntity, Vec3 sourcePosition, boolean sweep, boolean melting, boolean poison, boolean critical) {
-        DamageSource damageSource = new DamageSource(damageType, causingEntity, directEntity, sourcePosition);
-
-        if (sweep) damageSource.sweep();
-        if (melting) damageSource.melting();
-        if (poison) damageSource.poison();
+        DamageSource damageSource = new DamageSource(entity.registryAccess().lookupOrThrow(Registries.DAMAGE_TYPE).getOrThrow(resourceKey), directEntity, causingEntity, sourcePosition);
         if (critical) damageSource.critical();
-
         return damageSource;
     }
 

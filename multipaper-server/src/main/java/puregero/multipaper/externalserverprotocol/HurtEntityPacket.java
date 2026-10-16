@@ -105,13 +105,9 @@ public class HurtEntityPacket extends ExternalServerPacket {
                 Entity entityDamage = entityDamageUuid == null ? null : level.getEntity(entityDamageUuid);
                 Block blockDamage = blockDamagePos == null ? null : CraftBlock.at(level, blockDamagePos);
 
-                CraftEventFactory.entityDamage = entityDamage;
-                CraftEventFactory.blockDamage = blockDamage;
-
-                entity.hurt(source, amount);
-
-                CraftEventFactory.entityDamage = null;
-                CraftEventFactory.blockDamage = null;
+                if (entityDamage != null) source = source.eventEntityDamager(entityDamage);
+                if (blockDamagePos != null) source = source.eventBlockDamager(level, blockDamagePos);
+                entity.hurtServer(level, source, amount);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

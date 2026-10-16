@@ -118,7 +118,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
         if (MinecraftServer.getServer() != null) {
             for (ServerLevel level : MinecraftServer.getServer().getAllLevels()) {
-                level.chunkTaskScheduler.chunkHolderManager.getChunkHolders().forEach(chunkHolder -> {
+                ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolders().forEach(chunkHolder -> {
                     chunkHolder.externalSubscribers.clear();
                     channel.write(new SubscribeChunkMessage(level.getWorld().getName(), chunkHolder.chunkX, chunkHolder.chunkZ));
                     if (chunkHolder.getEntityChunk() != null) {
@@ -281,7 +281,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
             } else {
                 newChunkHolder.externalOwner = null;
             }
-            if (server != null && newChunkHolder.getCurrentChunk() != null && newChunkHolder.getCurrentChunk().getStatus() != ChunkStatus.FULL) {
+            if (server != null && newChunkHolder.getCurrentChunk() != null && newChunkHolder.getCurrentChunk().getPersistedStatus() != ChunkStatus.FULL) {
                 // A server has locked the chunk, which means their chunk must be full.
                 // Let's redownload their full copy
                 SendChunkPacket.forceChunkUnsafeUnload(message.world, message.cx, message.cz);
@@ -341,13 +341,13 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     @Override
     public void handle(ServerChangedChunkStatusMessage message) {
         ExternalServer server = getOrCreateServer(message.server);
-        ChunkStatus status = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(message.status));
+        ChunkStatus status = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(message.status)).map(net.minecraft.core.Holder.Reference::value).orElse(ChunkStatus.EMPTY);
 
         if (!server.isMe()) {
             NewChunkHolder holder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
             if (holder == null) {
                 LOGGER.warn("Received a chunk change status notification for an unloaded chunk " + message.world + ";" + message.cx + ";" + message.cz + " from " + server.getName());
-            } else if (holder.getCurrentChunk() != null && !holder.getCurrentChunk().getStatus().isOrAfter(status)) {
+            } else if (holder.getCurrentChunk() != null && !holder.getCurrentChunk().getPersistedStatus().isOrAfter(status)) {
                 SendChunkPacket.forceChunkUnsafeUnload(message.world, message.cx, message.cz);
             }
         }
@@ -390,14 +390,14 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
             }
         });
 
-        MCUtil.scheduleTask(2, () -> {
+        CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(() -> MultiPaper.runSync(() -> {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
             if (newChunkHolder != null) {
                 ChunkEntitySlices chunkEntities = newChunkHolder.getEntityChunk();
                 if (chunkEntities != null) {
                     // Send players' vehicles and passengers to the new subscriber
                     Set<Entity> rootVehiclesToSend = new HashSet<>();
-                    for (Entity entity : chunkEntities.entities) {
+                    for (Entity entity : chunkEntities.getRawEntities()) {
                         Entity controllingPassenger = MultiPaperEntitiesHandler.getControllingPassenger(entity.getRootVehicle());
                         if (MultiPaper.isRealPlayer(controllingPassenger) && controllingPassenger != entity) {
                             rootVehiclesToSend.add(entity.getRootVehicle());
@@ -406,7 +406,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
                     rootVehiclesToSend.forEach(entity -> EntityUpdateWithDependenciesPacket.sendVehicleAndPassengersPacketsRecursivelyToServers(entity, List.of(server)));
                 }
             }
-        });
+        }));
     }
 
     @Override

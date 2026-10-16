@@ -57,7 +57,7 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
         out.writeByte(this.slot);
 
         try {
-            out.writeByteArray(MultiPaper.nbtToBytes(this.MultiPaper.itemStackToNBT(itemStack)));
+            out.writeByteArray(MultiPaper.nbtToBytes(MultiPaper.itemStackToNBT(this.itemStack)));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -73,7 +73,7 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
 
             if (container == null) {
                 LOGGER.warn("Tried to take a " + this.itemStack + " in slot " + this.slot + " in a non-existent container at " + this.world + " " + this.source);
-            } else if (!ItemStack.isSameItemSameTags(this.itemStack, container.getItem(this.slot))) {
+            } else if (!ItemStack.isSameItemSameComponents(this.itemStack, container.getItem(this.slot))) {
                 LOGGER.warn("Tried to take a " + this.itemStack + " in slot " + this.slot + " from container at " + this.world + " " + this.source + ", but it is a " + container.getItem(this.slot));
             } else {
                 ItemStack origItemStack = container.getItem(this.slot);
@@ -82,9 +82,10 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
                 pulledItemStack.setCount(count);
                 origItemStack.setCount(origItemStack.getCount() - count);
 
-                HopperBlockEntity.ignoreTileUpdates = true;
+                boolean previousUpdating = puregero.multipaper.MultiPaperInventoryHandler.updatingInventory;
+                puregero.multipaper.MultiPaperInventoryHandler.updatingInventory = true;
                 container.setItem(this.slot, origItemStack);
-                HopperBlockEntity.ignoreTileUpdates = false;
+                puregero.multipaper.MultiPaperInventoryHandler.updatingInventory = previousUpdating;
                 container.setChanged();
 
                 connection.send(new AddItemToContainerPacket(level, this.destination, 0, pulledItemStack));

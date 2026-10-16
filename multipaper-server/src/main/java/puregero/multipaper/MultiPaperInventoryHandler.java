@@ -59,7 +59,7 @@ public class MultiPaperInventoryHandler {
             }
         } else if (packet instanceof ClientboundSetHeldSlotPacket setCarriedItemPacket) {
             // An external server is changing the selected item in the hotbar
-            player.getInventory().selected = setCarriedItemPacket.getSlot();
+            player.getInventory().setSelectedSlot(setCarriedItemPacket.slot());
         } else if (packet instanceof ClientboundSetExperiencePacket setExperiencePacket) {
             // An external server is changing the player's experience level
             player.experienceLevel = setExperiencePacket.getExperienceLevel();
@@ -67,13 +67,8 @@ public class MultiPaperInventoryHandler {
             player.totalExperience = setExperiencePacket.getTotalExperience();
         } else if (packet instanceof ClientboundPlayerPositionPacket playerPositionPacket) {
             // An external server is teleporting the player
-            double x = playerPositionPacket.getRelativeArguments().contains(Relative.X) ? player.getX() : 0.0D;
-            double y = playerPositionPacket.getRelativeArguments().contains(Relative.Y) ? player.getY() : 0.0D;
-            double z = playerPositionPacket.getRelativeArguments().contains(Relative.Z) ? player.getZ() : 0.0D;
-            float yaw = playerPositionPacket.getRelativeArguments().contains(Relative.Y_ROT) ? player.getYRot() : 0.0F;
-            float pitch = playerPositionPacket.getRelativeArguments().contains(Relative.X_ROT) ? player.getXRot() : 0.0F;
-            player.connection.teleport(x + playerPositionPacket.getX(), y + playerPositionPacket.getY(), z + playerPositionPacket.getZ(), yaw + playerPositionPacket.getYRot(), pitch + playerPositionPacket.getXRot(), playerPositionPacket.getRelativeArguments());
-            server.getConnection().send(new PlayerActionPacket(player, new ServerboundAcceptTeleportationPacket(playerPositionPacket.getId())));
+            player.connection.teleport(playerPositionPacket.change(), playerPositionPacket.relatives());
+            server.getConnection().send(new PlayerActionPacket(player, new ServerboundAcceptTeleportationPacket(playerPositionPacket.id(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot())));
             return true;
         }
 
@@ -84,8 +79,8 @@ public class MultiPaperInventoryHandler {
      * Returns true if the even should be cancelled
      */
     public static boolean handleInteractEvent(ServerPlayer player, ServerboundUseItemOnPacket packet) {
-        NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) player.level(), packet.getHitResult().getBlockPos());
-        ItemStack item = player.getItemInHand(packet.getHand());
+        NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) player.level(), packet.hitResult().getBlockPos());
+        ItemStack item = player.getItemInHand(packet.hand());
         if (MultiPaper.isChunkExternal(newChunkHolder) && !(item.getItem() instanceof BucketItem)) {
             newChunkHolder.externalOwner.getConnection().send(new PlayerActionPacket(player, packet));
             return true;
@@ -99,7 +94,7 @@ public class MultiPaperInventoryHandler {
      */
     public static boolean handleUseItemEvent(ServerPlayer player, ServerboundUseItemPacket packet) {
         NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) player.level(), player.blockPosition());
-        ItemStack item = player.getItemInHand(packet.getHand());
+        ItemStack item = player.getItemInHand(packet.hand());
         if (MultiPaper.isChunkExternal(newChunkHolder) && item.getItem() instanceof EnderEyeItem) {
             newChunkHolder.externalOwner.getConnection().send(new PlayerActionPacket(player, packet));
             return true;
@@ -190,7 +185,7 @@ public class MultiPaperInventoryHandler {
 
     private static void addItem(ItemStack itemStack, ServerPlayer player) {
         if (player.isDeadOrDying() || !player.getInventory().add(itemStack)) {
-            player.drop(itemStack, false);
+            player.drop(itemStack, false, net.minecraft.util.Prediction.SERVER_ONLY);
         }
     }
 
@@ -241,7 +236,7 @@ public class MultiPaperInventoryHandler {
                 LOGGER.info("{}: Removing {}x of {} from item entity at {}", player.getScoreboardName(), count, itemToRemove, entity.position());
                 entity.remove(Entity.RemovalReason.DISCARDED); // Remove the item entity to update the item inside
                 if (!item.isEmpty()) {
-                    entity.spawnAtLocation(item, 0); // Respawn it if it has items left
+            entity.spawnAtLocation((ServerLevel) entity.level(), item); // Respawn it if it has items left
                 }
             });
         }
@@ -251,7 +246,7 @@ public class MultiPaperInventoryHandler {
         if (itemToRemove.isEmpty()) return;
 
         ItemStack item = getter.get();
-        if (ItemStack.isSameItemSameTags(item, itemToRemove)) {
+        if (ItemStack.isSameItemSameComponents(item, itemToRemove)) {
             int itemCount = item.getCount();
             if (item.getCount() < itemToRemove.getCount()) {
                 item.setCount(0);
@@ -271,21 +266,11 @@ public class MultiPaperInventoryHandler {
         int leftDurability = left.getDamageValue();
         int rightDurability = right.getDamageValue();
 
-        if (left.getTag() != null && left.getTag().contains("Damage")) {
-            hasLeftDurability = true;
-            left.getTag().remove("Damage");
-        }
-        if (right.getTag() != null) {
-            hasRightDurability = true;
-            right.getTag().remove("Damage");
-        }
-
-        boolean result = ItemStack.isSameItemSameTags(left, right);
-
-        if (hasLeftDurability) left.getTag().putInt("Damage", leftDurability);
-        if (hasRightDurability) right.getTag().putInt("Damage", rightDurability);
-
-        return result;
+        ItemStack leftCopy = left.copy();
+        ItemStack rightCopy = right.copy();
+        leftCopy.setDamageValue(0);
+        rightCopy.setDamageValue(0);
+        return ItemStack.isSameItemSameComponents(leftCopy, rightCopy);
     }
 
     /**
@@ -323,14 +308,12 @@ public class MultiPaperInventoryHandler {
             ListTag items = new ListTag();
             for (int i = 0; i < inventoryComponent.size(); i++) {
                 if (inventoryComponent.dirty[i] || inventoryComponent.get(i).dirty) {
-                    CompoundTag item = new CompoundTag();
+                    CompoundTag item = MultiPaper.itemStackToNBT(inventoryComponent.get(i));
                     item.putInt("Slot", i);
-                    inventoryComponent.get(i).save(item);
                     items.add(item);
 
                     if (!MultiPaper.isRealPlayer(player)) {
-                        CompoundTag replacingItem = new CompoundTag();
-                        inventoryComponent.lastItems.get(i).save(replacingItem);
+                        CompoundTag replacingItem = MultiPaper.itemStackToNBT(inventoryComponent.lastItems.get(i));
                         item.put("Replacing", replacingItem);
                     }
 
@@ -357,9 +340,8 @@ public class MultiPaperInventoryHandler {
         }) {
             ListTag items = new ListTag();
             for (int i = 0; i < inventoryComponent.size(); i++) {
-                CompoundTag item = new CompoundTag();
+                CompoundTag item = MultiPaper.itemStackToNBT(inventoryComponent.get(i));
                 item.putInt("Slot", i);
-                inventoryComponent.get(i).save(item);
                 items.add(item);
             }
 
@@ -376,7 +358,7 @@ public class MultiPaperInventoryHandler {
 
         if (accepts != null) {
             accepts.removeIf(accept -> {
-               if (accept.id == packet.getId()) {
+               if (accept.id == packet.id()) {
                    accept.externalServer.getConnection().send(new PlayerActionPacket(player, packet));
                    return true;
                } else {

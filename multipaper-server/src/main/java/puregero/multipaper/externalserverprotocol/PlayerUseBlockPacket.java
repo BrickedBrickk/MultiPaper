@@ -49,7 +49,8 @@ public class PlayerUseBlockPacket extends ExternalServerPacket {
                 return;
             }
 
-            player.level().getBlockState(pos).use(player.level(), player, InteractionHand.MAIN_HAND, new BlockHitResult(new Vec3(pos.getX(), pos.getY(), pos.getZ()), Direction.NORTH, pos, false));
+            BlockHitResult hit = new BlockHitResult(new Vec3(pos.getX(), pos.getY(), pos.getZ()), Direction.NORTH, pos, false);
+            player.gameMode.useItemOn(player, player.level(), player.getItemInHand(InteractionHand.MAIN_HAND), InteractionHand.MAIN_HAND, hit);
         });
     }
 }

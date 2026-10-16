@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.zip.InflaterInputStream;
 
@@ -38,11 +39,11 @@ public class SendEntitiesPacket extends ExternalServerPacket {
     private final byte[] data;
 
     public SendEntitiesPacket(LevelChunk chunk) {
-        this(chunk.level, chunk.getPos(), null);
+        this((ServerLevel) chunk.getLevel(), chunk.getPos(), null);
     }
 
     public SendEntitiesPacket(LevelChunk chunk, ChunkEntitySlices chunkEntitySlices) {
-        this(chunk.level, chunk.getPos(), chunkEntitySlices);
+        this((ServerLevel) chunk.getLevel(), chunk.getPos(), chunkEntitySlices);
     }
 
     public SendEntitiesPacket(ServerLevel level, ChunkPos pos, ChunkEntitySlices chunkEntitySlices) {
@@ -64,18 +65,16 @@ public class SendEntitiesPacket extends ExternalServerPacket {
 
         CompoundTag entitiesRoot = new CompoundTag();
         ListTag entities = new ListTag();
-        for (Entity entity : chunkEntities.entities) {
+        for (Entity entity : chunkEntities.getRawEntities()) {
             if (MultiPaperEntitiesHandler.shouldSyncEntity(entity)) {
-                CompoundTag tag = new CompoundTag();
-                entity.isSyncing = true;
-                entity.save(tag);
-                entity.isSyncing = false;
-                entities.add(tag);
+                net.minecraft.world.level.storage.TagValueOutput output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING, entity.registryAccess());
+                entity.save(output);
+                entities.add(output.buildResult());
             } else if (foreachPlayer != null && entity instanceof ServerPlayer player && MultiPaper.isRealPlayer(player)) {
                 foreachPlayer.accept(player);
             }
         }
-        entitiesRoot.putInt("DataVersion", SharedConstants.getCurrentVersion().getDataVersion().getVersion());
+        entitiesRoot.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
         entitiesRoot.put("Entities", entities);
         entitiesRoot.put("Position", new IntArrayTag(new int[]{pos.x(), pos.z()}));
         return entitiesRoot;
@@ -132,13 +131,14 @@ public class SendEntitiesPacket extends ExternalServerPacket {
                 ChunkPos pos = new ChunkPos(cx, cz);
                 ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
                 // Check that we have these entities loaded in the first place
-                if (((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().isChunkLoaded(pos)) {
+                if (((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getChunk(cx, cz) != null) {
                     CompoundTag tag = MultiPaper.nbtFromBytes(data);
-                    ListTag entities = tag == null ? new ListTag() : tag.getList("Entities", Tag.TAG_COMPOUND);
+                    ListTag entities = tag == null ? new ListTag() : tag.getListOrEmpty("Entities");
                     MultiPaper.runSync(() -> {
-                        for (Tag entityTag : entities) {
-                            CompoundTag entityTagCompound = (CompoundTag) entityTag;
-                            EntityUpdateNBTPacket.loadEntity(level, entityTagCompound, entityTagCompound.getUUID("UUID"));
+                        for (int i = 0; i < entities.size(); i++) {
+                            CompoundTag entityTagCompound = entities.getCompoundOrEmpty(i);
+                            UUID uuid = entityTagCompound.read("UUID", net.minecraft.core.UUIDUtil.CODEC).orElse(new UUID(0L, 0L));
+                            EntityUpdateNBTPacket.loadEntity(level, entityTagCompound, uuid);
                         }
                     });
                 }

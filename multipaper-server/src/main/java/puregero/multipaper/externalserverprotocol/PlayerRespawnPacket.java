@@ -80,7 +80,8 @@ public class PlayerRespawnPacket extends ExternalServerPacket {
             ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
             ServerPlayer player = MinecraftServer.getServer().getPlayerList().getPlayer(uuid);
 
-            level.getServer().getPlayerList().respawn(player, level, alive, new Location(level.getWorld(), x, y, z, yaw, pitch), avoidSuffocation, PlayerRespawnEvent.RespawnReason.DEATH, respawnFlags);
+            player.setServerLevel(level);
+            player.snapTo(x, y, z, yaw, pitch);
         });
     }
 }

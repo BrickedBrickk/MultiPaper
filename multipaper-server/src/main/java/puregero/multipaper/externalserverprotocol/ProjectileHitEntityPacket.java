@@ -69,7 +69,7 @@ public class ProjectileHitEntityPacket extends ExternalServerPacket {
                     return;
                 }
 
-                projectile.onHit0(new EntityHitResult(entity, location));
+                projectile.multiPaperOnHit(new EntityHitResult(entity, location));
             }
         });
     }

@@ -1,12 +1,9 @@
 package puregero.multipaper.externalserverprotocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ServerGamePacketListener;
+import net.minecraft.network.protocol.game.ServerboundAttackPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -37,10 +34,8 @@ public class PlayerActionOnEntityPacket extends ExternalServerPacket {
         this.uuid = in.readUUID();
         this.entityUuid = in.readUUID();
 
-        ByteBuf buf = Unpooled.wrappedBuffer(in.readByteArray());
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        int packetId = friendlyByteBuf.readVarInt();
-        action = (Packet<ServerGamePacketListener>) ConnectionProtocol.PLAY.createPacket(PacketFlow.SERVERBOUND, packetId, friendlyByteBuf);
+        boolean attack = in.readBoolean();
+        action = attack ? ServerboundAttackPacket.STREAM_CODEC.decode(in) : ServerboundInteractPacket.STREAM_CODEC.decode(in);
     }
 
     @Override
@@ -48,13 +43,15 @@ public class PlayerActionOnEntityPacket extends ExternalServerPacket {
         out.writeUUID(uuid);
         out.writeUUID(entityUuid);
 
-        ConnectionProtocol protocol = ConnectionProtocol.getProtocolForPacket(action);
-        Integer id = protocol.getPacketId(PacketFlow.SERVERBOUND, action);
-        ByteBuf buf = Unpooled.buffer();
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        friendlyByteBuf.writeVarInt(id);
-        action.write(friendlyByteBuf);
-        out.writeByteArray(buf.array());
+        boolean attack = action instanceof ServerboundAttackPacket;
+        out.writeBoolean(attack);
+        if (attack) {
+            ServerboundAttackPacket.STREAM_CODEC.encode(out, (ServerboundAttackPacket) action);
+        } else if (action instanceof ServerboundInteractPacket interact) {
+            ServerboundInteractPacket.STREAM_CODEC.encode(out, interact);
+        } else {
+            throw new IllegalArgumentException("Unsupported entity action packet " + action.getClass().getName());
+        }
     }
 
     @Override
@@ -67,7 +64,7 @@ public class PlayerActionOnEntityPacket extends ExternalServerPacket {
                 return;
             }
 
-            Entity entity = ((ServerLevel) player.level()).getEntityOrPart(entityUuid); // MultiPaper
+            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) player.level()).moonrise$getEntityLookup().get(entityUuid); // MultiPaper
 
             if (entity == null) {
                 LOGGER.warn(player.getScoreboardName() + " tried to run an action on a non-existent entity with uuid " + entityUuid);
@@ -78,7 +75,9 @@ public class PlayerActionOnEntityPacket extends ExternalServerPacket {
 
             // Refactor the entity id
             if (action instanceof ServerboundInteractPacket serverboundInteractPacket) {
-                newPacket = new ServerboundInteractPacket(entity.getId(), serverboundInteractPacket.isUsingSecondaryAction(), serverboundInteractPacket.getAction());
+                newPacket = new ServerboundInteractPacket(entity.getId(), serverboundInteractPacket.hand(), serverboundInteractPacket.location(), serverboundInteractPacket.usingSecondaryAction());
+            } else if (action instanceof ServerboundAttackPacket) {
+                newPacket = new ServerboundAttackPacket(entity.getId());
             } else {
                 LOGGER.error("Unhandled action on entity " + action);
                 return;

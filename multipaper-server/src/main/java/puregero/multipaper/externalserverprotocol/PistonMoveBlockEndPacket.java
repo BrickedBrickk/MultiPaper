@@ -39,8 +39,8 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         LevelChunk chunk = level.getChunkIfLoaded(to);
 
         if (!MultiPaper.isChunkExternal(chunk)) {
-            if (level.getBlockEntity(to) instanceof PistonMovingBlockEntity pistonMovingBlockEntity && pistonMovingBlockEntity.movedState.is(Blocks.AIR)) {
-                pistonMovingBlockEntity.movedState = blockState;
+            if (level.getBlockEntity(to) instanceof PistonMovingBlockEntity pistonMovingBlockEntity && pistonMovingBlockEntity.getMovedState().is(Blocks.AIR)) {
+                pistonMovingBlockEntity.setMovedState(blockState);
             } else if (level.getBlockState(to).is(Blocks.AIR) || level.getBlockState(to).is(Blocks.PISTON_HEAD)) {
                 BlockState movingPiston = Blocks.MOVING_PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, pistonDir);
                 MultiPaperChunkHandler.blockUpdateChunk = chunk; // Don't call onRemove on the piston head
@@ -58,16 +58,14 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
             }
             level.getChunkSource().blockChanged(to);
 
-            if (isExternal) {
-                chunk.playerChunk.broadcastChangesToOtherServers(chunk);
-            }
+            if (isExternal) broadcastBlockUpdate(level, to);
             return;
         }
 
         // Ensure any changes have already been sent over before the server executes the piston move
-        chunk.playerChunk.broadcastChangesToOtherServers(chunk);
+        broadcastBlockUpdate(level, to);
 
-        chunk.getChunkHolder().externalOwner.getConnection().send(new PistonMoveBlockEndPacket(level, from, to, pistonDir, retract, blockState));
+        MultiPaper.getChunkHolder(chunk).externalOwner.getConnection().send(new PistonMoveBlockEndPacket(level, from, to, pistonDir, retract, blockState));
     }
 
     private final UUID worldUUID;
@@ -92,7 +90,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         this.to = in.readBlockPos();
         this.pistonDir = in.readEnum(Direction.class);
         this.retract = in.readBoolean();
-        this.blockState = in.readById(Block.BLOCK_STATE_REGISTRY);
+        this.blockState = Block.stateById(in.readVarInt());
     }
 
     @Override
@@ -102,7 +100,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         out.writeBlockPos(this.to);
         out.writeEnum(this.pistonDir);
         out.writeBoolean(this.retract);
-        out.writeId(Block.BLOCK_STATE_REGISTRY, this.blockState);
+        out.writeVarInt(Block.getId(this.blockState));
     }
 
     @Override
@@ -117,5 +115,12 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
 
             finishBlockMove(craftWorld.getHandle(), from, to, pistonDir, retract, blockState, true);
         });
+    }
+
+    private static void broadcastBlockUpdate(ServerLevel level, BlockPos pos) {
+        puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(
+            MultiPaper.getChunkHolder(level, pos),
+            new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(pos, level.getBlockState(pos))
+        );
     }
 }

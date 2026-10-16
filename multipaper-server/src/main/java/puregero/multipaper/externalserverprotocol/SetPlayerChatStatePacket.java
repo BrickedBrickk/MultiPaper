@@ -25,13 +25,13 @@ public class SetPlayerChatStatePacket extends ExternalServerPacket {
 
     public SetPlayerChatStatePacket(FriendlyByteBuf in) {
         this.uuid = in.readUUID();
-        this.chatSession = in.readNullable(RemoteChatSession.Data::read);
+        this.chatSession = in.readNullable(RemoteChatSession.Data.STREAM_CODEC);
     }
 
     @Override
     public void write(FriendlyByteBuf out) {
         out.writeUUID(this.uuid);
-        out.writeNullable(chatSession, RemoteChatSession.Data::write);
+        out.writeNullable(chatSession, RemoteChatSession.Data.STREAM_CODEC);
     }
 
     @Override

@@ -1,6 +1,9 @@
 package puregero.multipaper.externalserverprotocol;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
+import com.google.common.collect.HashMultimap;
 import ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -62,8 +65,8 @@ public class PlayerCreatePacket extends ExternalServerPacket {
         this.ip = ((InetSocketAddress) player.connection.connection.address).getAddress().getAddress();
         this.port = (short) ((InetSocketAddress) player.connection.connection.address).getPort();
         this.saveData = saveData;
-        this.advancements = player.getAdvancements().generateJson().toString();
-        this.stats = player.getStats().toJson();
+        this.advancements = player.getAdvancements().toJson();
+        this.stats = player.getStats().toJson().toString();
         this.data = player.getBukkitEntity().data;
         this.persistentData = player.getBukkitEntity().persistentData;
         this.entityId = player.getId();
@@ -71,7 +74,7 @@ public class PlayerCreatePacket extends ExternalServerPacket {
 
     public PlayerCreatePacket(FriendlyByteBuf in) {
         in.maxNbtSize = Long.MAX_VALUE; // Allow unlimited NBT size
-        gameProfile = in.readGameProfile();
+        gameProfile = readGameProfile(in);
         world = in.readUtf();
         x = in.readDouble();
         y = in.readDouble();
@@ -103,7 +106,7 @@ public class PlayerCreatePacket extends ExternalServerPacket {
 
     @Override
     public void write(FriendlyByteBuf out) {
-        out.writeGameProfile(gameProfile);
+        writeGameProfile(out, gameProfile);
         out.writeUtf(world);
         out.writeDouble(x);
         out.writeDouble(y);
@@ -137,11 +140,11 @@ public class PlayerCreatePacket extends ExternalServerPacket {
 
     @Override
     public void handle(ExternalServerConnection connection) {
-        LOGGER.info("Adding player " + gameProfile.getName() + " (" + gameProfile.id() + ")");
+        LOGGER.info("Adding player " + gameProfile.name() + " (" + gameProfile.id() + ")");
         MultiPaper.runSync(() -> {
             ServerPlayer existingPlayer = MinecraftServer.getServer().getPlayerList().getPlayer(gameProfile.id());
             if (existingPlayer != null) {
-                LOGGER.warn("Trying to add external player " + gameProfile.getName() + " (" + gameProfile.id() + "), but they're already online as a " + existingPlayer.getClass().getSimpleName() + ", kicking them");
+                LOGGER.warn("Trying to add external player " + gameProfile.name() + " (" + gameProfile.id() + "), but they're already online as a " + existingPlayer.getClass().getSimpleName() + ", kicking them");
                 existingPlayer.connection.disconnect(PlayerRemovePacket.LOGGED_IN_FROM_ANOTHER_LOCATION, PlayerKickEvent.Cause.DUPLICATE_LOGIN);
             }
 
@@ -153,9 +156,9 @@ public class PlayerCreatePacket extends ExternalServerPacket {
             }
 
             ExternalPlayer player = ExternalPlayer.create(connection, gameProfile, world, x, y, z, yaw, pitch, gamemode, address, saveData, advancements, stats, entityId);
-            player.getBukkitEntity().data = data;
-            player.getBukkitEntity().persistentData = persistentData;
-            PlayerJoinExternalServerEvent playerJoinExternalServerEvent = new PlayerJoinExternalServerEvent(gameProfile.id(), gameProfile.getName(), MultiPaperConfiguration.get().masterConnection.myName);
+            player.getBukkitEntity().data.putAll(data);
+            player.getBukkitEntity().persistentData.putAll(persistentData);
+            PlayerJoinExternalServerEvent playerJoinExternalServerEvent = new PlayerJoinExternalServerEvent(gameProfile.id(), gameProfile.name(), MultiPaperConfiguration.get().masterConnection.myName);
             Bukkit.getPluginManager().callEvent(playerJoinExternalServerEvent);
         });
     }
@@ -172,27 +175,18 @@ public class PlayerCreatePacket extends ExternalServerPacket {
             return;
         }
 
-        send(new PlayerCreatePacket(player, player.saveWithoutId(new CompoundTag())), connections);
-        send(new PlayerActionPacket(player, new ServerboundSetCarriedItemPacket(player.getInventory().selected)), connections);
-        send(new EntityUpdatePacket(player, new ClientboundSetEntityDataPacket(player.getId(), player.getEntityData().getAll())), connections);
+        net.minecraft.world.level.storage.TagValueOutput output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING, player.registryAccess());
+        player.saveWithoutId(output);
+        send(new PlayerCreatePacket(player, output.buildResult()), connections);
+        send(new PlayerActionPacket(player, new ServerboundSetCarriedItemPacket(player.getInventory().getSelectedSlot())), connections);
+        send(new EntityUpdatePacket(player, new ClientboundSetEntityDataPacket(player.getId(), player.getEntityData().packAll())), connections);
         send(new PlayerFoodUpdatePacket(player), connections);
         send(new PlayerListNameUpdatePacket(player), connections);
         send(new PlayerSetRespawnPosition(player), connections);
 
-        send(new EntityUpdatePacket(player, new ClientboundSetEntityDataPacket(player.getId(), player.getEntityData().getAll())), connections);
+        send(new EntityUpdatePacket(player, new ClientboundSetEntityDataPacket(player.getId(), player.getEntityData().packAll())), connections);
 
-        if (player.clientViewDistance != null) {
-            send(new PlayerActionPacket(player, new ServerboundClientInformationPacket(
-                    player.locale,
-                    player.clientViewDistance,
-                    player.getChatVisibility(),
-                    player.canChatInColor(),
-                    player.getEntityData().get(ServerPlayer.DATA_PLAYER_MODE_CUSTOMISATION),
-                    player.getEntityData().get(ServerPlayer.DATA_PLAYER_MAIN_HAND) == 0 ? HumanoidArm.LEFT : HumanoidArm.RIGHT,
-                    player.isTextFilteringEnabled(),
-                    player.allowsListing()
-            )), connections);
-        }
+        send(new PlayerActionPacket(player, new ServerboundClientInformationPacket(player.clientInformation())), connections);
 
         if (player.isPassenger() || player.isVehicle()) {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(player.getRootVehicle());
@@ -200,6 +194,33 @@ public class PlayerCreatePacket extends ExternalServerPacket {
                 List<ExternalServer> subscribedServers = Arrays.stream(connections).filter(e -> newChunkHolder.externalEntitiesSubscribers.contains(e.externalServer)).map(connection -> connection.externalServer).toList();
                 EntityUpdateWithDependenciesPacket.sendVehicleAndPassengersPacketsRecursivelyToServers(player.getRootVehicle(), subscribedServers);
             }
+        }
+    }
+
+    private static GameProfile readGameProfile(FriendlyByteBuf in) {
+        java.util.UUID id = in.readUUID();
+        String name = in.readUtf();
+        int count = in.readVarInt();
+        var properties = HashMultimap.<String, Property>create();
+        for (int i = 0; i < count; i++) {
+            String key = in.readUtf();
+            String value = in.readUtf();
+            properties.put(key, in.readBoolean() ? new Property(key, value, in.readUtf()) : new Property(key, value));
+        }
+        return new GameProfile(id, name, new PropertyMap(properties));
+    }
+
+    private static void writeGameProfile(FriendlyByteBuf out, GameProfile profile) {
+        out.writeUUID(profile.id());
+        out.writeUtf(profile.name());
+        var properties = profile.properties().entries();
+        out.writeVarInt(properties.size());
+        for (var entry : properties) {
+            Property property = entry.getValue();
+            out.writeUtf(entry.getKey());
+            out.writeUtf(property.value());
+            out.writeBoolean(property.hasSignature());
+            if (property.hasSignature()) out.writeUtf(property.signature());
         }
     }
 }

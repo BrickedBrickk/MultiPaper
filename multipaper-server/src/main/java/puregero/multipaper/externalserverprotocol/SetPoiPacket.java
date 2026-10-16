@@ -78,11 +78,10 @@ public class SetPoiPacket extends ExternalServerPacket {
             if (world instanceof CraftWorld craftWorld) {
                 PoiManager poiManager = craftWorld.getHandle().getPoiManager();
                 this.optionalKey.ifPresentOrElse(key -> {
-                    PoiSection poiSection = poiManager.getOrCreate(SectionPos.asLong(pos));
-                    PoiRecord record = poiSection.getPoiRecord(pos).orElse(null);
+                    PoiRecord record = poiManager.get(SectionPos.asLong(pos)).flatMap(poiSection -> poiSection.getPoiRecord(pos)).orElse(null);
                     if (record == null || !record.getPoiType().is(key)) {
-                        poiManager.add(this.pos, BuiltInRegistries.POINT_OF_INTEREST_TYPE.getHolderOrThrow(key));
-                        record = poiSection.getPoiRecord(pos).orElse(null);
+                        if (record != null) poiManager.remove(this.pos);
+                        record = poiManager.add(this.pos, BuiltInRegistries.POINT_OF_INTEREST_TYPE.get(key).orElseThrow());
                     }
                     if (record != null) {
                         record.setFreeTickets(freeTickets);

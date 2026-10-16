@@ -1,8 +1,9 @@
 package puregero.multipaper.externalserverprotocol;
 
+import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.ProtoChunkTicks;
+import net.minecraft.world.ticks.SavedTick;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
@@ -25,6 +27,8 @@ import java.io.IOException;
 public class SendTickListPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(SendTickListPacket.class.getSimpleName());
+    private static final Codec<java.util.List<SavedTick<Block>>> BLOCK_TICKS_CODEC = SavedTick.codec(BuiltInRegistries.BLOCK.byNameCodec()).listOf();
+    private static final Codec<java.util.List<SavedTick<Fluid>>> FLUID_TICKS_CODEC = SavedTick.codec(BuiltInRegistries.FLUID.byNameCodec()).listOf();
 
     private final String world;
     private final int cx;
@@ -32,13 +36,14 @@ public class SendTickListPacket extends ExternalServerPacket {
     private final CompoundTag tag;
 
     public SendTickListPacket(LevelChunk chunk) {
-        this.world = chunk.level.getServer().storageSource.getLevelId();
-        this.cx = chunk.locX;
-        this.cz = chunk.locZ;
+        ServerLevel level = (ServerLevel) chunk.getLevel();
+        this.world = level.getServer().storageSource.getLevelId();
+        this.cx = chunk.getPos().x();
+        this.cz = chunk.getPos().z();
 
         tag = new CompoundTag();
-        tag.put("block_ticks", chunk.blockTicks.save(chunk.level.getLevelData().getGameTime(), (block) -> BuiltInRegistries.BLOCK.getKey(block).toString()));
-        tag.put("fluid_ticks", chunk.fluidTicks.save(chunk.level.getLevelData().getGameTime(), (fluidtype) -> BuiltInRegistries.FLUID.getKey(fluidtype).toString()));
+        tag.put("block_ticks", BLOCK_TICKS_CODEC.encodeStart(NbtOps.INSTANCE, chunk.blockTicks.pack(level.getGameTime())).getOrThrow());
+        tag.put("fluid_ticks", FLUID_TICKS_CODEC.encodeStart(NbtOps.INSTANCE, chunk.fluidTicks.pack(level.getGameTime())).getOrThrow());
     }
 
     public SendTickListPacket(FriendlyByteBuf in) {
@@ -75,31 +80,21 @@ public class SendTickListPacket extends ExternalServerPacket {
             CraftWorld bukkitWorld = ((CraftWorld) Bukkit.getWorld(world));
             ServerLevel level = bukkitWorld != null ? bukkitWorld.getHandle() : null;
             ChunkAccess chunk = MultiPaper.getChunkAccess(world, cx, cz);
+            java.util.List<SavedTick<Block>> blockList = BLOCK_TICKS_CODEC.parse(NbtOps.INSTANCE, tag.get("block_ticks")).getOrThrow();
+            java.util.List<SavedTick<Fluid>> fluidList = FLUID_TICKS_CODEC.parse(NbtOps.INSTANCE, tag.get("fluid_ticks")).getOrThrow();
+            long now = level == null ? 0L : level.getGameTime();
             if (level != null && level.getChunkIfLoaded(cx, cz) != null) {
-                long now = level.getLevelData().getGameTime();
-
-                LevelChunkTicks<Block> blockTicks = LevelChunkTicks.load(tag.getList("block_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.BLOCK.getOptional(Identifier.tryParse(s)), chunk.getPos());
-                blockTicks.unpack(now);
-                blockTicks.removeIf(scheduled -> {
-                    level.getBlockTicks().schedule(scheduled);
-                    return true;
-                });
-
-                LevelChunkTicks<Fluid> fluidTicks = LevelChunkTicks.load(tag.getList("fluid_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.FLUID.getOptional(Identifier.tryParse(s)), chunk.getPos());
-                fluidTicks.unpack(now);
-                fluidTicks.removeIf(scheduled -> {
-                    level.getFluidTicks().schedule(scheduled);
-                    return true;
-                });
+                long subTick = 0L;
+                for (SavedTick<Block> tick : blockList) level.getBlockTicks().schedule(tick.unpack(now, subTick++));
+                subTick = 0L;
+                for (SavedTick<Fluid> tick : fluidList) level.getFluidTicks().schedule(tick.unpack(now, subTick++));
             } else if (chunk instanceof LevelChunk levelChunk) {
-                levelChunk.unregisterTickContainerFromLevel(level);
-                levelChunk.blockTicks = LevelChunkTicks.load(tag.getList("block_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.BLOCK.getOptional(Identifier.tryParse(s)), chunk.getPos());
-                levelChunk.fluidTicks = LevelChunkTicks.load(tag.getList("fluid_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.FLUID.getOptional(Identifier.tryParse(s)), chunk.getPos());
-                levelChunk.unpackTicks(level.getLevelData().getGameTime());
-                if (levelChunk.loaded) levelChunk.registerTickContainerInLevel(level);
+                levelChunk.blockTicks = new LevelChunkTicks<>(blockList);
+                levelChunk.fluidTicks = new LevelChunkTicks<>(fluidList);
+                levelChunk.unpackTicks(now);
             } else if (chunk instanceof ProtoChunk protoChunk) {
-                protoChunk.blockTicks = ProtoChunkTicks.load(tag.getList("block_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.BLOCK.getOptional(Identifier.tryParse(s)), chunk.getPos());
-                protoChunk.fluidTicks = ProtoChunkTicks.load(tag.getList("fluid_ticks", Tag.TAG_COMPOUND), s -> BuiltInRegistries.FLUID.getOptional(Identifier.tryParse(s)), chunk.getPos());
+                protoChunk.blockTicks = ProtoChunkTicks.load(blockList);
+                protoChunk.fluidTicks = ProtoChunkTicks.load(fluidList);
             } else {
                 LOGGER.warn("Received tick lists for an unloaded chunk " + world + "," + cx + "," + cz);
             }

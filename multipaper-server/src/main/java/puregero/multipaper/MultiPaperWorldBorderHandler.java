@@ -17,35 +17,35 @@ public class MultiPaperWorldBorderHandler implements BorderChangeListener {
     public static boolean updatingWorldBorder = false;
 
     @Override
-    public void onBorderSizeSet(@NotNull WorldBorder border, double size) {
+    public void onSetSize(WorldBorder border, double size) {
         onWorldBorderChange(border, new ClientboundSetBorderSizePacket(border));
     }
 
     @Override
-    public void onBorderSizeLerping(@NotNull WorldBorder border, double fromSize, double toSize, long time) {
+    public void onLerpSize(WorldBorder border, double fromSize, double toSize, long time, long gameTime) {
         onWorldBorderChange(border, new ClientboundSetBorderLerpSizePacket(border));
     }
 
     @Override
-    public void onBorderCenterSet(@NotNull WorldBorder border, double centerX, double centerZ) {
+    public void onSetCenter(WorldBorder border, double centerX, double centerZ) {
         onWorldBorderChange(border, new ClientboundSetBorderCenterPacket(border));
     }
 
     @Override
-    public void onBorderSetWarningTime(@NotNull WorldBorder border, int warningTime) {
+    public void onSetWarningTime(WorldBorder border, int warningTime) {
         onWorldBorderChange(border, new ClientboundSetBorderWarningDelayPacket(border));
     }
 
     @Override
-    public void onBorderSetWarningBlocks(@NotNull WorldBorder border, int warningBlockDistance) {
+    public void onSetWarningBlocks(WorldBorder border, int warningBlockDistance) {
         onWorldBorderChange(border, new ClientboundSetBorderWarningDistancePacket(border));
     }
 
     @Override
-    public void onBorderSetDamagePerBlock(@NotNull WorldBorder border, double damagePerBlock) {}
+    public void onSetDamagePerBlock(WorldBorder border, double damagePerBlock) {}
 
     @Override
-    public void onBorderSetDamageSafeZOne(@NotNull WorldBorder border, double safeZoneRadius) {}
+    public void onSetSafeZone(WorldBorder border, double safeZoneRadius) {}
 
     private void onWorldBorderChange(WorldBorder border, Packet<?> packet) {
         if (!updatingWorldBorder && border.world != null && border.world.getWorldBorder() == border) {
@@ -64,7 +64,7 @@ public class MultiPaperWorldBorderHandler implements BorderChangeListener {
         if (packet instanceof ClientboundSetBorderSizePacket setBorderSizePacket) {
             level.getWorldBorder().setSize(setBorderSizePacket.getSize());
         } else if (packet instanceof ClientboundSetBorderLerpSizePacket setBorderLerpSizePacket) {
-            level.getWorldBorder().lerpSizeBetween(setBorderLerpSizePacket.getOldSize(), setBorderLerpSizePacket.getNewSize(), setBorderLerpSizePacket.getLerpTime());
+            level.getWorldBorder().lerpSizeBetween(setBorderLerpSizePacket.getOldSize(), setBorderLerpSizePacket.getNewSize(), setBorderLerpSizePacket.getLerpTime(), level.getGameTime());
         } else if (packet instanceof ClientboundSetBorderCenterPacket setBorderCenterPacket) {
             level.getWorldBorder().setCenter(setBorderCenterPacket.getNewCenterX(), setBorderCenterPacket.getNewCenterZ());
         } else if (packet instanceof ClientboundSetBorderWarningDelayPacket setBorderWarningDelayPacket) {

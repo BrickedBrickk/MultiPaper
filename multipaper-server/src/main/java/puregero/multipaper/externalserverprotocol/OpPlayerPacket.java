@@ -65,7 +65,11 @@ public class OpPlayerPacket extends ExternalServerPacket {
             if (player != null) {
                 player.setOp(true);
             } else {
-                MinecraftServer.getServer().getPlayerList().getOps().add(new ServerOpListEntry(new GameProfile(uuid, name), level, bypassPlayerLimit));
+                MinecraftServer.getServer().getPlayerList().getOps().add(new ServerOpListEntry(
+                    new net.minecraft.server.players.NameAndId(uuid, name),
+                    net.minecraft.server.permissions.LevelBasedPermissionSet.forLevel(net.minecraft.server.permissions.PermissionLevel.byId(level)),
+                    bypassPlayerLimit
+                ));
             }
             handlingPacket = false;
         });

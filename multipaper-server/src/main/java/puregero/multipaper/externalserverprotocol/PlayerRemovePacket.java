@@ -47,7 +47,7 @@ public class PlayerRemovePacket extends ExternalServerPacket {
             }
 
             player.connection.disconnect(EXTERNAL_DISCONNECT_COMPONENT, PlayerKickEvent.Cause.TIMEOUT);
-            PlayerLeaveExternalServerEvent playerLeaveExternalServerEvent = new PlayerLeaveExternalServerEvent(player.getGameProfile().getId(), player.getGameProfile().getName(), MultiPaperConfiguration.get().masterConnection.myName);
+            PlayerLeaveExternalServerEvent playerLeaveExternalServerEvent = new PlayerLeaveExternalServerEvent(player.getGameProfile().id(), player.getGameProfile().name(), MultiPaperConfiguration.get().masterConnection.myName);
             Bukkit.getPluginManager().callEvent(playerLeaveExternalServerEvent);
         });
     }

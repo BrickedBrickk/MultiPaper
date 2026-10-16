@@ -40,12 +40,12 @@ public class PlayerStatsIncreasePacket extends ExternalServerPacket {
         uuid = in.readUUID();
 
         int length = in.readInt();
-        this.stats = MultiPaperStatHandler.hashMapPool.acquire();
+        this.stats = new HashMap<>();
         for (int i = 0; i < length; i++) {
             String type = in.readUtf();
             String subtype = in.readUtf();
 
-            StatType<?> statType = BuiltInRegistries.STAT_TYPE.get(Identifier.parse(type));
+            StatType<?> statType = BuiltInRegistries.STAT_TYPE.getOptional(Identifier.parse(type)).orElseThrow();
             Stat<?> stat = getStat(statType, subtype);
 
             stats.put(stat, in.readInt());
@@ -55,12 +55,12 @@ public class PlayerStatsIncreasePacket extends ExternalServerPacket {
     private static <T> Stat<T> getStat(StatType<T> type, String subtype) {
         Identifier subtypeLocation = Identifier.parse(subtype);
         Registry<T> typeRegistry = type.getRegistry();
-        return type.get(typeRegistry.get(subtypeLocation));
+        return type.get(typeRegistry.getOptional(subtypeLocation).orElseThrow());
     }
 
     private static <T> Identifier getStatLocation(Stat<T> stat) {
         Registry<T> typeRegistry = stat.getType().getRegistry();
-        return typeRegistry.getKey(stat.getValue());
+        return typeRegistry.getResourceKey(stat.getValue()).orElseThrow().identifier();
     }
 
     @Override
@@ -77,7 +77,7 @@ public class PlayerStatsIncreasePacket extends ExternalServerPacket {
         out.writeInt(entries.size());
 
         for (Map.Entry<Stat<?>, Integer> entry : entries) {
-            out.writeUtf(BuiltInRegistries.STAT_TYPE.getKey(entry.getKey().getType()).toString());
+            out.writeUtf(BuiltInRegistries.STAT_TYPE.getResourceKey(entry.getKey().getType()).orElseThrow().identifier().toString());
             out.writeUtf(getStatLocation(entry.getKey()).toString());
             out.writeInt(entry.getValue());
         }
@@ -96,7 +96,6 @@ public class PlayerStatsIncreasePacket extends ExternalServerPacket {
             }
 
             stats.clear();
-            MultiPaperStatHandler.hashMapPool.release(stats);
         });
     }
 

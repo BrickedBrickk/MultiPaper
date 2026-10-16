@@ -47,18 +47,16 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
                 level.getChunkSource().blockChanged(from);
             }
 
-            if (isExternal) {
-                fromChunk.playerChunk.broadcastChangesToOtherServers(fromChunk);
-            }
+            if (isExternal) broadcastBlockUpdate(level, from);
 
             return;
         }
 
         // Ensure any changes have already been sent over before the server executes the piston move
-        fromChunk.playerChunk.broadcastChangesToOtherServers(fromChunk);
-        toChunk.playerChunk.broadcastChangesToOtherServers(toChunk);
+        broadcastBlockUpdate(level, from);
+        broadcastBlockUpdate(level, to);
 
-        fromChunk.getChunkHolder().externalOwner.getConnection().send(new PistonMoveBlockStartPacket(level, from, to, pistonDir, retract));
+        MultiPaper.getChunkHolder(fromChunk).externalOwner.getConnection().send(new PistonMoveBlockStartPacket(level, from, to, pistonDir, retract));
     }
 
     private final UUID worldUUID;
@@ -104,5 +102,12 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
 
             startBlockMove(craftWorld.getHandle(), from, to, pistonDir, retract, true);
         });
+    }
+
+    private static void broadcastBlockUpdate(ServerLevel level, BlockPos pos) {
+        puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(
+            MultiPaper.getChunkHolder(level, pos),
+            new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(pos, level.getBlockState(pos))
+        );
     }
 }

@@ -28,6 +28,6 @@ public class PluginNotificationPacket extends ExternalServerPacket {
 
     @Override
     public void handle(ExternalServerConnection connection) {
-        MultiPaper.runSync(() -> ((CraftServer) Bukkit.getServer()).getMultiPaperNotificationManager().onNotification(connection, channel, data));
+        MultiPaper.runSync(() -> ((puregero.multipaper.CraftMultiPaperNotificationManager) ((CraftServer) Bukkit.getServer()).getMultiPaperNotificationManager()).onNotification(connection, channel, data));
     }
 }

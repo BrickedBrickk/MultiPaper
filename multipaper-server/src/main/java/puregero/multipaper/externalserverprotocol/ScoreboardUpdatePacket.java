@@ -1,11 +1,7 @@
 package puregero.multipaper.externalserverprotocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerScoreboard;
@@ -18,6 +14,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
+import puregero.multipaper.PacketSerialization;
 
 import javax.annotation.Nullable;
 
@@ -49,11 +46,7 @@ public class ScoreboardUpdatePacket extends ExternalServerPacket {
         String criteria = in.readUtf();
         this.criteria = criteria.isEmpty() ? null : criteria;
 
-        byte[] bytes = in.readByteArray();
-        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        int packetId = friendlyByteBuf.readVarInt();
-        packet = ConnectionProtocol.PLAY.createPacket(PacketFlow.CLIENTBOUND, packetId, friendlyByteBuf);
+        packet = PacketSerialization.readClientbound(in.readByteArray());
     }
 
     @Override
@@ -62,13 +55,7 @@ public class ScoreboardUpdatePacket extends ExternalServerPacket {
 
         out.writeUtf(criteria == null ? "" : criteria);
 
-        ConnectionProtocol protocol = ConnectionProtocol.getProtocolForPacket(packet);
-        Integer id = protocol.getPacketId(PacketFlow.CLIENTBOUND, packet);
-        ByteBuf buf = Unpooled.buffer();
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        friendlyByteBuf.writeVarInt(id);
-        packet.write(friendlyByteBuf);
-        out.writeByteArray(buf.array());
+        out.writeByteArray(PacketSerialization.writeClientbound(packet));
     }
 
     @Override
@@ -123,24 +110,21 @@ public class ScoreboardUpdatePacket extends ExternalServerPacket {
 
         if (setPlayerTeamPacket.getParameters().isPresent()) {
             ClientboundSetPlayerTeamPacket.Parameters parameters = setPlayerTeamPacket.getParameters().get();
-            team.setDisplayName(parameters.getDisplayName());
+            team.setDisplayName(parameters.displayName());
             team.unpackOptions(team.packOptions());
-            team.setNameTagVisibility(Team.Visibility.byName(parameters.getNametagVisibility()));
-            team.setCollisionRule(Team.CollisionRule.byName(parameters.getCollisionRule()));
-            team.setColor(parameters.getColor());
-            team.setPlayerPrefix(parameters.getPlayerPrefix());
-            team.setPlayerSuffix(parameters.getPlayerSuffix());
+            team.setNameTagVisibility(parameters.nameTagVisibility());
+            team.setCollisionRule(parameters.collisionRule());
+            team.setColor(parameters.color());
+            team.setPlayerPrefix(parameters.playerPrefix());
+            team.setPlayerSuffix(parameters.playerSuffix());
         }
     }
 
     private void handle(ServerScoreboard scoreboard, ClientboundSetScorePacket setScorePacket) {
-        Objective objective = scoreboard.getObjective(setScorePacket.getObjectiveName());
+        Objective objective = scoreboard.getObjective(setScorePacket.objectiveName());
 
-        if (setScorePacket.getMethod() == ServerScoreboard.Method.CHANGE) {
-            Score score = scoreboard.getOrCreatePlayerScore(setScorePacket.getOwner(), objective);
-            score.setScore(setScorePacket.getScore());
-        } else if (setScorePacket.getMethod() == ServerScoreboard.Method.REMOVE) {
-            scoreboard.resetPlayerScore(setScorePacket.getOwner(), objective);
+        if (objective != null) {
+            scoreboard.getOrCreatePlayerScore(net.minecraft.world.scores.ScoreHolder.forNameOnly(setScorePacket.owner()), objective).set(setScorePacket.score());
         }
     }
 
@@ -149,7 +133,7 @@ public class ScoreboardUpdatePacket extends ExternalServerPacket {
         ObjectiveCriteria objectiveCriteria = criteria == null ? null : ObjectiveCriteria.byName(criteria).get();
 
         if (setObjectivePacket.getMethod() == ClientboundSetObjectivePacket.METHOD_ADD && objective == null) {
-            objective = scoreboard.addObjective(setObjectivePacket.getObjectiveName(), objectiveCriteria, setObjectivePacket.getDisplayName(), setObjectivePacket.getRenderType());
+            objective = scoreboard.addObjective(setObjectivePacket.getObjectiveName(), objectiveCriteria, setObjectivePacket.getDisplayName(), setObjectivePacket.getRenderType(), false, setObjectivePacket.getNumberFormat().orElse(null));
         } else if (setObjectivePacket.getMethod() == ClientboundSetObjectivePacket.METHOD_REMOVE) {
             scoreboard.removeObjective(objective);
         } if (setObjectivePacket.getMethod() == ClientboundSetObjectivePacket.METHOD_CHANGE || setObjectivePacket.getMethod() == ClientboundSetObjectivePacket.METHOD_ADD) {

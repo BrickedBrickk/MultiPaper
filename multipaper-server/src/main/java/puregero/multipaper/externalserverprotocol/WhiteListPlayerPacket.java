@@ -49,7 +49,7 @@ public class WhiteListPlayerPacket extends ExternalServerPacket {
     public void handle(ExternalServerConnection connection) {
         MultiPaper.runSync(() -> {
             handlingPacket = true;
-            MinecraftServer.getServer().getPlayerList().getWhiteList().add(new UserWhiteListEntry(new GameProfile(uuid, name)));
+            MinecraftServer.getServer().getPlayerList().getWhiteList().add(new UserWhiteListEntry(new net.minecraft.server.players.NameAndId(uuid, name)));
             handlingPacket = false;
         });
     }

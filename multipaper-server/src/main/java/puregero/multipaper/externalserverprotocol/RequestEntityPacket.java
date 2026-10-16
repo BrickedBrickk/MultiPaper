@@ -89,10 +89,10 @@ public class RequestEntityPacket extends ExternalServerPacket {
                 entity = entity.getRootVehicle();
 
                 // Check that the server is subscribed to the entity's chunk
-                Optional<NewChunkHolder> chunkHolder = Optional.ofNullable(level.chunkSource.chunkMap.getVisibleChunkIfPresent(entity.chunkPosition().asLong())).map(holder -> holder.newChunkHolder);
+                NewChunkHolder chunkHolder = MultiPaper.getChunkHolder(level, entity.chunkPosition().x(), entity.chunkPosition().z());
 
-                if (chunkHolder.filter(holder -> holder.externalEntitiesSubscribers.contains(connection.externalServer)).isEmpty()) {
-                    LOGGER.warn(connection.externalServer.getName() + " requested entity " + uuid + ", but that entity is not in a chunk that server is subscribed to (" + craftWorld.getName() + "," + entity.chunkPosition().x + "," + entity.chunkPosition().z + ")");
+                if (chunkHolder == null || !chunkHolder.externalEntitiesSubscribers.contains(connection.externalServer)) {
+                    LOGGER.warn(connection.externalServer.getName() + " requested entity " + uuid + ", but that entity is not in a chunk that server is subscribed to (" + craftWorld.getName() + "," + entity.chunkPosition().x() + "," + entity.chunkPosition().z() + ")");
                     return;
                 }
 
@@ -104,7 +104,7 @@ public class RequestEntityPacket extends ExternalServerPacket {
     }
 
     private void triedToRequestPlayer(ExternalServerConnection connection, ServerPlayer serverPlayer) {
-        if (!MinecraftServer.getServer().getPlayerList().players.contains(serverPlayer)) return;
+        if (!MinecraftServer.getServer().getPlayerList().getPlayers().contains(serverPlayer)) return;
         Pair<UUID, ExternalServerConnection> key = Pair.of(serverPlayer.getUUID(), connection);
         int count = playerRequestCounts.getOrDefault(key, 0);
         playerRequestCounts.put(key, count + 1);

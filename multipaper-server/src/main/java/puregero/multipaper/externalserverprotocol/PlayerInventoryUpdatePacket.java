@@ -63,17 +63,14 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
-            ListTag items = tag.getList("items", Tag.TAG_COMPOUND);
+            ListTag items = tag.getListOrEmpty("items");
             items.forEach(i -> {
                 CompoundTag item = (CompoundTag) i;
-                ItemStack itemStack = ItemStack.of(item);
+                ItemStack itemStack = MultiPaper.itemStackFromNBT(item);
 
-                ItemStack replacingItem = null;
-                if (item.contains("Replacing")) {
-                    replacingItem = ItemStack.of(item.getCompound("Replacing"));
-                }
+                ItemStack replacingItem = item.getCompound("Replacing").map(MultiPaper::itemStackFromNBT).orElse(null);
 
-                MultiPaperInventoryHandler.updateInventory(player, component, item.getInt("Slot"), replacingItem, itemStack);
+                MultiPaperInventoryHandler.updateInventory(player, component, item.getIntOr("Slot", 0), replacingItem, itemStack);
             });
 
             player.detectEquipmentUpdates();

@@ -113,14 +113,14 @@ public class MultiPaperEntitiesHandler {
     }
 
     public static void onEntitiesUnload(NewChunkHolder newChunkHolder) {
-        MultiPaper.getConnection().send(new UnsubscribeEntitiesMessage(newChunkHolder.world.convertable.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
+        MultiPaper.getConnection().send(new UnsubscribeEntitiesMessage(newChunkHolder.world.getServer().storageSource.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
 
         // Clear our cache of other servers that are subscribed to this chunk
         newChunkHolder.externalEntitiesSubscribers.clear();
     }
 
     public static void willWriteEntities(NewChunkHolder newChunkHolder) {
-        MultiPaper.getConnection().send(new WillSaveEntitiesLaterMessage(newChunkHolder.world.convertable.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
+        MultiPaper.getConnection().send(new WillSaveEntitiesLaterMessage(newChunkHolder.world.getServer().storageSource.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
     }
 
     public static void onChunkMove(Entity entity, BlockPos to, BlockPos from) {
@@ -140,30 +140,30 @@ public class MultiPaperEntitiesHandler {
                 // Leaving our jurisdiction, do a full entity update to ensure the new external server has all the required info
                 if (!(entity instanceof ServerPlayer)) { // Ignore players as they aren't ticked by the new external server
                     onEntityUnlock(entity);
-                    MultiPaper.runSync(() -> MultiPaper.broadcastPacketToExternalServers(chunkTo.getChunkHolder().externalEntitiesSubscribers, () -> new EntityUpdateNBTPacket(entity)));
+                    MultiPaper.runSync(() -> MultiPaper.broadcastPacketToExternalServers(MultiPaper.getChunkHolder(chunkTo).externalEntitiesSubscribers, () -> new EntityUpdateNBTPacket(entity)));
                     if (entity instanceof Mob mob) {
                         MultiPaper.runSync(() -> {
                             BlockPos goal = mob.getNavigation().getTargetPos();
                             if (goal != null) {
-                                MultiPaper.broadcastPacketToExternalServers(chunkTo.getChunkHolder().externalEntitiesSubscribers, () -> new MobSetNavigationGoalPacket(mob, goal));
+                                MultiPaper.broadcastPacketToExternalServers(MultiPaper.getChunkHolder(chunkTo).externalEntitiesSubscribers, () -> new MobSetNavigationGoalPacket(mob, goal));
                             }
                         });
                     }
                 }
             }
-            for (ExternalServer fromServer : chunkFrom.getChunkHolder().externalEntitiesSubscribers) {
-                if (fromServer.getConnection() != null && !chunkTo.getChunkHolder().externalEntitiesSubscribers.contains(fromServer)) {
+            for (ExternalServer fromServer : MultiPaper.getChunkHolder(chunkFrom).externalEntitiesSubscribers) {
+                if (fromServer.getConnection() != null && !MultiPaper.getChunkHolder(chunkTo).externalEntitiesSubscribers.contains(fromServer)) {
                     // Entity is leaving another server's area, make sure they know this
-                    MultiPaper.runSync(() -> fromServer.getConnection().send(new EntityUpdatePacket(entity, new ClientboundTeleportEntityPacket(entity))));
+                    MultiPaper.runSync(() -> fromServer.getConnection().send(new EntityUpdatePacket(entity, teleportPacket(entity))));
                 }
             }
-            for (ExternalServer toServer : chunkTo.getChunkHolder().externalEntitiesSubscribers) {
-                if (toServer.getConnection() != null && !chunkFrom.getChunkHolder().externalEntitiesSubscribers.contains(toServer)) {
+            for (ExternalServer toServer : MultiPaper.getChunkHolder(chunkTo).externalEntitiesSubscribers) {
+                if (toServer.getConnection() != null && !MultiPaper.getChunkHolder(chunkFrom).externalEntitiesSubscribers.contains(toServer)) {
                     // Entity is entering another server's area, send them the full entity
                     MultiPaper.runSync(() -> {
                         if (entity instanceof ServerPlayer) {
                             // Ensure the player's position is up to date
-                            MultiPaper.runSync(() -> toServer.getConnection().send(new EntityUpdatePacket(entity, new ClientboundTeleportEntityPacket(entity))));
+                            MultiPaper.runSync(() -> toServer.getConnection().send(new EntityUpdatePacket(entity, teleportPacket(entity))));
                         } else {
                             MultiPaper.runSync(() -> {
                                 EntityUpdateWithDependenciesPacket.sendVehicleAndPassengersPacketsRecursivelyToServers(entity, List.of(toServer));
@@ -201,31 +201,28 @@ public class MultiPaperEntitiesHandler {
         if (packet instanceof ClientboundMoveEntityPacket moveEntityPacket) {
             VecDeltaCodec vecDeltaCodec = new VecDeltaCodec();
             vecDeltaCodec.setBase(entity.position());
-            Vec3 vector = vecDeltaCodec.decode(moveEntityPacket.getXa(), moveEntityPacket.getYa(), moveEntityPacket.getZa());
-            if (!(entity instanceof ServerPlayer) && !((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) entity.level()).moonrise$getEntityLookup().isChunkLoaded(new ChunkPos(new BlockPos((int) vector.x, (int) vector.y, (int) vector.z)))) {
+            net.minecraft.world.entity.PositionPath position = moveEntityPacket.getPositionDelta().decode(vecDeltaCodec);
+            Vec3 vector = position.endPosition();
+            ChunkPos destination = new ChunkPos(net.minecraft.core.BlockPos.containing(vector).getX() >> 4, net.minecraft.core.BlockPos.containing(vector).getZ() >> 4);
+            if (!(entity instanceof ServerPlayer) && ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) entity.level()).moonrise$getEntityLookup().getChunk(destination.x(), destination.z()) == null) {
                 setRemovedRecursive(entity);
                 return;
             }
-            entity.preserveMotion = true;
             setFallDistance(entity, vector.y);
-            if (moveEntityPacket.hasRotation()) {
-                entity.moveTo(vector.x, vector.y, vector.z, moveEntityPacket.getyRot() * 360f / 256, moveEntityPacket.getxRot() * 360f / 256);
-            } else {
-                // Include y-rot and x-rot, as without it, it teleports players
-                entity.moveTo(vector.x, vector.y, vector.z, entity.getYRot(), entity.getXRot());
-            }
-            entity.onGround = moveEntityPacket.isOnGround();
+            entity.moveOrInterpolateTo(position, moveEntityPacket.hasRotation() ? moveEntityPacket.getYRot() : entity.getYRot(), moveEntityPacket.hasRotation() ? moveEntityPacket.getXRot() : entity.getXRot(), moveEntityPacket.hasRotation());
+            entity.setOnGround(moveEntityPacket.isOnGround());
         } else if (packet instanceof ClientboundTeleportEntityPacket teleportEntityPacket) {
-            if (!(entity instanceof ServerPlayer) &&!((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) entity.level()).moonrise$getEntityLookup().isChunkLoaded(new ChunkPos(new BlockPos((int) teleportEntityPacket.getX(), (int) teleportEntityPacket.getY(), (int) teleportEntityPacket.getZ())))) {
+            Vec3 position = teleportEntityPacket.change().position();
+            ChunkPos destination = new ChunkPos(net.minecraft.core.BlockPos.containing(position).getX() >> 4, net.minecraft.core.BlockPos.containing(position).getZ() >> 4);
+            if (!(entity instanceof ServerPlayer) && ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) entity.level()).moonrise$getEntityLookup().getChunk(destination.x(), destination.z()) == null) {
                 setRemovedRecursive(entity);
                 return;
             }
-            entity.preserveMotion = true;
-            setFallDistance(entity, teleportEntityPacket.getY());
-            entity.moveTo(teleportEntityPacket.getX(), teleportEntityPacket.getY(), teleportEntityPacket.getZ(), teleportEntityPacket.getyRot() * 360f / 256, teleportEntityPacket.getxRot() * 360f / 256);
-            entity.onGround = teleportEntityPacket.isOnGround();
+            setFallDistance(entity, position.y);
+            entity.moveOrInterpolateTo(net.minecraft.world.entity.PositionPath.of(position), teleportEntityPacket.change().yRot(), teleportEntityPacket.change().xRot());
+            entity.setOnGround(teleportEntityPacket.onGround());
         } else if (packet instanceof ClientboundSetEntityMotionPacket setEntityMotionPacket) {
-            entity.setDeltaMovement(setEntityMotionPacket.getXa() / 8000.0D, setEntityMotionPacket.getYa() / 8000.0D, setEntityMotionPacket.getZa() / 8000.0D);
+            entity.setDeltaMovement(setEntityMotionPacket.movement());
         } else if (packet instanceof ClientboundRotateHeadPacket rotateHeadPacket) {
             entity.setYHeadRot(rotateHeadPacket.getYHeadRot() * 360f / 256);
         } else if (packet instanceof ClientboundSetEntityDataPacket setEntityDataPacket) {
@@ -236,7 +233,7 @@ public class MultiPaperEntitiesHandler {
             entity.getEntityData().assignValues(setEntityDataPacket.packedItems());
             if (entity instanceof LivingEntity livingEntity) {
                 for (SynchedEntityData.DataValue<?> item : setEntityDataPacket.packedItems()) {
-                    if (item.id() == LivingEntity.DATA_HEALTH_ID.getId()) {
+                    if (item.id() == LivingEntity.DATA_HEALTH_ID.id()) {
                         // Dumb CraftBukkit needs us to set the health using setHealth instead of simply updating the entity data
                         livingEntity.setHealth((Float) item.value());
                     }
@@ -244,10 +241,11 @@ public class MultiPaperEntitiesHandler {
             }
 
             // Due 1.19.3 packet changes when apply the values we should resync it to local players.
-            if (entity.tracker != null) {
-                entity.tracker.seenBy.forEach(serverplayerconnection -> {
+            var entityTracker = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
+            if (entityTracker != null) {
+                entityTracker.seenBy.forEach(serverplayerconnection -> {
                     if (MultiPaper.isRealPlayer(serverplayerconnection.getPlayer())) {
-                        entity.getEntityData().refresh(serverplayerconnection.getPlayer());
+                        serverplayerconnection.send(new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().packAll()));
                     }
                 });
             }
@@ -257,31 +255,31 @@ public class MultiPaperEntitiesHandler {
             }
         } else if (packet instanceof ClientboundUpdateAttributesPacket updateAttributesPacket) {
             for (ClientboundUpdateAttributesPacket.AttributeSnapshot snapshot : updateAttributesPacket.getValues()) {
-                AttributeInstance instance = ((LivingEntity) entity).getAttribute(snapshot.getAttribute());
-                instance.setBaseValue(snapshot.getBase());
+                AttributeInstance instance = ((LivingEntity) entity).getAttribute(snapshot.attribute());
+                instance.setBaseValue(snapshot.base());
                 instance.removeModifiers();
-                for (AttributeModifier modifier : snapshot.getModifiers()) {
+                for (AttributeModifier modifier : snapshot.modifiers()) {
                     instance.addPermanentModifier(modifier);
                 }
             }
         } else if (packet instanceof ClientboundAnimatePacket animatePacket) {
-            ChunkMap.TrackedEntity trackedEntity = entity.tracker;
+            ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
             if (trackedEntity != null) {
-                trackedEntity.broadcast(new ClientboundAnimatePacket(entity, animatePacket.getAction()));
+                trackedEntity.sendToTrackingPlayers(new ClientboundAnimatePacket(entity, animatePacket.getAction()));
             }
         } else if (packet instanceof ClientboundDamageEventPacket damageEventPacket) {
-            ChunkMap.TrackedEntity trackedEntity = entity.tracker;
+            ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
             if (trackedEntity != null) {
-                trackedEntity.broadcast(new ClientboundDamageEventPacket(entity, damageEventPacket.getSource(entity.level())));
+                trackedEntity.sendToTrackingPlayers(new ClientboundDamageEventPacket(entity, damageEventPacket.getSource(entity.level())));
             }
         } else if (packet instanceof ClientboundEntityEventPacket entityEventPacket) {
-            ChunkMap.TrackedEntity trackedEntity = entity.tracker;
+            ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
             if (trackedEntity != null) {
-                trackedEntity.broadcast(new ClientboundEntityEventPacket(entity, entityEventPacket.getEventId()));
+                trackedEntity.sendToTrackingPlayers(new ClientboundEntityEventPacket(entity, entityEventPacket.getEventId()));
             }
         } else if (packet instanceof ClientboundSetEquipmentPacket setEquipmentPacket) {
-            for (Pair<EquipmentSlot, ItemStack> pair : setEquipmentPacket.getSlots()) {
-                entity.setItemSlot(pair.getFirst(), pair.getSecond());
+            if (entity instanceof LivingEntity livingEntity) for (Pair<EquipmentSlot, ItemStack> pair : setEquipmentPacket.getSlots()) {
+                livingEntity.setItemSlot(pair.getFirst(), pair.getSecond());
             }
             if (entity instanceof LivingEntity livingEntity) {
                 livingEntity.detectEquipmentUpdates();
@@ -289,6 +287,10 @@ public class MultiPaperEntitiesHandler {
         } else {
             LOGGER.warn("Unhandled packet " + packet);
         }
+    }
+
+    private static ClientboundTeleportEntityPacket teleportPacket(Entity entity) {
+        return ClientboundTeleportEntityPacket.teleport(entity.getId(), net.minecraft.world.entity.PositionMoveRotation.of(entity), java.util.Set.of(), entity.onGround());
     }
 
     private static void setFallDistance(Entity entity, double newY) {
@@ -311,7 +313,7 @@ public class MultiPaperEntitiesHandler {
             }
             for (Entity passenger : entities) {
                 if (!entity.getPassengers().contains(passenger)) {
-                    passenger.startRiding(entity, true);
+                    passenger.startRiding(entity);
                 }
             }
             modifyingPassengers = false;
@@ -338,14 +340,14 @@ public class MultiPaperEntitiesHandler {
                 return;
             }
 
-            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x, entity.chunkPosition().z);
+            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x(), entity.chunkPosition().z());
             if (newChunkHolder != null) {
                 MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityUpdateNBTPacket(entity));
-                MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityUpdatePacket(entity, new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().getAll())));
+                MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityUpdatePacket(entity, new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().packAll())));
             } else {
                 LOGGER.warn(entity + " spawned in an unloaded chunk, broadcasting it to all servers just incase anyone has it loaded");
                 MultiPaper.broadcastPacketToExternalServers(new EntityUpdateNBTPacket(entity));
-                MultiPaper.broadcastPacketToExternalServers(new EntityUpdatePacket(entity, new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().getAll())));
+                MultiPaper.broadcastPacketToExternalServers(new EntityUpdatePacket(entity, new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().packAll())));
             }
         });
     }
@@ -360,7 +362,7 @@ public class MultiPaperEntitiesHandler {
         if (entity instanceof ExternalPlayer) return;
         if (reason == Entity.RemovalReason.UNLOADED_TO_CHUNK) return;
 
-        NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x, entity.chunkPosition().z);
+        NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x(), entity.chunkPosition().z());
         if (newChunkHolder != null) {
             MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityRemovePacket(entity, reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER));
         } else {
@@ -369,7 +371,7 @@ public class MultiPaperEntitiesHandler {
     }
 
     public static void onEntityUpdate(Entity entity, Packet<?> packet, NewChunkHolder newChunkHolder) {
-        if (!entity.shouldBeSaved() && !(entity instanceof ServerPlayer) && (entity.getPassengers().isEmpty() || entity.getIndirectPassengersStream().noneMatch(e -> e instanceof ServerPlayer))) return;
+        if (!entity.shouldBeSaved() && !(entity instanceof ServerPlayer) && (entity.getPassengers().isEmpty() || java.util.stream.StreamSupport.stream(entity.getIndirectPassengers().spliterator(), false).noneMatch(e -> e instanceof ServerPlayer))) return;
 
         if (packet instanceof ClientboundSetEquipmentPacket && entity instanceof ServerPlayer) {
             // This is handled with inventories for players

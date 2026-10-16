@@ -97,7 +97,7 @@ public class RequestChunkPacket extends ExternalServerPacket {
                 return;
             }
 
-            CompletableFuture<Void> lightFuture = ((ThreadedLevelLightEngine) level.getLightEngine()).theLightEngine.lightQueue.getChunkFuture(newChunkHolder.vanillaChunkHolder.getPos());
+            CompletableFuture<Void> lightFuture = ((ca.spottedleaf.moonrise.patches.starlight.light.StarLightLightingProvider) level.getLightEngine()).starlight$getLightEngine().getChunkFuture(newChunkHolder.vanillaChunkHolder.getPos());
 
             if (!lightFuture.isDone()) {
                 lightFuture.thenRunAsync(() -> handle(connection));

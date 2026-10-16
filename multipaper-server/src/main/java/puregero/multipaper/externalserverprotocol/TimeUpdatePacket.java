@@ -23,7 +23,7 @@ public class TimeUpdatePacket extends ExternalServerPacket {
     public TimeUpdatePacket(Level level, boolean force) {
         this.world = level.getWorld().getName();
         this.gameTime = level.getGameTime();
-        this.dayTime = level.getDayTime();
+        this.dayTime = level.getGameTime(); // Minecraft 26.3 stores game and day time together
         this.force = force;
     }
 
@@ -49,8 +49,7 @@ public class TimeUpdatePacket extends ExternalServerPacket {
             ServerLevel level = ((CraftWorld) bukkitWorld).getHandle();
             if (force || level.getGameTime() < gameTime - 20) {
                 // We're more than a second behind, update us
-                ((PrimaryLevelData) level.levelData).setGameTime(gameTime);
-                ((PrimaryLevelData) level.levelData).setDayTime(dayTime);
+                level.serverLevelData.setGameTime(gameTime);
             }
         }
     }

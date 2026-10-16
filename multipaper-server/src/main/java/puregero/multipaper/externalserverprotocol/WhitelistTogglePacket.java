@@ -33,7 +33,7 @@ public class WhitelistTogglePacket extends ExternalServerPacket {
     public void handle(ExternalServerConnection connection) {
         MultiPaper.runSync(() -> {
             updatingWhitelistToggle = true;
-            MinecraftServer.getServer().getPlayerList().setUsingWhiteList(whitelistEnabled);
+            net.minecraft.server.dedicated.DedicatedServer.getServer().setUsingWhitelist(whitelistEnabled);
             updatingWhitelistToggle = false;
         });
     }

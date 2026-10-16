@@ -1,11 +1,7 @@
 package puregero.multipaper.externalserverprotocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,6 +10,7 @@ import org.apache.logging.log4j.Logger;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperInventoryHandler;
+import puregero.multipaper.PacketSerialization;
 
 import java.util.List;
 import java.util.UUID;
@@ -45,11 +42,7 @@ public class SendPacketPacket extends ExternalServerPacket {
             this.uuids[i] = in.readUUID();
         }
 
-        byte[] bytes = in.readByteArray();
-        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        int packetId = friendlyByteBuf.readVarInt();
-        packet = ConnectionProtocol.PLAY.createPacket(PacketFlow.CLIENTBOUND, packetId, friendlyByteBuf);
+        packet = PacketSerialization.readClientbound(in.readByteArray());
     }
 
     @Override
@@ -59,13 +52,7 @@ public class SendPacketPacket extends ExternalServerPacket {
             out.writeUUID(uuid);
         }
 
-        ConnectionProtocol protocol = ConnectionProtocol.getProtocolForPacket(packet);
-        Integer id = protocol.getPacketId(PacketFlow.CLIENTBOUND, packet);
-        ByteBuf buf = Unpooled.buffer();
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        friendlyByteBuf.writeVarInt(id);
-        packet.write(friendlyByteBuf);
-        out.writeByteArray(buf.array());
+        out.writeByteArray(PacketSerialization.writeClientbound(packet));
     }
 
     @Override

@@ -19,8 +19,9 @@ public class SpawnUpdatePacket extends ExternalServerPacket {
 
     public SpawnUpdatePacket(ServerLevel level) {
         this.world = level.getWorld().getName();
-        this.pos = new BlockPos(level.levelData.getXSpawn(), level.levelData.getYSpawn(), level.levelData.getZSpawn());
-        this.angle = level.levelData.getSpawnAngle();
+        net.minecraft.world.level.storage.LevelData.RespawnData spawn = level.serverLevelData.getRespawnData();
+        this.pos = spawn.globalPos().pos();
+        this.angle = spawn.yaw();
     }
 
     public SpawnUpdatePacket(FriendlyByteBuf in) {
@@ -42,7 +43,9 @@ public class SpawnUpdatePacket extends ExternalServerPacket {
             World bukkitWorld = Bukkit.getWorld(world);
             if (bukkitWorld instanceof CraftWorld craftWorld) {
                 updatingSpawn = true;
-                craftWorld.getHandle().setDefaultSpawnPos(pos, angle);
+            craftWorld.getHandle().serverLevelData.setSpawn(new net.minecraft.world.level.storage.LevelData.RespawnData(
+                net.minecraft.core.GlobalPos.of(craftWorld.getHandle().dimension(), pos), angle, 0.0F
+            ));
                 updatingSpawn = false;
             }
         });

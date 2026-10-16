@@ -52,22 +52,21 @@ public class RequestEntitiesPacket extends ExternalServerPacket {
 
     private void sendChunkLater(ExternalServerConnection connection, String world, int cx, int cz, int depth) {
         ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
-        NewChunkHolder chunkHolder = level.chunkTaskScheduler.chunkHolderManager.getChunkHolder(ChunkPos.asLong(cx, cz));
+        NewChunkHolder chunkHolder = MultiPaper.getChunkHolder(level, cx, cz);
         if (chunkHolder == null || chunkHolder.getEntityChunk() == null) {
             if (depth >= 20 || Bukkit.isStopping()) {
                 LOGGER.warn(connection.externalServer.getName() + " is requesting entities " + world + "," + cx + "," + cz + " but we timed out waiting for them to load.");
                 connection.send(new SendEntitiesPacket(world, cx, cz, null));
                 return;
             }
-            ((CraftScheduler) Bukkit.getScheduler()).scheduleInternalTask(() -> {
-                sendChunkLater(connection, world, cx, cz, depth + 1);
-            }, 1, "ExternalServerConnection-sendEntitiesLater");
+            java.util.concurrent.CompletableFuture.delayedExecutor(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .execute(() -> MultiPaper.runSync(() -> sendChunkLater(connection, world, cx, cz, depth + 1)));
         } else {
             try {
                 connection.send(new SendEntitiesPacket(level.getWorld().getName(), cx, cz, SendEntitiesPacket.getEntities(level, new ChunkPos(cx, cz), player -> {
                     if (MultiPaperConfiguration.get().optimizations.reducePlayerPositionUpdatesInUnloadedChunks) {
                         // This player is now in a loaded chunk, ensure its position is up to date
-                        connection.send(new EntityUpdatePacket(player, new ClientboundTeleportEntityPacket(player)));
+                        connection.send(new EntityUpdatePacket(player, ClientboundTeleportEntityPacket.teleport(player.getId(), net.minecraft.world.entity.PositionMoveRotation.of(player), java.util.Set.of(), player.onGround())));
                     }
                 })));
             } catch (ConcurrentModificationException e) {

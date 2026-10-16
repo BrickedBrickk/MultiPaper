@@ -2,6 +2,7 @@ package puregero.multipaper.externalserverprotocol;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.level.ChunkPos;
@@ -17,12 +18,11 @@ public class RaidUpdatePacket extends ExternalServerPacket {
     private final String world;
     private final byte[] data;
 
-    public RaidUpdatePacket(Raid raid) {
-        this.world = raid.getLevel().getWorld().getName();
+    public RaidUpdatePacket(ServerLevel level, Raid raid) {
+        this.world = level.getWorld().getName();
 
-        CompoundTag tag = new CompoundTag();
-
-        raid.save(tag);
+        CompoundTag tag = (CompoundTag) Raid.MAP_CODEC.codec().encodeStart(level.registryAccess().createSerializationContext(NbtOps.INSTANCE), raid).getOrThrow();
+        tag.putInt("MultiPaperId", raid.idOrNegativeOne);
 
         try {
             this.data = MultiPaper.nbtToBytes(tag);
@@ -42,8 +42,8 @@ public class RaidUpdatePacket extends ExternalServerPacket {
         out.writeByteArray(data);
     }
 
-    public static void broadcastUpdate(Raid raid) {
-        MultiPaper.broadcastPacketToExternalServers(new RaidUpdatePacket(raid));
+    public static void broadcastUpdate(ServerLevel level, Raid raid) {
+        MultiPaper.broadcastPacketToExternalServers(new RaidUpdatePacket(level, raid));
     }
 
     @Override
@@ -55,20 +55,13 @@ public class RaidUpdatePacket extends ExternalServerPacket {
                 if (bukkitWorld instanceof CraftWorld craftWorld) {
                     ServerLevel level = craftWorld.getHandle();
                     CompoundTag tag = MultiPaper.nbtFromBytes(data);
-                    int id = tag.getInt("Id");
-
-                    Raid raid = level.getRaids().raidMap.get(id);
-                    if (raid == null) {
-                        raid = new Raid(level, tag);
-                    } else {
-                        raid.load(level, tag);
-                    }
-
-                    level.getRaids().raidMap.put(raid.getId(), raid);
-
-                    if (!raid.isStopped()) {
-                        level.getRaids().chunkToRaidIdMap.put(ChunkPos.asLong(raid.getCenter()), raid.getId());
-                    }
+                    int id = tag.getIntOr("MultiPaperId", -1);
+                    Raid raid = Raid.MAP_CODEC.codec()
+                        .parse(level.registryAccess().createSerializationContext(NbtOps.INSTANCE), tag)
+                        .getOrThrow();
+                    raid.idOrNegativeOne = id;
+                    level.getRaids().raidMap.put(id, raid);
+                    level.getRaids().setDirty();
                 }
             } catch (IOException e) {
                 e.printStackTrace();

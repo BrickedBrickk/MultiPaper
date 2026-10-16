@@ -31,6 +31,11 @@ public class MultiPaperVersionFetcher implements VersionFetcher {
     String mcVer;
 
     @Override
+    public Component getVersionMessage() {
+        return this.getVersionMessage(org.bukkit.Bukkit.getServer().getVersion());
+    }
+
+    @Override
     public long getCacheTime() {
         return 720000;
     }

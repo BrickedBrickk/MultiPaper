@@ -2,7 +2,7 @@ package puregero.multipaper.externalserverprotocol;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.storage.PrimaryLevelData;
+import net.minecraft.world.level.saveddata.WeatherData;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
@@ -18,7 +18,7 @@ public class WeatherUpdatePacket extends ExternalServerPacket {
     private final int rainingTime;
     private final int thunderingTime;
 
-    public WeatherUpdatePacket(String world, PrimaryLevelData levelData) {
+    public WeatherUpdatePacket(String world, WeatherData levelData) {
         this.world = world;
         this.raining = levelData.isRaining();
         this.thundering = levelData.isThundering();

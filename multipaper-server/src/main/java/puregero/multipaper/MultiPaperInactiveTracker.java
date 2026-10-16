@@ -5,19 +5,20 @@ import net.minecraft.world.entity.Entity;
 import puregero.multipaper.config.MultiPaperConfiguration;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public class MultiPaperInactiveTracker {
     private final ServerLevel level;
-    private final Queue<Entity> entitiesToSendChangesThisTick = new LinkedList<>();
+    private final Set<Entity> entitiesToSendChangesThisTick = new LinkedHashSet<>();
 
     public MultiPaperInactiveTracker(ServerLevel level) {
         this.level = level;
     }
 
     public void track(Entity entity) {
-        if (MultiPaperConfiguration.get().optimizations.ticksPerInactiveEntityTracking > 1 && !entity.sendChangesThisTick && entity.tracker != null) {
+        if (MultiPaperConfiguration.get().optimizations.ticksPerInactiveEntityTracking > 1
+            && ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity() != null) {
             entity.sendChangesThisTick = true;
             entitiesToSendChangesThisTick.add(entity);
         }
@@ -26,28 +27,25 @@ public class MultiPaperInactiveTracker {
     public boolean tick() {
         int tickCount = level.getServer().getTickCount();
         if (MultiPaperConfiguration.get().optimizations.ticksPerInactiveEntityTracking > 1 && tickCount % MultiPaperConfiguration.get().optimizations.ticksPerInactiveEntityTracking != 0) {
-            level.timings.trackerInactive.startTiming();
-            try {
-                Iterator<Entity> iterator = entitiesToSendChangesThisTick.iterator();
-                while (iterator.hasNext()) {
-                    Entity entity = iterator.next();
-
-                    if (entity.tracker == null) {
-                        entity.sendChangesThisTick = false;
-                        iterator.remove();
-                        continue;
-                    }
-
-                    if (tickCount - entity.tracker.serverEntity.lastChangesSent >= entity.tracker.serverEntity.updateInterval) {
-                        entity.tracker.serverEntity.lastChangesSent = tickCount;
-                        entity.tracker.updatePlayers(entity.getPlayersInTrackRange());
-                        entity.tracker.serverEntity.sendChanges();
-                        entity.sendChangesThisTick = false;
-                        iterator.remove();
-                    }
+            Iterator<Entity> iterator = entitiesToSendChangesThisTick.iterator();
+            while (iterator.hasNext()) {
+                Entity entity = iterator.next();
+                var trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
+                if (trackedEntity == null) {
+                    entity.sendChangesThisTick = false;
+                    iterator.remove();
+                    continue;
                 }
-            } finally {
-                level.timings.trackerInactive.stopTiming();
+
+                var chunkSystemEntity = (ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity) entity;
+                var chunkData = chunkSystemEntity.moonrise$getChunkData();
+                ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity) trackedEntity).moonrise$tick(chunkData.nearbyPlayers);
+                if (((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity) trackedEntity).moonrise$hasPlayers()
+                    || chunkSystemEntity.moonrise$getChunkStatus().isOrAfter(net.minecraft.server.level.FullChunkStatus.ENTITY_TICKING)) {
+                    trackedEntity.serverEntity.sendChanges();
+                }
+                entity.sendChangesThisTick = false;
+                iterator.remove();
             }
             return true;
         }

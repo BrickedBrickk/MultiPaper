@@ -1,11 +1,7 @@
 package puregero.multipaper.externalserverprotocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.server.level.ServerLevel;
 import org.apache.logging.log4j.LogManager;
@@ -14,6 +10,7 @@ import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperChunkHandler;
 import puregero.multipaper.MultiPaperWorldBorderHandler;
+import puregero.multipaper.PacketSerialization;
 
 import java.util.UUID;
 
@@ -25,7 +22,7 @@ public class SendUpdatePacket extends ExternalServerPacket {
     private final Packet<?> packet;
 
     public SendUpdatePacket(ServerLevel level, Packet<?> packet) {
-        this(level.uuid, packet);
+        this(level.getWorld().getUID(), packet);
     }
 
     public SendUpdatePacket(UUID world, Packet<?> packet) {
@@ -36,25 +33,14 @@ public class SendUpdatePacket extends ExternalServerPacket {
     public SendUpdatePacket(FriendlyByteBuf in) {
         world = in.readUUID();
 
-        byte[] bytes = in.readByteArray();
-        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        friendlyByteBuf.maxNbtSize = Long.MAX_VALUE;
-        int packetId = friendlyByteBuf.readVarInt();
-        packet = ConnectionProtocol.PLAY.createPacket(PacketFlow.CLIENTBOUND, packetId, friendlyByteBuf);
+        packet = PacketSerialization.readClientbound(in.readByteArray());
     }
 
     @Override
     public void write(FriendlyByteBuf out) {
         out.writeUUID(world);
 
-        ConnectionProtocol protocol = ConnectionProtocol.getProtocolForPacket(packet);
-        Integer id = protocol.getPacketId(PacketFlow.CLIENTBOUND, packet);
-        ByteBuf buf = Unpooled.buffer();
-        FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buf);
-        friendlyByteBuf.writeVarInt(id);
-        packet.write(friendlyByteBuf);
-        out.writeByteArray(buf.array());
+        out.writeByteArray(PacketSerialization.writeClientbound(packet));
     }
 
     @Override

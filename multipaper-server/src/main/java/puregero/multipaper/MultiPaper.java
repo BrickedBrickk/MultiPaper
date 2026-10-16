@@ -79,7 +79,7 @@ public class MultiPaper {
     }
 
     public static void tick() {
-        for (ServerPlayer player : MinecraftServer.getServer().getPlayerList().players) {
+        for (ServerPlayer player : MinecraftServer.getServer().getPlayerList().getPlayers()) {
             if (player instanceof ExternalPlayer externalPlayer) {
                 // Copied from Paper start - Configurable container update tick rate
                 if (externalPlayer.containerMenu != externalPlayer.inventoryMenu && --externalPlayer.containerUpdateDelay <= 0) {
@@ -88,26 +88,7 @@ public class MultiPaper {
                 }
                 // Copied from Paper end
 
-                externalPlayer.checkInsideBlocks();
-
-                externalPlayer.tickAttackStrength();
-
-                if (player.takeXpDelay > 0) {
-                    --player.takeXpDelay;
-                }
-
-                externalPlayer.tickDeathIfDead();
-
-                if (externalPlayer.isSleeping()) {
-                    externalPlayer.setSleepCounter(Math.min(100, externalPlayer.getSleepCounter() + 1));
-                } else {
-                    externalPlayer.setSleepCounter(0);
-                }
             }
-
-            player.syncExperience();
-
-            player.connection.reduceSpamCounters();
         }
 
         for (ExternalServer server : getConnection().getServersMap().values()) {
@@ -130,13 +111,12 @@ public class MultiPaper {
         if (hasBeen1Seconds) last1Seconds = System.currentTimeMillis();
 
         Bukkit.getWorlds().forEach(world -> {
-            DimensionDataStorage persistentData = ((CraftWorld) world).getHandle().getDataStorage();
+            net.minecraft.world.level.storage.SavedDataStorage persistentData = ((CraftWorld) world).getHandle().getDataStorage();
             try {
-                persistentData.cache.forEach((key, value) -> {
-                    if (value instanceof MapIndex || (value instanceof MapItemSavedData && hasBeen1Seconds)) {
-                        persistentData.save(key, value);
-                    }
-                });
+                boolean shouldSave = persistentData.cache.values().stream()
+                    .map(java.util.Optional::orElseThrow)
+                    .anyMatch(value -> value instanceof MapIndex || (hasBeen1Seconds && value instanceof MapItemSavedData));
+                if (shouldSave) persistentData.scheduleSave();
             } catch (ConcurrentModificationException e) {
                 // Ignore - plugins doing async things (HuskSync specifically)
             }
@@ -307,11 +287,11 @@ public class MultiPaper {
     }
 
     public static boolean isChunkExternal(LevelChunk chunk) {
-        return chunk != null && isChunkExternal(chunk.getChunkHolder());
+        return chunk != null && isChunkExternal(getChunkHolder(chunk));
     }
 
     public static boolean isChunkExternal(ServerLevel level, BlockPos pos) {
-        return isChunkExternal(level.chunkTaskScheduler.chunkHolderManager.getChunkHolder(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4)));
+        return isChunkExternal(((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4)));
     }
 
     public static boolean isChunkExternal(NewChunkHolder newChunkHolder) {
@@ -323,11 +303,11 @@ public class MultiPaper {
     }
 
     public static boolean isChunkLocal(LevelChunk chunk) {
-        return chunk != null && isChunkLocal(chunk.getChunkHolder());
+        return chunk != null && isChunkLocal(getChunkHolder(chunk));
     }
 
     public static boolean isChunkLocal(ServerLevel level, BlockPos pos) {
-        return isChunkLocal(level.chunkTaskScheduler.chunkHolderManager.getChunkHolder(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4)));
+        return isChunkLocal(((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4)));
     }
 
     public static boolean isChunkLocal(NewChunkHolder newChunkHolder) {
@@ -441,7 +421,7 @@ public class MultiPaper {
     public static CompoundTag readLevel(String world) throws IOException {
         byte[] data = getConnection().sendAndAwaitReply(new ReadLevelMessage(world), DataMessageReply.class).thenApply(message -> message.data).join();
 
-        return data.length == 0 ? null : NbtIo.readCompressed(new ByteArrayInputStream(data));
+        return data.length == 0 ? null : NbtIo.readCompressed(new ByteArrayInputStream(data), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
     }
 
     public static void writeLevel(String world, CompoundTag compoundTag) throws IOException {
@@ -471,7 +451,7 @@ public class MultiPaper {
     public static CompoundTag readPlayer(String world, String uuid) throws IOException {
         byte[] data = getConnection().sendAndAwaitReply(new ReadPlayerMessage(world, uuid), DataMessageReply.class).thenApply(message -> message.data).join();
 
-        return data.length == 0 ? null : NbtIo.readCompressed(new ByteArrayInputStream(data));
+        return data.length == 0 ? null : NbtIo.readCompressed(new ByteArrayInputStream(data), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
     }
 
     public static void writePlayer(String world, String uuid, CompoundTag compoundTag) throws IOException {
@@ -535,11 +515,15 @@ public class MultiPaper {
     public static void unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
         if (chunkAccess instanceof LevelChunk levelChunk && MultiPaper.isChunkLocal(newChunkHolder)) {
             if (chunkEntitySlices != null) {
-                chunkEntitySlices.entities.forEach(MultiPaperEntitiesHandler::onEntityUnlock);
+                java.util.Arrays.stream(chunkEntitySlices.getRawEntities()).forEach(MultiPaperEntitiesHandler::onEntityUnlock);
             }
             broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new SendEntitiesPacket(levelChunk, chunkEntitySlices));
             broadcastPacketToExternalServers(newChunkHolder.externalSubscribers, () -> new SendTickListPacket(levelChunk));
-            levelChunk.level.getRaids().getActiveRaid(levelChunk.getPos()).ifPresent(RaidUpdatePacket::broadcastUpdate);
+            ServerLevel level = (ServerLevel) levelChunk.getLevel();
+            for (BlockPos center : level.getRaids().getRaidCentersInChunk(levelChunk.getPos())) {
+                net.minecraft.world.entity.raid.Raid raid = level.getRaidAt(center);
+                if (raid != null) RaidUpdatePacket.broadcastUpdate(level, raid);
+            }
             for (BlockEntity blockEntity : levelChunk.getBlockEntities().values()) {
                 if (blockEntity instanceof Container container) {
                     List<HumanEntity> viewers = container.getViewers();
@@ -619,11 +603,15 @@ public class MultiPaper {
     }
 
     public static NewChunkHolder getChunkHolder(ServerLevel level, int x, int z) {
-        return level.chunkTaskScheduler.chunkHolderManager.getChunkHolder(x, z);
+        return ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(x, z);
+    }
+
+    public static NewChunkHolder getChunkHolder(LevelChunk chunk) {
+        return ((ca.spottedleaf.moonrise.patches.chunk_system.level.chunk.ChunkSystemLevelChunk) chunk).moonrise$getChunkHolder();
     }
 
     public static NewChunkHolder getChunkHolder(Entity entity) {
-        return getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x, entity.chunkPosition().z);
+        return getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x(), entity.chunkPosition().z());
     }
 
     public static void chunkChangedStatus(ServerLevel level, ChunkPos pos, ChunkStatus status) {

@@ -28,7 +28,7 @@ public class MobSetNavigationGoalPacket extends ExternalServerPacket {
         this.world = ((ServerLevel) mob.level()).getServer().storageSource.getLevelId();
         this.uuid = mob.getUUID();
         this.goal = goal;
-        this.speed = mob.getNavigation().speedModifier;
+        this.speed = mob.getNavigation().getSpeedModifier();
     }
 
     public MobSetNavigationGoalPacket(FriendlyByteBuf in) {
@@ -59,8 +59,8 @@ public class MobSetNavigationGoalPacket extends ExternalServerPacket {
 
             Entity entity = level.getEntity(uuid);
             if (entity instanceof Mob mob) {
-                mob.goalSelector.getRunningGoals().forEach(WrappedGoal::stop);
-                mob.targetSelector.getRunningGoals().forEach(WrappedGoal::stop);
+                mob.getGoalSelector().getAvailableGoals().stream().filter(WrappedGoal::isRunning).forEach(WrappedGoal::stop);
+                mob.targetSelector.getAvailableGoals().stream().filter(WrappedGoal::isRunning).forEach(WrappedGoal::stop);
                 mob.getNavigation().moveTo(mob.getNavigation().createPath(goal, 0), speed);
             } else {
                 LOGGER.warn("Couldn't find mob " + uuid + " for navigation goal");

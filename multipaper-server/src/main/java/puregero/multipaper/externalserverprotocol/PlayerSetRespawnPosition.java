@@ -28,10 +28,11 @@ public class PlayerSetRespawnPosition extends ExternalServerPacket {
 
     public PlayerSetRespawnPosition(ServerPlayer player) {
         this.uuid = player.getUUID();
-        this.dimension = player.respawnDimension;
-        this.pos = player.respawnPosition;
-        this.angle = player.respawnAngle;
-        this.forced = player.respawnForced;
+        ServerPlayer.RespawnConfig config = player.getRespawnConfig();
+        this.dimension = config == null ? Level.OVERWORLD : config.respawnData().dimension();
+        this.pos = config == null ? null : config.respawnData().pos();
+        this.angle = config == null ? 0.0F : config.respawnData().yaw();
+        this.forced = config != null && config.forced();
     }
 
     public PlayerSetRespawnPosition(FriendlyByteBuf in) {
@@ -45,7 +46,7 @@ public class PlayerSetRespawnPosition extends ExternalServerPacket {
     @Override
     public void write(FriendlyByteBuf out) {
         out.writeUUID(uuid);
-        out.writeUtf(dimension.location().toString());
+        out.writeUtf(dimension.identifier().toString());
 
         out.writeBoolean(pos != null);
         if (pos != null) {
@@ -67,7 +68,10 @@ public class PlayerSetRespawnPosition extends ExternalServerPacket {
             }
 
             settingRespawnPosition = true;
-            player.setRespawnPosition(dimension, pos, angle, forced, false);
+            ServerPlayer.RespawnConfig config = pos == null ? null : new ServerPlayer.RespawnConfig(
+                new net.minecraft.world.level.storage.LevelData.RespawnData(net.minecraft.core.GlobalPos.of(dimension, pos), angle, 0.0F), forced
+            );
+            player.setRespawnPosition(config, false);
             settingRespawnPosition = false;
         });
     }

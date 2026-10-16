@@ -50,9 +50,7 @@ public class PlayerExperienceUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
-            player.experienceProgress = player.lastExperienceProgress = progress;
-            player.totalExperience = player.lastTotalExperience = total;
-            player.experienceLevel = player.lastExperienceLevel = level;
+            player.applyMultiPaperExperience(progress, total, level);
         });
     }
 }
