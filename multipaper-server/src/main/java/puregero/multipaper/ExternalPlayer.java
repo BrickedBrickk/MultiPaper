@@ -86,7 +86,11 @@ public class ExternalPlayer extends ServerPlayer {
         containerMenu.transferTo(containerMenu, getBukkitEntity());
         initInventoryMenu();
         sendPackets = true;
-        gameMode.changeGameModeForPlayer(gamemode);
+        gameMode.changeGameModeForPlayer(
+            gamemode,
+            org.bukkit.event.player.PlayerGameModeChangeEvent.Cause.UNKNOWN,
+            null
+        );
         detectEquipmentUpdates();
     }
 

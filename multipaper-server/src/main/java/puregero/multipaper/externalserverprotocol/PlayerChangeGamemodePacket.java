@@ -44,7 +44,11 @@ public class PlayerChangeGamemodePacket extends ExternalServerPacket {
                 return;
             }
 
-            player.gameMode.changeGameModeForPlayer(gamemode);
+            player.gameMode.changeGameModeForPlayer(
+                gamemode,
+                org.bukkit.event.player.PlayerGameModeChangeEvent.Cause.UNKNOWN,
+                null
+            );
         });
     }
 }
