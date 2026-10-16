@@ -3,12 +3,14 @@ package puregero.multipaper.event.player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.UUID;
 
 /**
  * Called when a player leave an external MultiPaper instance.
  */
+@NullMarked
 public class PlayerLeaveExternalServerEvent extends Event {
 
 

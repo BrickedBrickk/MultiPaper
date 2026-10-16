@@ -2,11 +2,13 @@ package org.bukkit;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.jspecify.annotations.NullMarked;
 
 import java.nio.charset.StandardCharsets;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+@NullMarked
 public interface MultiPaperNotificationManager {
 
     /**

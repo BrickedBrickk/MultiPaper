@@ -3,12 +3,14 @@ package puregero.multipaper.event.player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.UUID;
 
 /**
  * Called when a player joins an external MultiPaper instance.
  */
+@NullMarked
 public class PlayerJoinExternalServerEvent extends Event {
 
     private static final HandlerList handlers = new HandlerList();

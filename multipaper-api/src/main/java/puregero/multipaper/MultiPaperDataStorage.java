@@ -1,16 +1,20 @@
 package puregero.multipaper;
 
+import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
+
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Asynchronous key-value storage hosted on the Master instance.
  */
+@NullMarked
 public interface MultiPaperDataStorage {
 
-    CompletableFuture<String> get(String key);
+    CompletableFuture<@Nullable String> get(String key);
 
-    default CompletableFuture<String> get(String key, String def) {
+    default CompletableFuture<@Nullable String> get(String key, @Nullable String def) {
         return get(key).thenApply(value -> value != null ? value : def);
     }
 
@@ -42,9 +46,9 @@ public interface MultiPaperDataStorage {
         return list(null);
     }
 
-    CompletableFuture<Map<String, String>> list(String prefix);
+    CompletableFuture<Map<String, String>> list(@Nullable String prefix);
 
-    CompletableFuture<String> set(String key, String value);
+    CompletableFuture<@Nullable String> set(String key, String value);
 
     default CompletableFuture<Long> set(String key, long value) {
         return set(key, Long.toString(value)).thenApply(Long::parseLong);
@@ -58,7 +62,7 @@ public interface MultiPaperDataStorage {
         return set(key, Double.toString(value)).thenApply(Double::parseDouble);
     }
 
-    CompletableFuture<String> add(String key, String increment);
+    CompletableFuture<@Nullable String> add(String key, String increment);
 
     default CompletableFuture<Long> add(String key, long increment) {
         return add(key, Long.toString(increment)).thenApply(Long::parseLong);
