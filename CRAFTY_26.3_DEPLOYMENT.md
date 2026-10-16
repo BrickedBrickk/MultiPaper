@@ -12,7 +12,7 @@ No Minecraft client logged in. The smoke run did not test blocks, chunks generat
 
 ### Later gameplay probe — cross-backend checks still required
 
-The prior direct-backend login probe crashed both backends with chunk cast errors. The forced-unload restriction has since been changed to an idle full-status guard requiring `FullChunkStatus.INACCESSIBLE`, then rebuilt and passed the full server suite. On 2026-10-16, two fresh backend processes ran concurrently against one Master and generated test world. One raw Minecraft 26.3 client logged into each backend and reached player placement; both remained connected during the observation window, both backend ports stayed listening, and neither log reported `ClassCastException`, `ProtoChunk`, or `ImposterProtoChunk`. A `setblock` command succeeded on Server 1, but the attempted readback from Server 2 did not establish the block's state, so cross-backend block synchronization remains unverified. This validates concurrent startup and basic direct login on one PC only. It does not test proxy login/authentication, two physical PCs, or safe sustained gameplay. The artifact hashes below identify the currently built JARs. Keep both servers closed to players until cross-backend gameplay tests pass.
+The initial forced-unload restriction still allowed Moonrise holders with active ticket levels to be removed. A fresh ordered startup then crashed with `Missing chunkholder when required` during player chunk loading. The guard now requires Moonrise's `isSafeToUnload()` checks to pass, in addition to stable inaccessible full status and no pending unload state. A fresh two-backend run on 2026-10-16 started Server 1 before Server 2, then logged raw Minecraft 26.3 clients into Server 2 and Server 1 in that order. Both reached player placement and remained connected for 60 seconds; neither backend reported the missing-holder exception. This verifies the specific startup/login crash fix on one PC. Cross-backend block synchronization remains unverified: an earlier `setblock` succeeded on Server 1, but its readback on Server 2 did not establish the block state. Proxy client login/authentication, two physical PCs, and sustained gameplay have not been verified. Keep both servers closed to players until those checks pass.
 
 ## Layout and network
 
@@ -47,7 +47,7 @@ Use the same Paperclip build on both server PCs. The server artifacts below were
 
 | Artifact path | Use | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,366 bytes | `CD70F8A99E0AA53A44EA815BF2955CD3EC89309323020963F9FB84F7B312D58B` |
+| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,651 bytes | `C338617F901332FAE0DAC39ED98AE709994C9B186FCAFED5B726F4B1883D6B11` |
 | `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,086,101 bytes | `07E9BCD322503B4874012EDD030BD46E903EA65541C268A9C00850A0FBDA791C` |
 | `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,686,961 bytes | `923E304310A5B6DCE2313275F02DF5E7CCED2D2F03C0CEFE0CA4733DFA7FD6C2` |
 | `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,151,848 bytes | `39B2098A13D000C3623D7C78A70CF4C02EBAEFDA77CFAD479DA861FED78F3A0C` |

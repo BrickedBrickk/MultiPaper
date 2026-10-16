@@ -12,12 +12,8 @@
 +    // MultiPaper start - guard forced remote chunk replacement against active generation
 +    public boolean canBeForceUnloadedForMultiPaper() {
 +        // Caller holds the scheduling lock.
-+        return this.generationTask == null && this.requestedGenStatus == null
++        return this.isSafeToUnload() == null
 +                && !this.processingFullStatus && this.pendingFullChunkStatus == this.currentFullChunkStatus
-+                && this.currentFullChunkStatus == net.minecraft.server.level.FullChunkStatus.INACCESSIBLE
-+                && this.totalNeighboursUsingThisChunk == 0 && this.neighboursWaitingForUs.isEmpty()
-+                && this.entityDataLoadTask == null && this.poiDataLoadTask == null
-+                && this.chunkDataUnload == null && this.entityDataUnload == null && this.poiDataUnload == null
 +                && this.unloadState == null;
 +    }
 +    // MultiPaper end

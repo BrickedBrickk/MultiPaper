@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
-@@ -1180,7 +1180,7 @@ public final class ChunkHolderManager {
+@@ -1180,7 +1180,8 @@ public final class ChunkHolderManager {
          }
      }
  
@@ -9,7 +9,7 @@
          holder.onUnload();
          this.autoSaveQueue.remove(holder);
          ((ChunkSystemServerChunkCache)this.world.getChunkSource()).moonrise$chunkHolderUnload(holder);
-@@ -1344,6 +1344,69 @@ public final class ChunkHolderManager {
+@@ -1344,6 +1345,70 @@ public final class ChunkHolderManager {
          }
      }
  
@@ -23,7 +23,8 @@
 +        if (this.ticketLockArea.isHeldByCurrentThread(chunkHolder.chunkX, chunkHolder.chunkZ)) {
 +            throw new IllegalStateException("Cannot hold ticket update lock while calling processUnloads");
 +        }
-+        if (this.taskScheduler.schedulingLockArea.isHeldByCurrentThread(chunkHolder.chunkX, chunkHolder.chunkZ)) {
++        final int schedulingLockRadius = 2 * ChunkTaskScheduler.getMaxAccessRadius();
++        if (this.taskScheduler.schedulingLockArea.isHeldByCurrentThread(chunkHolder.chunkX, chunkHolder.chunkZ, schedulingLockRadius)) {
 +            throw new IllegalStateException("Cannot hold scheduling lock while calling processUnloads");
 +        }
 +
@@ -31,7 +32,7 @@
 +
 +        final ReentrantAreaLock.Node ticketLock = this.ticketLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
 +        try {
-+            final ReentrantAreaLock.Node schedulingLock = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++            final ReentrantAreaLock.Node schedulingLock = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ, schedulingLockRadius);
 +            try {
 +                if (!chunkHolder.canBeForceUnloadedForMultiPaper()) {
 +                    return false;
@@ -58,7 +59,7 @@
 +
 +        final ReentrantAreaLock.Node ticketLock2 = this.ticketLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
 +        try {
-+            final ReentrantAreaLock.Node schedulingLock2 = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++            final ReentrantAreaLock.Node schedulingLock2 = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ, schedulingLockRadius);
 +            try {
 +                if (chunkHolder.unloadStage3()) {
 +                    this.removeChunkHolder(chunkHolder);
