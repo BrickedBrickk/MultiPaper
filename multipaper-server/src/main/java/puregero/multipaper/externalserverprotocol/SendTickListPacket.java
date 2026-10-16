@@ -37,7 +37,7 @@ public class SendTickListPacket extends ExternalServerPacket {
 
     public SendTickListPacket(LevelChunk chunk) {
         ServerLevel level = (ServerLevel) chunk.getLevel();
-        this.world = level.getServer().storageSource.getLevelId();
+        this.world = level.getWorld().getName();
         this.cx = chunk.getPos().x();
         this.cz = chunk.getPos().z();
 

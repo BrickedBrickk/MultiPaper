@@ -6,8 +6,8 @@ import puregero.multipaper.server.ServerConnection;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.NoSuchFileException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -42,22 +42,28 @@ public class RequestEntityIdBlockHandler {
         }
 
         try {
-            String str = Files.readString(Path.of("lastblock.txt"));
-            lastBlock = new AtomicInteger(Integer.parseInt(str));
+            String str = Files.readString(lastBlockFile());
+            // Entity id zero is reserved by Minecraft to mean "not assigned".
+            lastBlock = new AtomicInteger(Math.max(Integer.parseInt(str), 1));
             return;
         } catch (NoSuchFileException ignored) {
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        lastBlock = new AtomicInteger(0);
+        // Entity id zero is reserved by Minecraft to mean "not assigned".
+        lastBlock = new AtomicInteger(1);
+    }
+
+    private static Path lastBlockFile() {
+        return Path.of(System.getProperty("multipaper.entityid.file", "lastblock.txt"));
     }
 
     private static synchronized void saveLastBlock() {
         if (queueLastBlockSave) {
             queueLastBlockSave = false;
             try {
-                Files.writeString(Path.of("lastblock.txt"), Integer.toString(lastBlock.get()));
+                Files.writeString(lastBlockFile(), Integer.toString(lastBlock.get()));
             } catch (IOException e) {
                 e.printStackTrace();
             }

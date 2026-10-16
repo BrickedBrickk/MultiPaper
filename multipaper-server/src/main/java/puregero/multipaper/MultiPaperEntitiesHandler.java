@@ -113,14 +113,14 @@ public class MultiPaperEntitiesHandler {
     }
 
     public static void onEntitiesUnload(NewChunkHolder newChunkHolder) {
-        MultiPaper.getConnection().send(new UnsubscribeEntitiesMessage(newChunkHolder.world.getServer().storageSource.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
+        MultiPaper.getConnection().send(new UnsubscribeEntitiesMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
 
         // Clear our cache of other servers that are subscribed to this chunk
         newChunkHolder.externalEntitiesSubscribers.clear();
     }
 
     public static void willWriteEntities(NewChunkHolder newChunkHolder) {
-        MultiPaper.getConnection().send(new WillSaveEntitiesLaterMessage(newChunkHolder.world.getServer().storageSource.getLevelId(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
+        MultiPaper.getConnection().send(new WillSaveEntitiesLaterMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
     }
 
     public static void onChunkMove(Entity entity, BlockPos to, BlockPos from) {
@@ -198,7 +198,19 @@ public class MultiPaperEntitiesHandler {
             serverLevel.inactiveTracker.track(entity);
         }
 
-        if (packet instanceof ClientboundMoveEntityPacket moveEntityPacket) {
+        if (packet instanceof ClientboundEntityPositionSyncPacket positionSyncPacket) {
+            net.minecraft.world.entity.PositionPath position = positionSyncPacket.position();
+            Vec3 vector = position.endPosition();
+            BlockPos destinationPos = BlockPos.containing(vector);
+            ChunkPos destination = new ChunkPos(destinationPos.getX() >> 4, destinationPos.getZ() >> 4);
+            if (!(entity instanceof ServerPlayer) && ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) entity.level()).moonrise$getEntityLookup().getChunk(destination.x(), destination.z()) == null) {
+                setRemovedRecursive(entity);
+                return;
+            }
+            setFallDistance(entity, vector.y);
+            entity.moveOrInterpolateTo(position, positionSyncPacket.yRot(), positionSyncPacket.xRot(), true);
+            entity.setOnGround(positionSyncPacket.onGround());
+        } else if (packet instanceof ClientboundMoveEntityPacket moveEntityPacket) {
             VecDeltaCodec vecDeltaCodec = new VecDeltaCodec();
             vecDeltaCodec.setBase(entity.position());
             net.minecraft.world.entity.PositionPath position = moveEntityPacket.getPositionDelta().decode(vecDeltaCodec);

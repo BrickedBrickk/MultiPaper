@@ -15,6 +15,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerDi
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestEntityIdBlock;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.StartMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SetPortMessage;
@@ -27,11 +28,14 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePla
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ChunkLoadedOnAnotherServerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.mastermessagingprotocol.messages.serverbound.IntegerPairMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerStartedMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetChunkOwnerMessage;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -105,11 +109,23 @@ class MasterIntegrationTest {
 
     @Test
     @Order(3)
-    void startIsBroadcastToOtherServers() throws Exception {
+    void startCreatesBidirectionalPeerConnections() throws Exception {
+        serverA.send(new SetPortMessage(25565));
+        serverB.send(new SetPortMessage(25566));
+
         serverA.send(new StartMessage("127.0.0.1", 25565));
-        ServerStartedMessage message = serverB.serverStartedMessages.poll(10, TimeUnit.SECONDS);
-        assertEquals("127.0.0.1", message.host);
-        assertEquals(25565, message.port);
+        ServerStartedMessage aStarted = serverB.serverStartedMessages.poll(10, TimeUnit.SECONDS);
+        assertEquals("127.0.0.1", aStarted.host);
+        assertEquals(25565, aStarted.port);
+
+        serverB.send(new StartMessage("127.0.0.1", 25566));
+        ServerStartedMessage bStarted = serverA.serverStartedMessages.poll(10, TimeUnit.SECONDS);
+        assertEquals("127.0.0.1", bStarted.host);
+        assertEquals(25566, bStarted.port);
+
+        ServerStartedMessage existingA = serverB.serverStartedMessages.poll(10, TimeUnit.SECONDS);
+        assertEquals("127.0.0.1", existingA.host);
+        assertEquals(25565, existingA.port);
     }
 
     @Test
@@ -344,6 +360,22 @@ class MasterIntegrationTest {
             fail("Chunk should not be owned by anyone, but was attributed to " + redirect.server);
         }
         assertArrayEquals(CHUNK_PAYLOAD, ((DataMessageReply) readReply).data);
+    }
+
+    @Test
+    @Order(16)
+    void entityIdBlocksSkipTheReservedZeroEvenWhenPersistedStateIsZero() throws Exception {
+        Path idFile = Path.of("entity-ids", "lastblock.txt").toAbsolutePath();
+        Files.createDirectories(idFile.getParent());
+        Files.writeString(idFile, "0");
+        System.setProperty("multipaper.entityid.file", idFile.toString());
+
+        IntegerPairMessageReply first = (IntegerPairMessageReply) serverB.request(new RequestEntityIdBlock());
+        assertEquals(1, first.x, "Entity id zero is reserved as Minecraft's unassigned sentinel");
+
+        IntegerPairMessageReply second = (IntegerPairMessageReply) serverB.request(new RequestEntityIdBlock());
+        assertEquals(first.y, second.x, "Sequential ID ranges must be contiguous");
+        assertTrue(second.x > first.x, "The second allocated range must advance");
     }
 
     private static SetChunkOwnerMessage pollUntilOwner(TestServerClient client, int cx, int cz, String expectedOwner) throws InterruptedException {

@@ -22,7 +22,7 @@ public class EntityUpdateEffectPacket extends ExternalServerPacket {
     private final byte[] data;
 
     public EntityUpdateEffectPacket(Entity entity, MobEffectInstance effect, boolean remove) {
-        this.world = ((ServerLevel) entity.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) entity.level()).getWorld().getName();
         this.uuid = entity.getUUID();
         this.remove = remove;
 

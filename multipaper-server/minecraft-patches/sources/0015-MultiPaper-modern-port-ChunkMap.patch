@@ -25,7 +25,26 @@
          this.iteratingTrackerEntities = true;
          try {
              final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.entity.Entity> trackerEntities = this.trackerEntities;
-@@ -1375,7 +1377,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+@@ -1366,6 +1368,14 @@ public class TrackedEntity implements ServerEntity.Synchronizer {
+         @Override
+         public void sendToTrackingPlayers(final Packet<? super ClientGamePacketListener> packet) {
+-            for (ServerPlayerConnection connection : this.seenBy) {
+-                connection.send(packet);
+-            }
+-        }
++            // MultiPaper start - synchronize entity updates with subscribed servers
++            var newChunkHolder = MultiPaper.getChunkHolder(this.entity);
++            var controllingPassenger = puregero.multipaper.MultiPaperEntitiesHandler.getControllingPassenger(this.entity);
++            if (!MultiPaper.isExternalPlayer(controllingPassenger)
++                && (MultiPaper.isRealPlayer(controllingPassenger) || MultiPaper.isChunkLocal(newChunkHolder))) {
++                puregero.multipaper.MultiPaperEntitiesHandler.onEntityUpdate(this.entity, packet, newChunkHolder);
++            }
++            // MultiPaper end
++            for (ServerPlayerConnection connection : this.seenBy) {
++                if (!MultiPaper.isExternalPlayer(connection.getPlayer())) connection.send(packet); // MultiPaper - only send to local players
++            }
++        }
+@@ -1375,7 +1385,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
          @Override
          public void sendToTrackingPlayersAndSelf(final Packet<? super ClientGamePacketListener> packet) {
              this.sendToTrackingPlayers(packet);
@@ -34,7 +53,7 @@
                  player.connection.send(packet);
              }
          }
-@@ -1407,7 +1409,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+@@ -1407,7 +1417,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
  
          public void updatePlayer(final ServerPlayer player) {
              org.spigotmc.AsyncCatcher.catchOp("player tracker update"); // Spigot

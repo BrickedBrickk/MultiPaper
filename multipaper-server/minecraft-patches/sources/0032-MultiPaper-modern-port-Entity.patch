@@ -17,6 +17,14 @@
      private int remainingFireTicks;
      private final EntityFluidInteraction fluidInteraction = new EntityFluidInteraction(FLUIDS_WITH_CURRENT);
      protected boolean wasTouchingWater;
+@@ -584,6 +587,6 @@ public Entity(final EntityType<?> type, final Level level) {
+         this.type = type;
+         this.level = level;
+-        this.id = level.getNextEntityId();
++        this.id = puregero.multipaper.MultiPaperEntityIdManager.next(); // MultiPaper - allocate entity ids across servers
+         this.dimensions = type.getDimensions();
+         this.maxAirTicks = level == null || this.getDefaultMaxAirSupply() != Entity.TOTAL_AIR_SUPPLY ? this.getDefaultMaxAirSupply() : this.level.purpurConfig.drowningAirTicks; // Purpur - Drowning Settings
+         // Purpur start - Add toggle for RNG manipulation
 @@ -1923,6 +1926,11 @@ public abstract class Entity
                  }
  
@@ -49,3 +57,19 @@
      public EntityDimensions getDimensions(final Pose pose) {
          return this.type.getDimensions();
      }
+@@ -5229,4 +5250,10 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
+         if (!checkPosition(this, x, y, z)) {
+             return;
+         }
++        int targetX = Mth.floor(x);
++        int targetY = Mth.floor(y);
++        int targetZ = Mth.floor(z);
++        if ((targetX >> 4) != this.chunkPosition.x() || (targetZ >> 4) != this.chunkPosition.z()) {
++            puregero.multipaper.MultiPaperEntitiesHandler.onChunkMove(this, new BlockPos(targetX, targetY, targetZ), this.blockPosition);
++        }
+         // Paper end - Block invalid positions and bounding box
+@@ -5390,3 +5417,4 @@ public final void setRemoved(final Entity.RemovalReason reason, org.bukkit.event.entity.EntityRemoveEvent.@Nullable Cause cause) {
+         }
+         // Paper end - rewrite chunk system
++        puregero.multipaper.MultiPaperEntitiesHandler.onEntityRemove(this, reason); // MultiPaper
+         org.bukkit.craftbukkit.event.CraftEventFactory.callEntityRemoveEvent(this, cause); // CraftBukkit

@@ -109,10 +109,25 @@ public class ExternalPlayer extends ServerPlayer {
         public void setReadOnly() {
             // Do nothing
         }
+
+        @Override
+        public void flushChannel() {
+            // Packets are forwarded immediately through the peer connection.
+        }
  
         @Override
         public boolean isConnected() {
             return true;
+        }
+
+        @Override
+        public void send(Packet<?> packet) {
+            send(packet, (ChannelFutureListener) null);
+        }
+
+        @Override
+        public void send(Packet<?> packet, @Nullable ChannelFutureListener packetsendlistener, boolean flush) {
+            send(packet, packetsendlistener);
         }
 
         @Override

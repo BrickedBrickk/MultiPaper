@@ -28,7 +28,7 @@ public class PlayerRespawnPacket extends ExternalServerPacket {
 
     public PlayerRespawnPacket(ServerPlayer player, ServerLevel worldserver, boolean alive, Location location, boolean avoidSuffocation, PlayerRespawnEvent.RespawnFlag[] respawnFlags) {
         this.uuid = player.getUUID();
-        this.world = worldserver.getServer().storageSource.getLevelId();
+        this.world = worldserver.getWorld().getName();
         this.alive = alive;
         this.x = location.getX();
         this.y = location.getY();

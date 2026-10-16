@@ -25,7 +25,7 @@ public class MobSetNavigationGoalPacket extends ExternalServerPacket {
     private final double speed;
 
     public MobSetNavigationGoalPacket(Mob mob, BlockPos goal) {
-        this.world = ((ServerLevel) mob.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) mob.level()).getWorld().getName();
         this.uuid = mob.getUUID();
         this.goal = goal;
         this.speed = mob.getNavigation().getSpeedModifier();

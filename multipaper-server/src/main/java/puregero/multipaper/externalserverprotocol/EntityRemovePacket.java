@@ -28,7 +28,7 @@ public class EntityRemovePacket extends ExternalServerPacket {
     private final boolean unloadedWithPlayer;
 
     public EntityRemovePacket(Entity entity, boolean unloadedWithPlayer) {
-        this(((ServerLevel) entity.level()).getServer().storageSource.getLevelId(), entity.getUUID(), unloadedWithPlayer);
+        this(((ServerLevel) entity.level()).getWorld().getName(), entity.getUUID(), unloadedWithPlayer);
     }
 
     public EntityRemovePacket(String world, UUID uuid, boolean unloadedWithPlayer) {

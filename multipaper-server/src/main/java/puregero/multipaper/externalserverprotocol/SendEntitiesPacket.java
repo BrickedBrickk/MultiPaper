@@ -58,7 +58,7 @@ public class SendEntitiesPacket extends ExternalServerPacket {
         if (chunkEntities == null) {
             chunkEntities = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getChunk(pos.x(), pos.z());
             if (chunkEntities == null) {
-                new Exception("Entities are not loaded in " + level.getServer().storageSource.getLevelId() + pos + ", sending null entities").printStackTrace();
+                new Exception("Entities are not loaded in " + level.getWorld().getName() + pos + ", sending null entities").printStackTrace();
                 return null;
             }
         }

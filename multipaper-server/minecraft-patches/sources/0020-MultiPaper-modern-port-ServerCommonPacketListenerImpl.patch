@@ -32,13 +32,15 @@
                  this.cserver.getPluginManager().callEvent(event);
              }
  
-@@ -443,7 +452,9 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+@@ -443,7 +452,11 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
          }
  
          // Send the possibly modified leave message
 -        this.disconnect0(new DisconnectionDetails(reason, details.report(), details.bugReportLink(), java.util.Optional.ofNullable(leaveMessage), details.disconnectionReason()));
 +        if (shouldKick) { // MultiPaper - don't send the disconnect packet for external disconnects
 +            this.disconnect0(new DisconnectionDetails(reason, details.report(), details.bugReportLink(), java.util.Optional.ofNullable(leaveMessage), details.disconnectionReason()));
++        } else if (this instanceof ServerGamePacketListenerImpl serverGamePacketListener && serverGamePacketListener.player instanceof ExternalPlayer) {
++            serverGamePacketListener.onDisconnect(details); // MultiPaper - remove external players without a network channel
 +        }
      }
  

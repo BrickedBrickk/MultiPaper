@@ -50,7 +50,13 @@
          NameAndId gameProfile = player.nameAndId();
          UserNameToIdResolver profileCache = this.server.services().nameToIdCache();
          Optional<NameAndId> oldProfile = profileCache.get(gameProfile.id());
-@@ -418,6 +440,7 @@ public abstract class PlayerList {
+@@ -297,4 +319,5 @@ public abstract class PlayerList {
+         player.sentListPacket = true;
+         player.suppressTrackerForLogin = false; // Paper - Fire PlayerJoinEvent when Player is actually ready
+         player.level().getChunkSource().addEntity(player); // Paper - Fire PlayerJoinEvent when Player is actually ready; track entity now
++        MultiPaper.onPlayerJoin(player); // MultiPaper - publish the real player to subscribed peers
+         // CraftBukkit end
+@@ -418,6 +441,7 @@ public abstract class PlayerList {
  
      protected void save(final ServerPlayer player) {
          if (!player.getBukkitEntity().isPersistent()) return; // CraftBukkit
@@ -58,7 +64,7 @@
          player.lastSave = MinecraftServer.currentTick; // Paper - Incremental chunk and player saving
          this.playerIo.save(player);
          ServerStatsCounter stats = player.getStats(); // CraftBukkit
-@@ -446,8 +469,8 @@ public abstract class PlayerList {
+@@ -446,8 +470,8 @@ public abstract class PlayerList {
              player.closeContainer(org.bukkit.event.inventory.InventoryCloseEvent.Reason.DISCONNECT); // Paper - Inventory close reason
          }
  
@@ -69,7 +75,7 @@
          player.getBukkitEntity().disconnect();
  
          // CraftBukkit end
-@@ -531,6 +554,9 @@ public abstract class PlayerList {
+@@ -531,6 +555,9 @@ public abstract class PlayerList {
          // This removes the scoreboard (and player reference) for the specific player in the manager
          this.cserver.getScoreboardManager().removePlayer(player.getBukkitEntity());
          // CraftBukkit end
@@ -79,7 +85,7 @@
          return playerQuitEvent.quitMessage(); // Paper - Adventure
      }
  
-@@ -606,6 +632,14 @@ public abstract class PlayerList {
+@@ -606,6 +633,14 @@ public abstract class PlayerList {
          TeleportTransition respawnInfo = result.transition();
          Level fromLevel = serverPlayer.level();
          // Paper end - respawn event
@@ -94,7 +100,7 @@
          this.players.remove(serverPlayer);
          this.playersByName.remove(serverPlayer.getScoreboardName().toLowerCase(java.util.Locale.ROOT)); // Paper
          serverPlayer.level().removePlayerImmediately(serverPlayer, removalReason);
-@@ -713,6 +747,25 @@ public abstract class PlayerList {
+@@ -713,6 +748,25 @@ public abstract class PlayerList {
          ).callEvent();
          // Paper end
  
@@ -120,7 +126,7 @@
          return player;
      }
  
-@@ -742,6 +795,20 @@ public abstract class PlayerList {
+@@ -742,6 +796,20 @@ public abstract class PlayerList {
          this.sendPlayerPermissionLevel(player, permissions, recalculatePermissions); // Paper - avoid recalculating permissions if possible
      }
  

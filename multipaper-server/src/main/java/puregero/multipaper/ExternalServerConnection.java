@@ -109,6 +109,7 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
         while (channel.pipeline().last() != null) {
             channel.pipeline().removeLast();
         }
+        channel.config().setAutoRead(true);
 
         // And add our own
         if (!Boolean.getBoolean("Paper.disableFlushConsolidate")) channel.pipeline().addFirst(new io.netty.handler.flush.FlushConsolidationHandler());

@@ -29,7 +29,7 @@ public class EntityUpdateNBTPacket extends ExternalServerPacket {
     private final byte[] data;
 
     public EntityUpdateNBTPacket(Entity entity) {
-        this.world = ((ServerLevel) entity.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) entity.level()).getWorld().getName();
         this.uuid = entity.getUUID();
 
         net.minecraft.world.level.storage.TagValueOutput output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(

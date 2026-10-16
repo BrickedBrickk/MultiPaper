@@ -29,7 +29,7 @@ public class AddItemToEntityContainerPacket extends ExternalServerPacket {
     private final ItemStack itemStack;
 
     public AddItemToEntityContainerPacket(Entity entity, int slot, ItemStack itemStack) {
-        this.world = ((ServerLevel) entity.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) entity.level()).getWorld().getName();
         this.uuid = entity.getUUID();
         this.slot = slot;
         this.itemStack = itemStack;

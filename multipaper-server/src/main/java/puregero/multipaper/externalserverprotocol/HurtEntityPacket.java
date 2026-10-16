@@ -33,7 +33,7 @@ public class HurtEntityPacket extends ExternalServerPacket {
     private final BlockPos blockDamagePos;
 
     public HurtEntityPacket(Entity entity, DamageSource source, float amount, Entity entityDamage, Block blockDamage) {
-        this.world = ((ServerLevel) entity.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) entity.level()).getWorld().getName();
         this.uuid = entity.getUUID();
         this.amount = amount;
         this.entityDamageUuid = entityDamage == null ? null : entityDamage.getUUID();

@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
-@@ -1180,7 +1180,8 @@ public final class ChunkHolderManager {
+@@ -1180,7 +1180,7 @@ public final class ChunkHolderManager {
          }
      }
  
@@ -9,7 +9,7 @@
          holder.onUnload();
          this.autoSaveQueue.remove(holder);
          ((ChunkSystemServerChunkCache)this.world.getChunkSource()).moonrise$chunkHolderUnload(holder);
-@@ -1344,6 +1345,70 @@ public final class ChunkHolderManager {
+@@ -1344,6 +1344,72 @@ public final class ChunkHolderManager {
          }
      }
  
@@ -37,6 +37,8 @@
 +                if (!chunkHolder.canBeForceUnloadedForMultiPaper()) {
 +                    return false;
 +                }
++                chunkHolder.removeFromUnloadQueue();
++                this.unloadQueue.removeChunk(chunkHolder.chunkX, chunkHolder.chunkZ);
 +                state = chunkHolder.unloadStage1();
 +                if (state == null) {
 +                    // can unload immediately

@@ -29,7 +29,7 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
     private final BlockPos destination;
 
     public PullItemFromContainerPacket(BlockEntity blockEntity, int slot, ItemStack itemStack, Hopper destinationHopper) {
-        this.world = ((ServerLevel) blockEntity.getLevel()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) blockEntity.getLevel()).getWorld().getName();
         this.source = blockEntity.getBlockPos();
         this.slot = slot;
         this.itemStack = itemStack;

@@ -33,7 +33,7 @@ public class AddItemToContainerPacket extends ExternalServerPacket {
     }
 
     public AddItemToContainerPacket(ServerLevel serverLevel, BlockPos blockPos, int slot, ItemStack itemStack) {
-        this.world = serverLevel.getServer().storageSource.getLevelId();
+        this.world = serverLevel.getWorld().getName();
         this.pos = blockPos;
         this.slot = slot;
         this.itemStack = itemStack;

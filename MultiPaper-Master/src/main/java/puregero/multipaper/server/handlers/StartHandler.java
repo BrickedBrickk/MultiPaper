@@ -15,7 +15,13 @@ public class StartHandler {
             connection.setHost(message.host);
         }
 
-        System.out.println(connection.getBungeeCordName() + " (" + connection.getHost() + ":" + message.port + ") has started, broadcasting start to other servers...");
+        connection.setPort(message.port);
+        System.out.println(connection.getBungeeCordName() + " (" + connection.getHost() + ":" + message.port + ") has started, announcing connected servers...");
+        for (ServerConnection existing : ServerConnection.getConnections()) {
+            if (existing != connection && existing.getPort() > 0 && existing.getChannel().isActive()) {
+                connection.send(new ServerStartedMessage(existing.getHost(), existing.getPort()));
+            }
+        }
         connection.broadcastOthers(new ServerStartedMessage(connection.getHost(), message.port));
     }
 }

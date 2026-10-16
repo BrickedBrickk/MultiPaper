@@ -97,6 +97,10 @@ public class MultiPaperEntityIdManager {
         if (MultiPaperConfiguration.get().syncSettings.syncEntityIds) {
             Block block = entityIdBlock;
             int id = LOCAL_ENTITY_COUNTER.getAndIncrement();
+            if (id <= 0) {
+                // Entity id zero is reserved as the unassigned sentinel by Minecraft.
+                return next();
+            }
             if (block == null || !block.isInBounds(id)) { // Check the max id before the min id due to concurrent variable modification
                 getNextBlock(block);
                 return next();

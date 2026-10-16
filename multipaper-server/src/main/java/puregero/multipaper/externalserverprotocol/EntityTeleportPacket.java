@@ -21,7 +21,7 @@ public class EntityTeleportPacket extends ExternalServerPacket {
     private final float pitch;
 
     public EntityTeleportPacket(Entity entity, double x, double y, double z, float yaw, float pitch) {
-        this.world = ((ServerLevel) entity.level()).getServer().storageSource.getLevelId();
+        this.world = ((ServerLevel) entity.level()).getWorld().getName();
         this.uuid = entity.getUUID();
         this.x = x;
         this.y = y;
