@@ -1,0 +1,26 @@
+--- a/net/minecraft/world/level/border/WorldBorder.java
++++ b/net/minecraft/world/level/border/WorldBorder.java
+@@ -41,6 +41,7 @@ public class WorldBorder extends SavedData {
+ 
+     public WorldBorder() {
+         this(WorldBorder.Settings.DEFAULT);
++        listeners.add(new puregero.multipaper.MultiPaperWorldBorderHandler()); // MultiPaper - Add our own world border listener
+     }
+ 
+     public WorldBorder(final WorldBorder.Settings settings) {
+@@ -357,6 +358,7 @@ public class WorldBorder extends SavedData {
+ 
+     // Paper start - add back applySettings
+     public void applySettings(WorldBorder.Settings settings) {
++        puregero.multipaper.MultiPaperWorldBorderHandler.updatingWorldBorder = true; // MultiPaper
+         this.setCenter(settings.centerX(), settings.centerZ());
+         this.setDamagePerBlock(settings.damagePerBlock());
+         this.setSafeZone(settings.safeZone());
+@@ -368,6 +370,7 @@ public class WorldBorder extends SavedData {
+         } else {
+             this.setSize(settings.size());
+         }
++        puregero.multipaper.MultiPaperWorldBorderHandler.updatingWorldBorder = false; // MultiPaper
+     }
+     // Paper end - add back applySettings
+ 

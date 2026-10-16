@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/chunk/storage/EntityStorage.java
++++ b/net/minecraft/world/level/chunk/storage/EntityStorage.java
+@@ -52,7 +52,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
+         this.reportLoadFailureIfPresent(loadFuture, pos);
+         return loadFuture.thenApplyAsync(tag -> {
+             if (tag.isEmpty()) {
+-                this.emptyChunks.add(pos.pack());
++                this.emptyChunks.remove(pos.pack()); // MultiPaper - don't cache empty chunks
+                 return emptyChunk(pos);
+             }
+ 

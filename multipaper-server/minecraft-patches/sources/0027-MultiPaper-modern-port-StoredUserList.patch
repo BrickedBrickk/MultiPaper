@@ -1,0 +1,56 @@
+--- a/net/minecraft/server/players/StoredUserList.java
++++ b/net/minecraft/server/players/StoredUserList.java
+@@ -21,6 +21,7 @@ import java.util.Objects;
+ import net.minecraft.server.notifications.NotificationService;
+ import net.minecraft.util.GsonHelper;
+ import net.minecraft.util.Util;
++import puregero.multipaper.MultiPaper;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+@@ -129,12 +130,45 @@ public abstract class StoredUserList<K, V extends StoredUserEntry<K>> {
+         JsonArray result = new JsonArray();
+         this.map.values().stream().map(entry -> Util.make(new JsonObject(), entry::serialize)).forEach(result::add);
+ 
++        // MultiPaper start - don't touch files
++        try {
++            MultiPaper.writeJson(this.file.getName(), GSON.toJson(result));
++            return;
++        } catch (Exception e) {
++            LOGGER.warn("Failed to write {} via MultiPaper, falling back to local file", this.file, e);
++        }
++        // MultiPaper end - don't touch files
++
+         try (BufferedWriter writer = Files.newWriter(this.file, StandardCharsets.UTF_8)) {
+             GSON.toJson(result, GSON.newJsonWriter(writer));
+         }
+     }
+ 
+     public void load() throws IOException {
++        // MultiPaper start - read from MultiPaper when possible
++        try {
++            String json = MultiPaper.readJson(this.file.getName());
++            if (json != null && !json.isEmpty()) {
++                this.map.clear();
++                JsonArray contents = GSON.fromJson(json, JsonArray.class);
++                if (contents == null) {
++                    return;
++                }
++
++                for (JsonElement element : contents) {
++                    JsonObject object = GsonHelper.convertToJsonObject(element, "entry");
++                    StoredUserEntry<K> entry = this.createEntry(object);
++                    if (entry.getUser() != null) {
++                        this.map.put(this.getKeyForUser(entry.getUser()), (V)entry);
++                    }
++                }
++                return;
++            }
++        } catch (Exception e) {
++            LOGGER.warn("Failed to read {} via MultiPaper, falling back to local file", this.file, e);
++        }
++        // MultiPaper end - read from MultiPaper when possible
++
+         if (this.file.exists()) {
+             try (BufferedReader reader = Files.newReader(this.file, StandardCharsets.UTF_8)) {
+                 this.map.clear();

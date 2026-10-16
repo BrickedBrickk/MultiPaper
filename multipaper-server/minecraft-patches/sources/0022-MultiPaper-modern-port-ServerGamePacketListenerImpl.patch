@@ -1,0 +1,137 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -252,6 +252,7 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+ import org.bukkit.event.player.PlayerTeleportEvent;
+ import org.bukkit.event.player.PlayerToggleFlightEvent;
+ import org.bukkit.event.player.PlayerToggleSprintEvent;
++import puregero.multipaper.MultiPaper; // MultiPaper
+ // CraftBukkit end
+ 
+ public class ServerGamePacketListenerImpl
+@@ -274,7 +275,7 @@ public class ServerGamePacketListenerImpl
+     public ServerPlayer player;
+     public final PlayerChunkSender chunkSender;
+     private int tickCount;
+-    private int ackBlockChangesUpTo = -1;
++    public int ackBlockChangesUpTo = -1; // MultiPaper - make public
+     private final TickThrottler dropSpamThrottler = new TickThrottler(20, 1480);
+     private final TickThrottler chatSpamThrottler;
+     private final TickThrottler commandSpamThrottler;
+@@ -813,6 +814,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleAcceptTeleportPacket(final ServerboundAcceptTeleportationPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        puregero.multipaper.MultiPaperInventoryHandler.handleAcceptTeleport(this.player, packet); // MultiPaper
+         if (packet.id() == this.awaitingTeleport) {
+             if (this.awaitingPositionFromClient == null || containsInvalidValues(packet.x(), packet.y(), packet.z(), packet.yRot(), packet.xRot())) {
+                 ServerGamePacketListenerImpl.LOGGER.warn("Disconnected on accept teleport packet. Was not expecting position data from client at this time"); // Purpur - Add more logger output for invalid movement kicks
+@@ -861,6 +863,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleRecipeBookChangeSettingsPacket(final ServerboundRecipeBookChangeSettingsPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet); // MultiPaper
+         CraftEventFactory.callRecipeBookSettingsEvent(this.player, packet.getBookType(), packet.isOpen(), packet.isFiltering()); // CraftBukkit
+         this.player.getRecipeBook().setBookSetting(packet.getBookType(), packet.isOpen(), packet.isFiltering());
+     }
+@@ -1141,6 +1144,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleRenameItem(final ServerboundRenameItemPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+         if (this.player.containerMenu instanceof AnvilMenu menu) {
+             if (!menu.stillValid(this.player)) {
+                 LOGGER.debug("Player {} interacted with invalid menu {}", this.player, menu);
+@@ -1154,6 +1158,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleSetBeaconPacket(final ServerboundSetBeaconPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+         if (this.player.containerMenu instanceof BeaconMenu menu) {
+             if (!this.player.containerMenu.stillValid(this.player)) {
+                 LOGGER.debug("Player {} interacted with invalid menu {}", this.player, this.player.containerMenu);
+@@ -1345,6 +1350,8 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleSelectTrade(final ServerboundSelectTradePacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
++
+         int selection = packet.getItem();
+         if (this.player.containerMenu instanceof MerchantMenu menu) {
+             // CraftBukkit start
+@@ -2230,6 +2237,7 @@ public class ServerGamePacketListenerImpl
+ 
+     @Override
+     public void handleUseItemOn(final ServerboundUseItemOnPacket packet) {
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleInteractEvent(this.player, packet)) return; // MultiPaper - send to external server if necessary
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
+         if (this.player.isImmobile()) return; // CraftBukkit
+         if (!this.checkLimit(packet.timestamp())) return; // Spigot - check limit
+@@ -2322,6 +2330,7 @@ public class ServerGamePacketListenerImpl
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
+         if (this.player.isImmobile()) return; // CraftBukkit
+         if (!this.checkLimit(packet.timestamp())) return; // Spigot - check limit
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleUseItemEvent(this.player, packet)) return; // MultiPaper
+         if (this.hasClientLoaded()) {
+             this.ackBlockChangesUpTo(packet.sequence());
+             ServerLevel level = this.player.level();
+@@ -2431,9 +2440,9 @@ public class ServerGamePacketListenerImpl
+         this.player.disconnect();
+         // Paper start - Adventure
+         quitMessage = quitMessage == null ? this.server.getPlayerList().remove(this.player) : this.server.getPlayerList().remove(this.player, quitMessage); // Paper - pass in quitMessage to fix kick message not being used
+-        if ((quitMessage != null) && !quitMessage.equals(net.kyori.adventure.text.Component.empty())) {
++        if ((quitMessage != null) && !quitMessage.equals(net.kyori.adventure.text.Component.empty()) && MultiPaper.isRealPlayer(this.player)) { // MultiPaper - Only run for real players
+             this.server.getPlayerList().broadcastSystemMessage(PaperAdventure.asVanilla(quitMessage), false);
+-            // Paper end - Adventure
++            // Paper end
+         }
+         // CraftBukkit end
+         this.player.getTextFilter().leave();
+@@ -2446,6 +2455,7 @@ public class ServerGamePacketListenerImpl
+         }
+ 
+         this.ackBlockChangesUpTo = Math.max(packetSequenceNr, this.ackBlockChangesUpTo);
++        puregero.multipaper.MultiPaperAckBlockChangesHandler.onAckNeeded(this.player); // MultiPaper
+     }
+ 
+     @Override
+@@ -2468,6 +2478,8 @@ public class ServerGamePacketListenerImpl
+ 
+             this.player.getInventory().setSelectedSlot(packet.getSlot());
+             this.player.resetLastActionTime();
++            if (MultiPaper.isRealPlayer(this.player)) MultiPaper.broadcastPacketToExternalServers(this.player, new puregero.multipaper.externalserverprotocol.PlayerActionPacket(this.player, packet)); // MultiPaper
++            else this.player.detectEquipmentUpdates(); // MultiPaper
+             if (io.papermc.paper.configuration.GlobalConfiguration.get().unsupportedSettings.updateEquipmentOnPlayerActions) this.player.detectEquipmentUpdates(); // Paper - Force update attributes.
+         } else {
+             LOGGER.warn("{} tried to set an invalid carried item", this.player.getPlainTextName());
+@@ -3183,6 +3195,7 @@ public class ServerGamePacketListenerImpl
+     public void handleContainerClose(ServerboundContainerClosePacket packet, org.bukkit.event.inventory.InventoryCloseEvent.Reason reason) {
+         // Paper end - Inventory close reason
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+ 
+         if (this.player.isImmobile()) return; // CraftBukkit
+         CraftEventFactory.handleInventoryCloseEvent(this.player, reason); // CraftBukkit // Paper
+@@ -3192,6 +3205,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleContainerClick(final ServerboundContainerClickPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+         if (this.player.isImmobile()) return; // CraftBukkit
+         this.player.resetLastActionTime();
+         if (this.player.containerMenu.containerId == packet.containerId() && this.player.containerMenu.stillValid(this.player)) { // CraftBukkit
+@@ -3534,6 +3548,7 @@ public class ServerGamePacketListenerImpl
+         }
+         // Paper end - auto recipe limit
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+         this.player.resetLastActionTime();
+         if (!this.player.isSpectator() && this.player.containerMenu.containerId == packet.containerId()) {
+             if (!this.player.containerMenu.stillValid(this.player)) {
+@@ -3600,6 +3615,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleContainerButtonClick(final ServerboundContainerButtonClickPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.handleContainerEvent(this.player, packet)) return; // MultiPaper
+         if (this.player.isImmobile()) return; // CraftBukkit
+         this.player.resetLastActionTime();
+         if (this.player.containerMenu.containerId == packet.containerId() && !this.player.isSpectator()) {

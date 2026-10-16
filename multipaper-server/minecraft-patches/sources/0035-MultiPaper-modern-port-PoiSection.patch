@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/entity/ai/village/poi/PoiSection.java
++++ b/net/minecraft/world/entity/ai/village/poi/PoiSection.java
+@@ -129,7 +129,7 @@ public class PoiSection implements ca.spottedleaf.moonrise.patches.chunk_system.
+         return this.getPoiRecord(pos).map(PoiRecord::getPoiType);
+     }
+ 
+-    private Optional<PoiRecord> getPoiRecord(final BlockPos pos) {
++    public Optional<PoiRecord> getPoiRecord(final BlockPos pos) {
+         return Optional.ofNullable(this.records.get(SectionPos.sectionRelativePos(pos)));
+     }
+ 

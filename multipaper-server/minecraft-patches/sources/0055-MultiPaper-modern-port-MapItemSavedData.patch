@@ -1,0 +1,35 @@
+--- a/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java
++++ b/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java
+@@ -284,7 +284,7 @@ public class MapItemSavedData extends SavedData {
+             this.trackedDecorationCount--;
+         }
+ 
+-        if (decoration != null) this.setDecorationsDirty(); // Paper - only mark dirty if a change occurs
++        if (decoration != null) this.setDecorationsDirty(decoration.type()); // MultiPaper - track the decoration being made dirty // Paper - only mark dirty if a change occurs
+     }
+ 
+     public static void addTargetDecoration(final ItemStack itemStack, final BlockPos position, final String key, final Holder<MapDecorationType> decorationType) {
+@@ -321,7 +321,7 @@ public class MapItemSavedData extends SavedData {
+                     this.trackedDecorationCount++;
+                 }
+ 
+-                this.setDecorationsDirty();
++                this.setDecorationsDirty(locationAndType.type()); // MultiPaper - track the decoration being made dirty
+             }
+         }
+     }
+@@ -416,7 +416,13 @@ public class MapItemSavedData extends SavedData {
+         }
+     }
+ 
+-    private void setDecorationsDirty() {
++    private void setDecorationsDirty(final Holder<MapDecorationType> type) { // MultiPaper - track the decoration being made dirty
++        if (!type.is(MapDecorationTypes.FRAME)
++            && !type.is(MapDecorationTypes.PLAYER)
++            && !type.is(MapDecorationTypes.PLAYER_OFF_LIMITS)
++            && !type.is(MapDecorationTypes.PLAYER_OFF_MAP)) {
++            return; // MultiPaper - don't save for these decorations
++        }
+         this.carriedBy.forEach(MapItemSavedData.HoldingPlayer::markDecorationsDirty);
+     }
+ 

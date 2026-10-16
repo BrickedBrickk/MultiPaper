@@ -1,0 +1,79 @@
+--- a/net/minecraft/stats/ServerStatsCounter.java
++++ b/net/minecraft/stats/ServerStatsCounter.java
+@@ -17,6 +17,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
+ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+ import java.io.IOException;
+ import java.io.Reader;
++import java.io.StringReader;
+ import java.io.Writer;
+ import java.nio.charset.StandardCharsets;
+ import java.nio.file.Files;
+@@ -38,6 +39,9 @@ import net.minecraft.util.datafix.DataFixTypes;
+ import net.minecraft.world.entity.player.Player;
+ import org.slf4j.Logger;
+ 
++import puregero.multipaper.ExternalPlayer;
++import puregero.multipaper.MultiPaper;
++
+ public class ServerStatsCounter extends StatsCounter {
+     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -50,6 +54,7 @@ public class ServerStatsCounter extends StatsCounter {
+             return stats;
+         }, map -> map.entrySet().stream().collect(Collectors.groupingBy(entry -> entry.getKey().getType(), Util.toMap())));
+     private final Path file;
++    private final MinecraftServer server; // MultiPaper - save stats to the owning server
+     private final Set<Stat<?>> dirty = Sets.newHashSet();
+ 
+     private static <T> Codec<Map<Stat<?>, Integer>> createTypedStatsCodec(final StatType<T> type) {
+@@ -65,7 +70,23 @@ public class ServerStatsCounter extends StatsCounter {
+ 
+     public ServerStatsCounter(final MinecraftServer server, final Path file) {
+         this.file = file;
+-        if (Files.isRegularFile(file)) {
++        this.server = server; // MultiPaper
++        // MultiPaper start - load the stats from the owning server
++        String json = null, uuid = this.file.getFileName().toString().split("\\.")[0];
++        try {
++            json = puregero.multipaper.ExternalPlayer.loadedStats.remove(java.util.UUID.fromString(uuid));
++        } catch (IllegalArgumentException e) {
++            LOGGER.error("Invalid UUID was passed, possible a plugin doing weird stuff?, you can safely ignore this if you are using such plugins: {}", e.getMessage());
++        }
++        if (json == null) json = puregero.multipaper.MultiPaper.readStats(server.storageSource.getLevelId(), uuid);
++        if (json != null && !json.isEmpty()) {
++            try {
++                this.parse(server.getFixerUpper(), StrictJsonParser.parse(new StringReader(json))); // MultiPaper
++            } catch (JsonParseException jsonparseexception) {
++                LOGGER.error("Couldn't parse statistics file {}", file, jsonparseexception);
++            }
++        // MultiPaper end - load the stats from the owning server
++        } else if (Files.isRegularFile(file)) {
+             try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                 JsonElement element = StrictJsonParser.parse(reader);
+                 this.parse(server.getFixerUpper(), element);
+@@ -90,6 +111,16 @@ public class ServerStatsCounter extends StatsCounter {
+ 
+     public void save() {
+         if (org.spigotmc.SpigotConfig.disableStatSaving) return; // Spigot
++        // MultiPaper start - save the stats to the owning server
++        try {
++            puregero.multipaper.MultiPaper.writeStats(
++                this.server.storageSource.getLevelId(), this.file.getFileName().toString().split("\\.")[0], this.toJson().toString()
++            );
++            return;
++        } catch (Exception e) {
++            LOGGER.warn("Failed to save stats via MultiPaper, falling back to local file", e);
++        }
++        // MultiPaper end - save the stats to the owning server
+         try {
+             FileUtil.createDirectoriesSafe(this.file.getParent());
+ 
+@@ -126,7 +157,7 @@ public class ServerStatsCounter extends StatsCounter {
+             );
+     }
+ 
+-    protected JsonElement toJson() {
++    public JsonElement toJson() { // MultiPaper - make public
+         JsonObject result = new JsonObject();
+         result.add("stats", STATS_CODEC.encodeStart(JsonOps.INSTANCE, this.stats).getOrThrow());
+         result.addProperty("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());

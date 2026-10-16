@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/entity/projectile/Projectile.java
++++ b/net/minecraft/world/entity/projectile/Projectile.java
+@@ -447,6 +447,10 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+         }
+     }
+ 
++    public void multiPaperOnHit(final HitResult hitResult) {
++        this.onHit(hitResult);
++    }
++
+     protected void onHitEntity(final EntityHitResult hitResult) {
+     }
+ 

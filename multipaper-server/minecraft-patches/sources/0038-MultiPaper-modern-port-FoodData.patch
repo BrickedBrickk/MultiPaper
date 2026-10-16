@@ -1,0 +1,15 @@
+--- a/net/minecraft/world/food/FoodData.java
++++ b/net/minecraft/world/food/FoodData.java
+@@ -139,4 +139,12 @@ public class FoodData {
+     public void setSaturation(final float saturation) {
+         this.saturationLevel = saturation;
+     }
++
++    public float getExhaustionLevel() {
++        return this.exhaustionLevel;
++    }
++
++    public void setExhaustion(final float exhaustion) {
++        this.exhaustionLevel = Math.max(0.0F, Math.min(exhaustion, 40.0F));
++    }
+ }

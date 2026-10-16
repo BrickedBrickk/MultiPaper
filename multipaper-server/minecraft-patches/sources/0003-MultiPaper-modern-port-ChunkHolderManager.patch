@@ -1,0 +1,77 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
+@@ -1180,7 +1180,7 @@ public final class ChunkHolderManager {
+         }
+     }
+ 
+-    private void removeChunkHolder(final NewChunkHolder holder) {
++    public void removeChunkHolder(final NewChunkHolder holder) { // MultiPaper - make public (unsafe method, do not use!!!)
+         holder.onUnload();
+         this.autoSaveQueue.remove(holder);
+         ((ChunkSystemServerChunkCache)this.world.getChunkSource()).moonrise$chunkHolderUnload(holder);
+@@ -1344,6 +1344,65 @@ public final class ChunkHolderManager {
+         }
+     }
+ 
++    // MultiPaper start - unload a chunk immediately without saving it
++    public void unloadChunkNowNoSave(final NewChunkHolder chunkHolder) {
++        TickThread.ensureTickThread("Cannot unload chunks off-main");
++
++        if (BLOCK_TICKET_UPDATES.get() == Boolean.TRUE) {
++            throw new IllegalStateException("Cannot unload chunks recursively");
++        }
++        if (this.ticketLockArea.isHeldByCurrentThread(chunkHolder.chunkX, chunkHolder.chunkZ)) {
++            throw new IllegalStateException("Cannot hold ticket update lock while calling processUnloads");
++        }
++        if (this.taskScheduler.schedulingLockArea.isHeldByCurrentThread(chunkHolder.chunkX, chunkHolder.chunkZ)) {
++            throw new IllegalStateException("Cannot hold scheduling lock while calling processUnloads");
++        }
++
++        NewChunkHolder.UnloadState state;
++
++        final ReentrantAreaLock.Node ticketLock = this.ticketLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++        try {
++            final ReentrantAreaLock.Node schedulingLock = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++            try {
++                state = chunkHolder.unloadStage1();
++                if (state == null) {
++                    // can unload immediately
++                    this.removeChunkHolder(chunkHolder);
++                    return;
++                }
++            } finally {
++                this.taskScheduler.schedulingLockArea.unlock(schedulingLock);
++            }
++        } finally {
++            this.ticketLockArea.unlock(ticketLock);
++        }
++
++        final Boolean before = this.blockTicketUpdates();
++        try {
++            chunkHolder.unloadStage2(state, true);
++        } finally {
++            this.unblockTicketUpdates(before);
++        }
++
++        final ReentrantAreaLock.Node ticketLock2 = this.ticketLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++        try {
++            final ReentrantAreaLock.Node schedulingLock2 = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
++            try {
++                if (chunkHolder.unloadStage3()) {
++                    this.removeChunkHolder(chunkHolder);
++                } else {
++                    // add cooldown so the next unload check is not immediately next tick
++                    this.addTicketAtLevel(UNLOAD_COOLDOWN, chunkHolder.chunkX, chunkHolder.chunkZ, MAX_TICKET_LEVEL, null);
++                }
++            } finally {
++                this.taskScheduler.schedulingLockArea.unlock(schedulingLock2);
++            }
++        } finally {
++            this.ticketLockArea.unlock(ticketLock2);
++        }
++    }
++    // MultiPaper end - unload a chunk immediately without saving it
++
+     public enum TicketOperationType {
+         ADD, REMOVE, ADD_IF_REMOVED, ADD_AND_REMOVE
+     }

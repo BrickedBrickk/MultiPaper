@@ -1,0 +1,15 @@
+--- a/net/minecraft/server/Main.java
++++ b/net/minecraft/server/Main.java
+@@ -117,6 +117,12 @@ public class Main {
+             org.purpurmc.purpur.PurpurConfig.registerMinecraftDisabledCommands = purpurConfiguration.getBoolean("settings.register-minecraft-disabled-commands"); // Purpur - register disabled minecraft commands
+             // Purpur end - Add toggle for enchant level clamping - load config files early
+ 
++            // MultiPaper start
++            puregero.multipaper.config.MultiPaperConfigurationLoader.init((File) options.valueOf("multipaper-settings"));
++            System.setProperty("multipaper.master-connection.my-name", puregero.multipaper.config.MultiPaperConfiguration.get().masterConnection.myName); // MultiPaper - remember this property even after config reloads
++            puregero.multipaper.MultiPaper.getConnection(); // MultiPaper - start connection
++            // MultiPaper end
++
+             io.papermc.paper.plugin.PluginInitializerManager.load(options); // Paper
+             Bootstrap.bootStrap();
+             Bootstrap.validate();

@@ -1,0 +1,54 @@
+--- a/net/minecraft/world/level/storage/PlayerDataStorage.java
++++ b/net/minecraft/world/level/storage/PlayerDataStorage.java
+@@ -19,19 +19,34 @@ import net.minecraft.util.datafix.DataFixTypes;
+ import net.minecraft.world.entity.player.Player;
+ import org.slf4j.Logger;
+ 
++import puregero.multipaper.MultiPaper;
++
+ public class PlayerDataStorage {
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private final File playerDir;
++    private final LevelStorageSource.LevelStorageAccess session; // MultiPaper
+     protected final DataFixer fixerUpper;
+ 
+     public PlayerDataStorage(final LevelStorageSource.LevelStorageAccess levelAccess, final DataFixer fixerUpper) {
+         this.fixerUpper = fixerUpper;
++        this.session = levelAccess; // MultiPaper
+         this.playerDir = levelAccess.getLevelPath(LevelResource.PLAYER_DATA_DIR).toFile();
+         this.playerDir.mkdirs();
+     }
+ 
+     public void save(final Player player) {
+         if (org.spigotmc.SpigotConfig.disablePlayerDataSaving) return; // Spigot
++        // MultiPaper start - write the player data to the owning server
++        try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
++            TagValueOutput output = TagValueOutput.createWithContext(reporter, player.registryAccess());
++            player.saveWithoutId(output);
++            CompoundTag nbttagcompound = output.buildResult();
++            MultiPaper.writePlayer(this.session.getLevelDirectory().path().getFileName().toString(), player.getStringUUID(), nbttagcompound);
++            return;
++        } catch (Exception e) {
++            LOGGER.warn("Failed to save player data for {} via MultiPaper, falling back to local file", player.getPlainTextName(), e);
++        }
++        // MultiPaper end - write the player data to the owning server
+         try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
+             TagValueOutput output = TagValueOutput.createWithContext(reporter, player.registryAccess());
+             player.saveWithoutId(output);
+@@ -62,6 +77,16 @@ public class PlayerDataStorage {
+     }
+ 
+     private Optional<CompoundTag> load(final NameAndId nameAndId, final String suffix) {
++        // MultiPaper start - read the player data from the owning server
++        try {
++            final CompoundTag tag = MultiPaper.readPlayer(this.session.getLevelDirectory().path().getFileName().toString(), nameAndId.id().toString());
++            if (tag != null) {
++                return Optional.of(tag);
++            }
++        } catch (Exception e) {
++            LOGGER.warn("Failed to load player data for {} via MultiPaper, falling back to local file", nameAndId.name(), e);
++        }
++        // MultiPaper end - read the player data from the owning server
+         File realFile = new File(this.playerDir, nameAndId.id() + suffix);
+         // Spigot start
+         boolean usingWrongFile = false;

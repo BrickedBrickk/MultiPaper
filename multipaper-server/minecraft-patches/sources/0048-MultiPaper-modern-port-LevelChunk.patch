@@ -1,0 +1,70 @@
+--- a/net/minecraft/world/level/chunk/LevelChunk.java
++++ b/net/minecraft/world/level/chunk/LevelChunk.java
+@@ -59,6 +59,8 @@ import net.minecraft.world.level.material.Fluids;
+ import net.minecraft.world.level.storage.TagValueInput;
+ import net.minecraft.world.ticks.LevelChunkTicks;
+ import net.minecraft.world.ticks.TickContainerAccess;
++
++import puregero.multipaper.*;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+@@ -90,8 +92,10 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+     private @Nullable Supplier<FullChunkStatus> fullStatus;
+     private LevelChunk.@Nullable PostLoadProcessor postLoad;
+     private final Int2ObjectMap<GameEventListenerRegistry> gameEventListenerRegistrySections;
+-    private final LevelChunkTicks<Block> blockTicks;
+-    private final LevelChunkTicks<Fluid> fluidTicks;
++    public net.minecraft.nbt.ListTag entitiesToLoad; // MultiPaper
++    public net.minecraft.nbt.ListTag blockEntitiesToLoad; // MultiPaper
++    public LevelChunkTicks<Block> blockTicks; // MultiPaper - make public and non-final
++    public LevelChunkTicks<Fluid> fluidTicks; // MultiPaper - make public and non-final
+     private LevelChunk.UnsavedListener unsavedListener = chunkPos -> {};
+     // CraftBukkit start
+     public boolean mustNotSave;
+@@ -118,6 +122,9 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+     @Override
+     public final void moonrise$setChunkHolder(final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder holder) {
+         this.chunkAndHolder = holder;
++        // MultiPaper start - unlock the chunk when it stops ticking
++        if (holder != null && holder.hasExternalLockRequest) MultiPaper.unlockChunk(holder, holder.getCurrentChunk(), holder.getEntityChunk());
++        // MultiPaper end - unlock the chunk when it stops ticking
+     }
+     // Paper end - rewrite chunk system
+     // Paper start - get block chunk optimisation
+@@ -580,8 +587,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         return result;
+     }
+ 
+-    @Override
++@Override
+     public void removeBlockEntity(final BlockPos pos) {
++        // MultiPaper start - allow removing a block entity on unloaded block entities
++        if (this.blockEntitiesToLoad != null) {
++            this.blockEntitiesToLoad.removeIf(tag -> pos.equals(BlockEntity.getPosFromTag(null, (CompoundTag) tag)));
++        }
++        // MultiPaper end - allow removing a block entity on unloaded block entities
+         if (this.isInLevel()) {
+             BlockEntity removeThis = this.blockEntities.remove(pos);
+             // CraftBukkit start - SPIGOT-5561: Also remove from pending map
+@@ -639,6 +651,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         // Paper end
+         org.bukkit.Server server = this.level.getCraftServer();
+         // Paper - rewrite chunk system
++        puregero.multipaper.MultiPaperChunkHandler.onChunkLoad(this); // MultiPaper
+         if (server != null) {
+             /*
+              * If it's a new world, the first few chunks are generated inside
+@@ -697,6 +710,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+             return true;
+         }
+ 
++        if (puregero.multipaper.MultiPaper.isChunkExternal(this)) return false; // MultiPaper - only save if no one else owns it
+         return super.isUnsaved();
+         // Paper end - rewrite chunk system
+     }
+@@ -1055,3 +1069,4 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         void setUnsaved(ChunkPos chunkPos);
+     }
+ }
++

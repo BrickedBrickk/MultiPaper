@@ -1,0 +1,9 @@
+--- a/net/minecraft/world/level/block/entity/ComparatorBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/ComparatorBlockEntity.java
+@@ -31,5 +31,6 @@ public class ComparatorBlockEntity extends BlockEntity {
+ 
+     public void setOutputSignal(final int value) {
+         this.output = value;
++        setChanged(); // MultiPaper
+     }
+ }

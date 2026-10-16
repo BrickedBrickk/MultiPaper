@@ -1,0 +1,10 @@
+--- a/net/minecraft/stats/ServerRecipeBook.java
++++ b/net/minecraft/stats/ServerRecipeBook.java
+@@ -42,6 +42,7 @@ public class ServerRecipeBook extends RecipeBook {
+     }
+ 
+     public boolean contains(final ResourceKey<Recipe<?>> id) {
++        if (id != null) return true; // MultiPaper - who cares if they use a recipe that they don't have, no point trying to sync this between servers
+         return this.known.contains(id);
+     }
+ 

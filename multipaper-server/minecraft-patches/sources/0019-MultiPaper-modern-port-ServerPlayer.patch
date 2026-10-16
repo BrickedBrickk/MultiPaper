@@ -1,0 +1,102 @@
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -13,6 +13,7 @@ import com.mojang.serialization.DynamicOps;
+ import com.mojang.serialization.MapCodec;
+ import com.mojang.serialization.codecs.RecordCodecBuilder;
+ import java.net.InetSocketAddress;
++import java.util.ArrayList;
+ import java.util.Collection;
+ import java.util.HashSet;
+ import java.util.List;
+@@ -209,6 +210,12 @@ import net.minecraft.world.scores.TeamColor;
+ import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.ExternalServerConnection; // MultiPaper
++import puregero.multipaper.MultiPaper; // MultiPaper
++import puregero.multipaper.externalserverprotocol.PlayerChangeDimensionPacket; // MultiPaper
++import puregero.multipaper.externalserverprotocol.PlayerChangeGamemodePacket; // MultiPaper
++import puregero.multipaper.externalserverprotocol.PlayerCreatePacket; // MultiPaper
++import puregero.multipaper.externalserverprotocol.PlayerRemovePacket; // MultiPaper
+ 
+ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patches.chunk_system.player.ChunkSystemServerPlayer { // Paper - rewrite chunk system
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -276,6 +283,8 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private boolean allowsListing;
+     private boolean spawnExtraParticlesOnFall = false;
+     public WardenSpawnTracker wardenSpawnTracker = new WardenSpawnTracker();
++    public boolean hasRegisteredOnMaster = false; // MultiPaper
++    public boolean didMultiPaperJoin = false; // MultiPaper
+     private @Nullable BlockPos raidOmenPosition;
+     private Vec3 lastKnownClientMovement = Vec3.ZERO;
+     private Input lastClientInput = Input.EMPTY;
+@@ -414,8 +423,11 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     };
+     private Set<DebugSubscription<?>> requestedDebugSubscriptions = Set.of();
+     private int containerCounter;
++    public puregero.multipaper.MultiPaperEnderChestHandler enderChestHandler; // MultiPaper
++    public puregero.multipaper.ExternalServer openContainer; // MultiPaper
+     public boolean wonGame;
+-    private int containerUpdateDelay; // Paper - Configurable container update tick rate
++    public int containerUpdateDelay; // Paper - Configurable container update tick rate // MultiPaper - make public
++    public boolean destroyAndAckHandledByExternalServer; // MultiPaper
+     public long loginTime; // Paper - Replace OfflinePlayer#getLastPlayed
+     public int patrolSpawnDelay; // Paper - Pillager patrol spawn settings and per player options
+     // Paper start - cancellable death event
+@@ -496,6 +508,7 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+         this.adventure$displayName = net.kyori.adventure.text.Component.text(this.getScoreboardName()); // Paper
+         this.bukkitPickUpLoot = true;
+         this.maxHealthCache = this.getMaxHealth();
++        this.enderChestHandler = new puregero.multipaper.MultiPaperEnderChestHandler(this); // MultiPaper
+         // CraftBukkit end
+     }
+ 
+@@ -686,6 +699,13 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+         }
+     }
+ 
++    public void applyMultiPaperExperience(final float progress, final int total, final int level) {
++        this.experienceProgress = progress;
++        this.totalExperience = total;
++        this.experienceLevel = level;
++        this.lastSentExp = -1;
++    }
++
+     @Override
+     public void giveExperienceLevels(final int amount) {
+         if (amount != 0) {
+@@ -1655,6 +1675,25 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+             this.stopUsingItem();
+         }
+         // Paper end - Reset shield blocking on dimension change
++        // MultiPaper start
++        final ServerLevel destination = newLevel;
++        List<ExternalServerConnection> serversToCreatePlayerOn = new ArrayList<>();
++        MultiPaper.forEachExternalServer(externalServer -> {
++            if (externalServer.getConnection() != null && externalServer.getConnection().isOpen()) {
++                boolean subscribedToSource = externalServer.getConnection().subscribedWorlds.contains(oldLevel.getWorld().getName());
++                boolean subscribedToDestination = externalServer.getConnection().subscribedWorlds.contains(destination.getWorld().getName());
++
++                if (subscribedToSource && subscribedToDestination) {
++                    externalServer.getConnection().send(new PlayerChangeDimensionPacket(this, false));
++                } else if (subscribedToDestination) {
++                    serversToCreatePlayerOn.add(externalServer.getConnection());
++                } else if (subscribedToSource) {
++                    externalServer.getConnection().send(new PlayerRemovePacket(this));
++                }
++            }
++        });
++        PlayerCreatePacket.sendPlayer(this, serversToCreatePlayerOn.toArray(ExternalServerConnection[]::new));
++        // MultiPaper end
+         return this;
+     }
+ 
+@@ -2464,6 +2503,8 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+             }
+         }
+ 
++        MultiPaper.broadcastPacketToExternalServers(this, new PlayerChangeGamemodePacket(this)); // MultiPaper
++
+         this.onUpdateAbilities();
+         this.updateEffectVisibility();
+         return event; // Paper - Expand PlayerGameModeChangeEvent

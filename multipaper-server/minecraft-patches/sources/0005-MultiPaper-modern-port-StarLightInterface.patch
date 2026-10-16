@@ -1,0 +1,94 @@
+--- a/ca/spottedleaf/moonrise/patches/starlight/light/StarLightInterface.java
++++ b/ca/spottedleaf/moonrise/patches/starlight/light/StarLightInterface.java
+@@ -12,6 +12,7 @@ import ca.spottedleaf.moonrise.patches.chunk_system.level.chunk.ChunkSystemChunk
+ import ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType;
+ import ca.spottedleaf.moonrise.patches.starlight.chunk.StarlightChunk;
+ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
++import ca.spottedleaf.concurrentutil.collection.MultiThreadedQueue;
+ import it.unimi.dsi.fastutil.shorts.ShortCollection;
+ import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
+ import net.minecraft.core.BlockPos;
+@@ -356,6 +357,12 @@ public final class StarLightInterface {
+         return this.lightAccess;
+     }
+ 
++    public java.util.concurrent.CompletableFuture<Void> getChunkFuture(final ChunkPos chunkPos) {
++        return this.lightQueue instanceof ServerLightQueue serverQueue
++            ? serverQueue.getChunkFuture(chunkPos)
++            : java.util.concurrent.CompletableFuture.completedFuture(null);
++    }
++
+     public SkyStarLightEngine getSkyLightEngine() {
+         if (!this.hasSkyLight || this.world == null) {
+             return null;
+@@ -559,7 +566,8 @@ public final class StarLightInterface {
+ 
+             protected final StarLightInterface lightEngine;
+             protected final LightQueue queue;
+-            protected final MultiThreadedQueue<Runnable> onComplete = new MultiThreadedQueue<>();
++            protected final java.util.concurrent.CompletableFuture<Void> onComplete = new java.util.concurrent.CompletableFuture<>(); // MultiPaper - get Chunk on lighting complete
++            protected final MultiThreadedQueue<Runnable> queuedTasks = new MultiThreadedQueue<>(); // MultiPaper - queue callbacks while lighting
+             protected final Set<BlockPos> changedPositions = new HashSet<>();
+             protected Boolean[] changedSectionSet;
+             protected ShortOpenHashSet queuedEdgeChecksSky;
+@@ -576,7 +584,7 @@ public final class StarLightInterface {
+             public abstract void run();
+ 
+             public void queueOrRunTask(final Runnable run) {
+-                if (!this.onComplete.add(run)) {
++                if (!this.queuedTasks.add(run)) {
+                     run.run();
+                 }
+             }
+@@ -655,9 +663,11 @@ public final class StarLightInterface {
+                 }
+ 
+                 Runnable run;
+-                while ((run = this.onComplete.pollOrBlockAdds()) != null) {
++                while ((run = this.queuedTasks.pollOrBlockAdds()) != null) {
+                     run.run();
+                 }
++
++                this.onComplete.complete(null); // MultiPaper - get Chunk on lighting complete
+             }
+         }
+     }
+@@ -745,12 +755,24 @@ public final class StarLightInterface {
+ 
+     public static final class ServerLightQueue extends LightQueue {
+ 
+-        private final ConcurrentChainedLong2ReferenceHashTable<ServerChunkTasks> chunkTasks = new ConcurrentChainedLong2ReferenceHashTable<>();
++        public final ConcurrentChainedLong2ReferenceHashTable<ServerChunkTasks> chunkTasks = new ConcurrentChainedLong2ReferenceHashTable<>();
+ 
+         public ServerLightQueue(final StarLightInterface lightInterface) {
+             super(lightInterface);
+         }
+ 
++        // MultiPaper start - get Chunk on lighting complete
++        public java.util.concurrent.CompletableFuture<Void> getChunkFuture(final net.minecraft.world.level.ChunkPos chunkPos) {
++            final ServerChunkTasks tasks = this.chunkTasks.get(CoordinateUtils.getChunkKey(chunkPos));
++
++            if (tasks == null) {
++                return java.util.concurrent.CompletableFuture.completedFuture(null);
++            }
++
++            return tasks.getOnComplete();
++        }
++        // MultiPaper end - get Chunk on lighting complete
++
+         public void lowerPriority(final int chunkX, final int chunkZ, final Priority priority) {
+             final ServerChunkTasks task = this.chunkTasks.get(CoordinateUtils.getChunkKey(chunkX, chunkZ));
+             if (task != null) {
+@@ -901,6 +923,12 @@ public final class StarLightInterface {
+                 return !this.ticketAdded.get() && false == this.ticketAdded.compareAndExchange(false, true);
+             }
+ 
++            // MultiPaper start - get Chunk on lighting complete
++            public java.util.concurrent.CompletableFuture<Void> getOnComplete() {
++                return this.onComplete;
++            }
++            // MultiPaper end - get Chunk on lighting complete
++
+             public void schedule() {
+                 this.task.queue();
+             }

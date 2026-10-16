@@ -1,0 +1,27 @@
+--- a/net/minecraft/server/dedicated/DedicatedPlayerList.java
++++ b/net/minecraft/server/dedicated/DedicatedPlayerList.java
+@@ -21,16 +21,18 @@ public class DedicatedPlayerList extends PlayerList {
+     @Override
+     public void loadAndSaveFiles() {
+         // Paper end - fix converting txt to json file
++        // MultiPaper start - why are we saving these if we haven't modified them?
+         this.loadUserBanList();
+-        this.saveUserBanList();
++        // this.saveUserBanList();
+         this.loadIpBanList();
+-        this.saveIpBanList();
++        // this.saveIpBanList();
+         this.loadOps();
+         this.loadWhiteList();
+-        this.saveOps();
+-        if (!this.getWhiteList().getFile().exists()) {
+-            this.saveWhiteList();
+-        }
++        // this.saveOps();
++        // if (!this.getWhiteList().getFile().exists()) {
++        //    this.saveWhiteList();
++        // }
++        // MultiPaper end
+     }
+ 
+     @Override

@@ -1,0 +1,38 @@
+--- a/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
++++ b/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
+@@ -6,6 +6,7 @@ import net.minecraft.core.Direction;
+ import net.minecraft.core.HolderLookup;
+ import net.minecraft.core.registries.Registries;
+ import net.minecraft.nbt.CompoundTag;
++import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.util.Mth;
+ import net.minecraft.world.entity.Entity;
+ import net.minecraft.world.entity.MoverType;
+@@ -26,6 +27,7 @@ import net.minecraft.world.phys.AABB;
+ import net.minecraft.world.phys.Vec3;
+ import net.minecraft.world.phys.shapes.Shapes;
+ import net.minecraft.world.phys.shapes.VoxelShape;
++import puregero.multipaper.MultiPaper;
+ 
+ public class PistonMovingBlockEntity extends BlockEntity {
+     private static final int TICKS_TO_EXTEND = 2;
+@@ -81,6 +83,10 @@ public class PistonMovingBlockEntity extends BlockEntity {
+         return this.isSourcePiston;
+     }
+ 
++    public void setMovedState(final BlockState movedState) {
++        this.movedState = movedState;
++    }
++
+     public float getProgress(float a) {
+         if (a > 1.0F) {
+             a = 1.0F;
+@@ -264,7 +270,7 @@ public class PistonMovingBlockEntity extends BlockEntity {
+     }
+ 
+     public void finalTick() {
+-        if (this.level != null && (this.progressO < 1.0F || this.level.isClientSide())) {
++        if (this.level != null && (this.progressO < 1.0F || this.level.isClientSide()) && !puregero.multipaper.MultiPaper.isChunkExternal((net.minecraft.server.level.ServerLevel) this.level, this.worldPosition)) { // MultiPaper
+             this.progress = 1.0F;
+             this.progressO = this.progress;
+             this.level.removeBlockEntity(this.worldPosition);

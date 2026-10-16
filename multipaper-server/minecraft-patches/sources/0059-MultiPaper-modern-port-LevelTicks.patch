@@ -1,0 +1,46 @@
+--- a/net/minecraft/world/ticks/LevelTicks.java
++++ b/net/minecraft/world/ticks/LevelTicks.java
+@@ -23,10 +23,12 @@ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.SectionPos;
+ import net.minecraft.core.Vec3i;
+ import net.minecraft.util.Util;
++import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.util.profiling.Profiler;
+ import net.minecraft.util.profiling.ProfilerFiller;
+ import net.minecraft.world.level.ChunkPos;
+ import net.minecraft.world.level.levelgen.structure.BoundingBox;
++import puregero.multipaper.MultiPaper;
+ 
+ public class LevelTicks<T> implements LevelTickAccess<T> {
+     private static final Comparator<LevelChunkTicks<?>> CONTAINER_DRAIN_ORDER = (o1, o2) -> ScheduledTick.INTRA_TICK_DRAIN_ORDER.compare(o1.peek(), o2.peek());
+@@ -47,6 +49,17 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
+         this.tickCheck = tickCheck;
+     }
+ 
++    public ServerLevel level; // MultiPaper - add level
++
++    public LevelTicks(final ServerLevel level, final LongPredicate tickingFutureReadyPredicate) { // MultiPaper - add level
++        this(level, tickingFutureReadyPredicate, () -> null);
++    }
++
++    public LevelTicks(ServerLevel level, LongPredicate tickingFutureReadyPredicate, java.util.function.Supplier<net.minecraft.util.profiling.ProfilerFiller> profilerGetter) { // MultiPaper - add level
++        this(tickingFutureReadyPredicate);
++        this.level = level; // MultiPaper - add level
++    }
++
+     public void addContainer(final ChunkPos pos, final LevelChunkTicks<T> container) {
+         long posKey = pos.pack();
+         this.allContainers.put(posKey, container);
+@@ -114,6 +127,12 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
+                         it.remove();
+                     } else if (scheduledTick.triggerTick() > currentTick) {
+                         entry.setValue(scheduledTick.triggerTick());
++                    } else if (level != null && candidateContainer.count() > 0 && !MultiPaper.isChunkLocal(
++                            ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)(Object)level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(chunkPos))) {
++                        // MultiPaper start - Don't tick chunks that aren't owned by us
++                        candidateContainer.getAll().forEach(tick -> tick.triggerTick++);
++                        entry.setValue(candidateContainer.peek().triggerTick());
++                        // MultiPaper end - Don't tick chunks that aren't owned by us
+                     } else if (this.tickCheck.test(chunkPos)) {
+                         it.remove();
+                         this.containersToTick.add(candidateContainer);

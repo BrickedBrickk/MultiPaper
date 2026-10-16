@@ -1,0 +1,21 @@
+--- a/net/minecraft/network/protocol/game/ClientboundBlockEntityDataPacket.java
++++ b/net/minecraft/network/protocol/game/ClientboundBlockEntityDataPacket.java
+@@ -28,10 +28,16 @@ public class ClientboundBlockEntityDataPacket implements Packet<ClientGamePacket
+     private final CompoundTag tag;
+ 
+     public static ClientboundBlockEntityDataPacket create(
+-        final BlockEntity blockEntity, final BiFunction<BlockEntity, RegistryAccess, CompoundTag> updateTagSaver
++        final BlockEntity blockEntity, final BiFunction<BlockEntity, RegistryAccess, CompoundTag> updateTagSaver, boolean sanitizeNbt
+     ) {
+         RegistryAccess registryAccess = blockEntity.getLevel().registryAccess();
+-        return new ClientboundBlockEntityDataPacket(blockEntity.getBlockPos(), blockEntity.getType(), blockEntity.sanitizeSentNbt(updateTagSaver.apply(blockEntity, registryAccess))); // Paper - Sanitize sent data
++        return new ClientboundBlockEntityDataPacket(blockEntity.getBlockPos(), blockEntity.getType(), sanitizeNbt ? blockEntity.sanitizeSentNbt(updateTagSaver.apply(blockEntity, registryAccess)) : updateTagSaver.apply(blockEntity, registryAccess)); // MultiPaper - Skip nbt sanitization when syncing between servers
++    }
++
++    public static ClientboundBlockEntityDataPacket create(
++        final BlockEntity blockEntity, final BiFunction<BlockEntity, RegistryAccess, CompoundTag> updateTagSaver
++    ) {
++        return create(blockEntity, updateTagSaver, true); // MultiPaper - Sanitize sent data (Paper compatibility)
+     }
+ 
+     public static ClientboundBlockEntityDataPacket create(final BlockEntity blockEntity) {

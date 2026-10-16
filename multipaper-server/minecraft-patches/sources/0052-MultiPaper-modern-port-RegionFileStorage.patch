@@ -1,0 +1,21 @@
+--- a/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
++++ b/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+@@ -333,6 +333,7 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+     // Paper end
+ 
+     public @Nullable CompoundTag read(final ChunkPos pos) throws IOException {
++        if (true) return puregero.multipaper.MultiPaper.readRegionFileNBT(this.folder.toFile(), pos); // MultiPaper
+         RegionFile region = this.getRegionFile(pos, false);
+         if (region == null) {
+             return null;
+@@ -379,6 +380,10 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+     }
+ 
+     public void write(final ChunkPos pos, final @Nullable CompoundTag value) throws IOException {
++        if (true) { // MultiPaper - always route writes through MultiPaper
++            puregero.multipaper.MultiPaper.writeRegionFileNBT(this.folder.toFile(), pos, value);
++            return;
++        }
+         // Paper start - rewrite chunk system
+         // if the RegionFile doesn't exist, no point in deleting from it
+         if (value == null && this.moonrise$getRegionFileIfExists(pos.x(), pos.z()) == null) {

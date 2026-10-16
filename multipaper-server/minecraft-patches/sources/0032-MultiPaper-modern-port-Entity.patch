@@ -1,0 +1,51 @@
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -156,6 +156,7 @@ import org.jetbrains.annotations.Contract;
+ import org.joml.Quaternionf;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.MultiPaper;
+ 
+ public abstract class Entity
+     implements Nameable,
+@@ -305,6 +306,8 @@ public abstract class Entity
+     public boolean noPhysics;
+     public final RandomSource random; // Paper - Share random for entities to make them more random // Purpur - Add toggle for RNG manipulation
+     public int tickCount;
++    public boolean sendChangesThisTick = false; // MultiPaper - inactive entity synchronization
++    public volatile boolean fake = false; // MultiPaper - fake entity API
+     private int remainingFireTicks;
+     private final EntityFluidInteraction fluidInteraction = new EntityFluidInteraction(FLUIDS_WITH_CURRENT);
+     protected boolean wasTouchingWater;
+@@ -1923,6 +1926,11 @@ public abstract class Entity
+                 }
+ 
+                 iterations.set(iteration);
++                // MultiPaper start - Only check for blocks on our server (or portals)
++                if (!MultiPaper.isRealPlayer(this) && MultiPaper.isChunkExternal(this.level.getChunkAt(blockIntersection))) {
++                    return false;
++                }
++                // MultiPaper end - Only check for blocks on our server (or portals)
+                 BlockState state = this.level().getBlockState(blockIntersection);
+                 if (state.isAir()) {
+                     if (debugEntityBlockIntersections) {
+@@ -5097,6 +5105,19 @@ public abstract class Entity
+         return new ClientboundAddEntityPacket(this, serverEntity);
+     }
+ 
++    public boolean isFake() {
++        return this.fake;
++    }
++
++    public void setFake() {
++        if (this instanceof net.minecraft.server.level.ServerPlayer player
++            && player.level() instanceof net.minecraft.server.level.ServerLevel level
++            && level.getServer().getPlayerList().getPlayer(player.getUUID()) == player) {
++            throw new IllegalStateException("Online player cannot be set as a fake entity");
++        }
++        this.fake = true;
++    }
++
+     public EntityDimensions getDimensions(final Pose pose) {
+         return this.type.getDimensions();
+     }

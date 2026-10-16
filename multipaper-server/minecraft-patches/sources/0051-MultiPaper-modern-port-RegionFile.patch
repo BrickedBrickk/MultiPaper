@@ -1,0 +1,22 @@
+--- a/net/minecraft/world/level/chunk/storage/RegionFile.java
++++ b/net/minecraft/world/level/chunk/storage/RegionFile.java
+@@ -860,6 +860,7 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+     }
+ 
+     public boolean hasChunk(final ChunkPos pos) {
++        if (true) return true; // MultiPaper - always return true
+         return this.getOffset(pos) != 0;
+     }
+ 
+@@ -869,6 +870,11 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+ 
+     @Override
+     public void close() throws IOException {
++        // MultiPaper start - don't attempt to close a file that was never created
++        if (this.file == null) {
++            return;
++        }
++        // MultiPaper end - don't attempt to close a file that was never created
+         try {
+             this.padToFullSector();
+         } finally {

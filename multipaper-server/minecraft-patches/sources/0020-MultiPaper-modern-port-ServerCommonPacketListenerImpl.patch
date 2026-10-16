@@ -1,0 +1,45 @@
+--- a/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
+@@ -29,6 +29,8 @@ import net.minecraft.util.VisibleForDebug;
+ import net.minecraft.util.profiling.Profiler;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.ExternalPlayer; // MultiPaper
++import puregero.multipaper.externalserverprotocol.PlayerRemovePacket; // MultiPaper
+ 
+ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPacketListener {
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -407,6 +409,7 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+ 
+         Component reason;
+         Component leaveMessage;
++        boolean shouldKick = true; // MultiPaper - don't run kick event for external disconnects
+         if (this instanceof ServerGamePacketListenerImpl serverGamePacketListener) {
+             net.kyori.adventure.text.Component rawLeaveMessage = net.kyori.adventure.text.Component.translatable("multiplayer.player.left", net.kyori.adventure.text.format.NamedTextColor.YELLOW, io.papermc.paper.configuration.GlobalConfiguration.get().messages.useDisplayNameInQuitMessage ? serverGamePacketListener.player.getBukkitEntity().displayName() : net.kyori.adventure.text.Component.text(serverGamePacketListener.player.getScoreboardName())); // Paper - Adventure
+ 
+@@ -419,7 +422,13 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+ 
+             );
+ 
+-            if (this.cserver.getServer().isRunning()) {
++            // MultiPaper start - don't run kick event for external disconnects
++            final net.kyori.adventure.text.Component adventureReason = io.papermc.paper.adventure.PaperAdventure.asAdventure(details.reason());
++            shouldKick = !adventureReason.equals(PlayerRemovePacket.EXTERNAL_DISCONNECT_COMPONENT)
++                    && !(adventureReason.equals(PlayerRemovePacket.LOGGED_IN_FROM_ANOTHER_LOCATION) && player instanceof ExternalPlayer);
++            // MultiPaper end
++
++            if (this.cserver.getServer().isRunning() && shouldKick) { // MultiPaper
+                 this.cserver.getPluginManager().callEvent(event);
+             }
+ 
+@@ -443,7 +452,9 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+         }
+ 
+         // Send the possibly modified leave message
+-        this.disconnect0(new DisconnectionDetails(reason, details.report(), details.bugReportLink(), java.util.Optional.ofNullable(leaveMessage), details.disconnectionReason()));
++        if (shouldKick) { // MultiPaper - don't send the disconnect packet for external disconnects
++            this.disconnect0(new DisconnectionDetails(reason, details.report(), details.bugReportLink(), java.util.Optional.ofNullable(leaveMessage), details.disconnectionReason()));
++        }
+     }
+ 
+     private void disconnect0(final DisconnectionDetails details) {

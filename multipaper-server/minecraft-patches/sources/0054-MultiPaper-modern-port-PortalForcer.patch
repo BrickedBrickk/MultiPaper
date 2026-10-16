@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/portal/PortalForcer.java
++++ b/net/minecraft/world/level/portal/PortalForcer.java
+@@ -64,7 +64,7 @@ public class PortalForcer {
+                     }
+                     // Paper end - Configurable nether ceiling damage
+ 
+-                    net.minecraft.world.level.chunk.ChunkAccess lowest = this.level.getChunk(pos.getX() >> 4, pos.getZ() >> 4, net.minecraft.world.level.chunk.status.ChunkStatus.EMPTY);
++                    net.minecraft.world.level.chunk.ChunkAccess lowest = this.level.getChunk(pos.getX() >> 4, pos.getZ() >> 4, net.minecraft.world.level.chunk.status.ChunkStatus.FULL); // MultiPaper - For some reason empty was reseting the chunks nearby the portal
+                     net.minecraft.world.level.levelgen.BelowZeroRetrogen belowZeroRetrogen;
+                     if (!lowest.getPersistedStatus().isOrAfter(net.minecraft.world.level.chunk.status.ChunkStatus.FULL)
+                             // check below zero retrogen so that pre 1.17 worlds still load portals (JMP)

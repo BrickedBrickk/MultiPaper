@@ -1,0 +1,115 @@
+--- a/net/minecraft/world/entity/player/Inventory.java
++++ b/net/minecraft/world/entity/player/Inventory.java
+@@ -2,6 +2,7 @@ package net.minecraft.world.entity.player;
+ 
+ import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
+ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
++import java.util.List;
+ import java.util.Map;
+ import java.util.function.Predicate;
+ import net.minecraft.CrashReport;
+@@ -26,6 +27,7 @@ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.level.storage.ValueInput;
+ import net.minecraft.world.level.storage.ValueOutput;
++import puregero.multipaper.NonNullListFilter;
+ 
+ public class Inventory implements Container, Nameable {
+     public static final int POP_TIME_DURATION = 5;
+@@ -54,7 +56,12 @@ public class Inventory implements Container, Nameable {
+         )
+     );
+     private static final Component DEFAULT_NAME = Component.translatable("container.inventory");
+-    private final NonNullList<ItemStack> items = NonNullList.withSize(36, ItemStack.EMPTY);
++    // MultiPaper start - Use NonNullListFilter instead of NonNullList
++    public final NonNullListFilter<ItemStack> items;
++    public final NonNullListFilter<ItemStack> armor;
++    public final NonNullListFilter<ItemStack> offhand;
++    public final List<NonNullListFilter<ItemStack>> compartments;
++    // MultiPaper end
+     private int selected;
+     public final Player player;
+     public final EntityEquipment equipment;
+@@ -137,6 +144,20 @@ public class Inventory implements Container, Nameable {
+     public Inventory(final Player player, final EntityEquipment equipment) {
+         this.player = player;
+         this.equipment = equipment;
++        // MultiPaper start - Filter the inventory and sync it with other server
++        // 26.3 keeps the armour/offhand in EntityEquipment, so the legacy NonNullLists are backed by views onto it
++        final EquipmentSlot[] armorSlots = new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
++        this.items = NonNullListFilter.withSize(INVENTORY_SIZE, ItemStack.EMPTY, player, "items");
++        this.armor = NonNullListFilter.withSize(armorSlots.length, ItemStack.EMPTY, player, "armor");
++        this.offhand = NonNullListFilter.withSize(1, ItemStack.EMPTY, player, "offhand");
++        for (int i = 0; i < armorSlots.length; i++) {
++            this.armor.set(i, equipment.get(armorSlots[i]));
++            this.armor.lastItems.set(i, equipment.get(armorSlots[i]).copy());
++        }
++        this.offhand.set(0, equipment.get(EquipmentSlot.OFFHAND));
++        this.offhand.lastItems.set(0, equipment.get(EquipmentSlot.OFFHAND).copy());
++        this.compartments = List.copyOf(List.<NonNullListFilter<ItemStack>>of(this.items, this.armor, this.offhand));
++        // MultiPaper end
+     }
+ 
+     public int getSelectedSlot() {
+@@ -438,6 +459,7 @@ public class Inventory implements Container, Nameable {
+     @Override
+     public ItemStack removeItem(final int slot, final int count) {
+         if (slot < this.items.size()) {
++            ((NonNullListFilter<ItemStack>) this.items).markDirty(slot); // MultiPaper
+             return ContainerHelper.removeItem(this.items, slot, count);
+         }
+ 
+@@ -445,13 +467,30 @@ public class Inventory implements Container, Nameable {
+         if (equipmentSlot != null) {
+             ItemStack itemStack = this.equipment.get(equipmentSlot);
+             if (!itemStack.isEmpty()) {
+-                return itemStack.split(count);
++                ItemStack split = itemStack.split(count);
++                this.equipment.set(equipmentSlot, itemStack);
++                markEquipmentDirty(equipmentSlot); // MultiPaper
++                return split;
+             }
+         }
+ 
+         return ItemStack.EMPTY;
+     }
+ 
++    // MultiPaper start - mark the mirrored inventory lists as dirty so the change is synced
++    private void markEquipmentDirty(final EquipmentSlot equipmentSlot) {
++        switch (equipmentSlot) {
++            case HEAD -> this.armor.markDirty(0);
++            case CHEST -> this.armor.markDirty(1);
++            case LEGS -> this.armor.markDirty(2);
++            case FEET -> this.armor.markDirty(3);
++            case OFFHAND -> this.offhand.markDirty(0);
++            default -> {
++            }
++        }
++    }
++    // MultiPaper end - mark the mirrored inventory lists as dirty so the change is synced
++
+     public void removeItem(final ItemStack itemStack) {
+         for (int slot = 0; slot < this.items.size(); slot++) {
+             if (this.items.get(slot) == itemStack) {
+@@ -464,6 +503,7 @@ public class Inventory implements Container, Nameable {
+             ItemStack stackInSlot = this.equipment.get(equipmentSlot);
+             if (stackInSlot == itemStack) {
+                 this.equipment.set(equipmentSlot, ItemStack.EMPTY);
++                markEquipmentDirty(equipmentSlot); // MultiPaper
+                 return;
+             }
+         }
+@@ -477,7 +517,12 @@ public class Inventory implements Container, Nameable {
+             return itemStack;
+         } else {
+             EquipmentSlot equipmentSlot = EQUIPMENT_SLOT_MAPPING.get(slot);
+-            return equipmentSlot != null ? this.equipment.set(equipmentSlot, ItemStack.EMPTY) : ItemStack.EMPTY;
++            if (equipmentSlot != null) {
++                ItemStack removed = this.equipment.set(equipmentSlot, ItemStack.EMPTY);
++                markEquipmentDirty(equipmentSlot); // MultiPaper
++                return removed;
++            }
++            return ItemStack.EMPTY;
+         }
+     }
+ 

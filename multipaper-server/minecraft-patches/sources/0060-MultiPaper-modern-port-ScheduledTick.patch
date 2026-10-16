@@ -1,0 +1,67 @@
+--- a/net/minecraft/world/ticks/ScheduledTick.java
++++ b/net/minecraft/world/ticks/ScheduledTick.java
+@@ -5,19 +5,33 @@ import java.util.Comparator;
+ import net.minecraft.core.BlockPos;
+ import org.jspecify.annotations.Nullable;
+ 
+-public record ScheduledTick<T>(T type, BlockPos pos, long triggerTick, TickPriority priority, long subTickOrder) {
++// MultiPaper start - transform ScheduledTick from a record into a class
++public class ScheduledTick<T> {
++
++    public T type; public T type() { return type; }
++    public long triggerTick; public long triggerTick() { return triggerTick; }
++    public BlockPos pos; public BlockPos pos() { return pos; }
++    public TickPriority priority; public TickPriority priority() { return priority; }
++    public long subTickOrder; public long subTickOrder() { return subTickOrder; }
++// MultiPaper end
++
+     public static final Comparator<ScheduledTick<?>> DRAIN_ORDER = (o1, o2) -> {
+         int compare = Long.compare(o1.triggerTick, o2.triggerTick);
+         if (compare != 0) {
+             return compare;
+         }
+-
+         compare = o1.priority.compareTo(o2.priority);
+-        return compare != 0 ? compare : Long.compare(o1.subTickOrder, o2.subTickOrder);
++        if (compare != 0) {
++            return compare;
++        }
++        return Long.compare(o1.subTickOrder, o2.subTickOrder);
+     };
+     public static final Comparator<ScheduledTick<?>> INTRA_TICK_DRAIN_ORDER = (o1, o2) -> {
+         int compare = o1.priority.compareTo(o2.priority);
+-        return compare != 0 ? compare : Long.compare(o1.subTickOrder, o2.subTickOrder);
++        if (compare != 0) {
++            return compare;
++        }
++        return Long.compare(o1.subTickOrder, o2.subTickOrder);
+     };
+     public static final Strategy<ScheduledTick<?>> UNIQUE_TICK_HASH = new Strategy<ScheduledTick<?>>() {
+         @Override
+@@ -27,7 +41,7 @@ public record ScheduledTick<T>(T type, BlockPos pos, long triggerTick, TickPrior
+ 
+         @Override
+         public boolean equals(final @Nullable ScheduledTick<?> a, final @Nullable ScheduledTick<?> b) {
+-            return a == b || a != null && b != null && a.type() == b.type() && a.pos().equals(b.pos());
++            return a == b || a != null && b != null && a.type() == b.type && a.pos().equals(b.pos());
+         }
+     };
+ 
+@@ -35,9 +49,15 @@ public record ScheduledTick<T>(T type, BlockPos pos, long triggerTick, TickPrior
+         this(type, pos, triggerTick, TickPriority.NORMAL, subTickOrder);
+     }
+ 
+-    public ScheduledTick {
+-        pos = pos.immutable();
++    // MultiPaper start - transform ScheduledTick from a record into a class
++    public ScheduledTick(T type, BlockPos pos, long triggerTick, TickPriority priority, long subTickOrder) {
++        this.type = type;
++        this.pos = pos.immutable();
++        this.triggerTick = triggerTick;
++        this.priority = priority;
++        this.subTickOrder = subTickOrder;
+     }
++    // MultiPaper end
+ 
+     public static <T> ScheduledTick<T> probe(final T type, final BlockPos pos) {
+         return new ScheduledTick<>(type, pos, 0L, TickPriority.NORMAL, 0L);

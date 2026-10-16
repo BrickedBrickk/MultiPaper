@@ -1,0 +1,13 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
+@@ -62,6 +62,10 @@ public final class ChunkEntitySlices {
+         return this.isTransient;
+     }
+ 
++    public Entity[] getRawEntities() {
++        return Arrays.copyOf(this.entities.getRawData(), this.entities.size());
++    }
++
+     public void setTransient(final boolean value) {
+         this.isTransient = value;
+     }

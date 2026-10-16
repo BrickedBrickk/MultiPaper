@@ -1,0 +1,20 @@
+--- a/net/minecraft/server/network/ServerConnectionListener.java
++++ b/net/minecraft/server/network/ServerConnectionListener.java
+@@ -50,7 +50,7 @@ public class ServerConnectionListener {
+     private volatile @Nullable UUID sessionId;
+     private final List<ChannelFuture> channels = Collections.synchronizedList(Lists.newArrayList());
+     private final List<Connection> connections = Collections.synchronizedList(Lists.newArrayList());
+-    private final Queue<Connection> pendingConnections = new ConcurrentLinkedQueue<>();
++    public final Queue<Connection> pendingConnections = new ConcurrentLinkedQueue<>(); // MultiPaper - make public
+ 
+     public ServerConnectionListener(final MinecraftServer server) {
+         this.server = server;
+@@ -139,7 +139,7 @@ public class ServerConnectionListener {
+                         )
+                         .group(eventLoopGroupHolder.eventLoopGroup())
+                         .localAddress(address) // Paper - Unix domain socket support
+-                        .option(ChannelOption.AUTO_READ, false) // CraftBukkit
++                        .option(ChannelOption.AUTO_READ, true) // CraftBukkit // MultiPaper - set auto read to true
+                         .bind()
+                         .syncUninterruptibly()
+                 );

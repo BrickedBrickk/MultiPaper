@@ -1,0 +1,24 @@
+--- a/net/minecraft/server/players/UserBanList.java
++++ b/net/minecraft/server/players/UserBanList.java
+@@ -34,6 +34,11 @@ public class UserBanList extends StoredUserList<NameAndId, UserBanListEntry> {
+         if (super.add(infos)) {
+             if (infos.getUser() != null) {
+                 this.notificationService.playerBanned(infos);
++                // MultiPaper start - broadcast bans
++                puregero.multipaper.externalserverprotocol.BanPlayerPacket.broadcast(
++                    infos.getUser().name(), infos.getUser().id(), infos.getCreated(), infos.getExpires(), infos.getReason(), infos.getSource()
++                );
++                // MultiPaper end - broadcast bans
+             }
+ 
+             return true;
+@@ -46,6 +51,9 @@ public class UserBanList extends StoredUserList<NameAndId, UserBanListEntry> {
+     public boolean remove(final NameAndId user) {
+         if (super.remove(user)) {
+             this.notificationService.playerUnbanned(user);
++            // MultiPaper start - broadcast pardons
++            puregero.multipaper.externalserverprotocol.PardonPlayerPacket.broadcast(user.name(), user.id());
++            // MultiPaper end - broadcast pardons
+             return true;
+         } else {
+             return false;

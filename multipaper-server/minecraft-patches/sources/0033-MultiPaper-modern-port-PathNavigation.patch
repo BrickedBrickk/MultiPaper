@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/entity/ai/navigation/PathNavigation.java
++++ b/net/minecraft/world/entity/ai/navigation/PathNavigation.java
+@@ -98,6 +98,10 @@ public abstract class PathNavigation {
+         this.speedModifier = speedModifier;
+     }
+ 
++    public double getSpeedModifier() {
++        return this.speedModifier;
++    }
++
+     public void recomputePath() {
+         if (this.level.getGameTime() - this.timeLastRecompute <= 20L || !this.canUpdatePath()) {
+             this.hasDelayedRecomputation = true;

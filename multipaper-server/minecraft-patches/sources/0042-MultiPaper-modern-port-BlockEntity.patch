@@ -1,0 +1,28 @@
+--- a/net/minecraft/world/level/block/entity/BlockEntity.java
++++ b/net/minecraft/world/level/block/entity/BlockEntity.java
+@@ -51,6 +51,7 @@ public abstract class BlockEntity implements DebugValueSource, TypedInstance<Blo
+     protected final BlockPos worldPosition;
+     protected boolean remove;
+     private BlockState blockState;
++    public final net.minecraft.resources.Identifier minecraftKey; // MultiPaper
+     private DataComponentMap components = DataComponentMap.EMPTY;
+ 
+     public BlockEntity(final BlockEntityType<?> type, final BlockPos worldPosition, final BlockState blockState) {
+@@ -59,6 +60,7 @@ public abstract class BlockEntity implements DebugValueSource, TypedInstance<Blo
+         this.validateBlockState(blockState);
+         this.blockState = blockState;
+         this.persistentDataContainer = new org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer(DATA_TYPE_REGISTRY); // Paper - always init
++        this.minecraftKey = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getResourceKey(this.type).orElseThrow().identifier(); // MultiPaper
+     }
+ 
+     private void validateBlockState(final BlockState blockState) {
+@@ -216,6 +218,9 @@ public abstract class BlockEntity implements DebugValueSource, TypedInstance<Blo
+     }
+ 
+     protected static void setChanged(final Level level, final BlockPos worldPosition, final BlockState blockState) {
++        if (level instanceof net.minecraft.server.level.ServerLevel) {
++            ((net.minecraft.server.level.ServerLevel) level).getChunkSource().blockChanged(worldPosition); // MultiPaper
++        }
+         level.blockEntityChanged(worldPosition);
+         if (!blockState.isAir()) {
+             level.updateNeighbourForOutputSignal(worldPosition, blockState.getBlock());

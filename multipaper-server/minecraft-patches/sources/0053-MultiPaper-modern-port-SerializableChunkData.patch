@@ -1,0 +1,85 @@
+--- a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
++++ b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
+@@ -87,6 +87,7 @@ public record SerializableChunkData(
+     ChunkAccess.PackedTicks packedTicks,
+     @Nullable ShortList[] postProcessingSections,
+     boolean lightCorrect,
++    boolean unsaved, // MultiPaper
+     List<SerializableChunkData.SectionData> sectionData,
+     List<CompoundTag> entities,
+     List<CompoundTag> blockEntities,
+@@ -252,6 +253,7 @@ public record SerializableChunkData(
+             packedTicks,
+             postProcessingSections,
+             lightCorrect,
++            false, // MultiPaper - newly parsed chunk data is not marked unsaved
+             sectionData,
+             entities,
+             blockEntities,
+@@ -368,6 +370,10 @@ public record SerializableChunkData(
+                 postLoadChunk(level, this.entities, this.blockEntities),
+                 BlendingData.unpack(this.blendingData)
+             );
++            // MultiPaper start - Keep copy of entities and block entities until they're loaded
++            ((net.minecraft.world.level.chunk.LevelChunk) chunk).entitiesToLoad = toListTag(this.entities);
++            ((net.minecraft.world.level.chunk.LevelChunk) chunk).blockEntitiesToLoad = toListTag(this.blockEntities);
++            // MultiPaper end - Keep copy of entities and block entities until they're loaded
+         } else {
+             ProtoChunkTicks<Block> blockTicks = ProtoChunkTicks.load(this.packedTicks.blocks());
+             ProtoChunkTicks<Fluid> fluidTicks = ProtoChunkTicks.load(this.packedTicks.fluids());
+@@ -527,6 +533,7 @@ public record SerializableChunkData(
+             ticksForSerialization,
+             postProcessingSections,
+             chunk.isLightCorrect(),
++            chunk.unsaved, // MultiPaper
+             sectionData,
+             entities,
+             blockEntities,
+@@ -544,6 +551,7 @@ public record SerializableChunkData(
+         tag.putLong("InhabitedTime", this.inhabitedTime);
+         tag.putString("Status", BuiltInRegistries.CHUNK_STATUS.getKey(this.chunkStatus).toString());
+         tag.storeNullable("blending_data", BlendingData.Packed.CODEC, this.blendingData);
++        if (this.unsaved) tag.putBoolean("shouldSave", true); // MultiPaper
+         tag.storeNullable("below_zero_retrogen", BelowZeroRetrogen.CODEC, this.belowZeroRetrogen);
+         if (!this.upgradeData.isEmpty()) {
+             tag.put("UpgradeData", this.upgradeData.write());
+@@ -633,10 +641,25 @@ public record SerializableChunkData(
+         return tag != null ? tag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY) : ChunkStatus.EMPTY;
+     }
+ 
++    // MultiPaper start - Keep copy of entities and block entities until they're loaded
++    private static net.minecraft.nbt.ListTag toListTag(final List<CompoundTag> tags) {
++        if (tags == null || tags.isEmpty()) {
++            return null;
++        }
++
++        final net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
++        listTag.addAll(tags);
++        return listTag;
++    }
++
++    private static List<CompoundTag> toCompoundTagList(final net.minecraft.nbt.ListTag listTag) {
++        return listTag == null ? List.of() : listTag.compoundStream().toList();
++    }
++    // MultiPaper end - Keep copy of entities and block entities until they're loaded
++
+     private static LevelChunk.@Nullable PostLoadProcessor postLoadChunk(
+         final ServerLevel level, final List<CompoundTag> entities, final List<CompoundTag> blockEntities
+-    ) {
+-        return entities.isEmpty() && blockEntities.isEmpty()
++    ) {        return entities.isEmpty() && blockEntities.isEmpty()
+             ? null
+             : levelChunk -> {
+                 if (!entities.isEmpty()) {
+@@ -659,6 +682,11 @@ public record SerializableChunkData(
+                         }
+                     }
+                 }
++
++                // MultiPaper start - Keep copy of entities and block entities until they're loaded
++                levelChunk.entitiesToLoad = null;
++                levelChunk.blockEntitiesToLoad = null;
++                // MultiPaper end - Keep copy of entities and block entities until they're loaded
+             };
+     }
+ 

@@ -1,0 +1,70 @@
+--- a/net/minecraft/world/level/storage/SavedDataStorage.java
++++ b/net/minecraft/world/level/storage/SavedDataStorage.java
+@@ -37,6 +37,7 @@ import net.minecraft.world.level.saveddata.SavedData;
+ import net.minecraft.world.level.saveddata.SavedDataType;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.MultiPaper;
+ 
+ public class SavedDataStorage implements AutoCloseable {
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -86,14 +87,36 @@ public class SavedDataStorage implements AutoCloseable {
+     private <T extends SavedData> @Nullable T readSavedData(final SavedDataType<T> type) {
+         try {
+             Path file = this.getDataFile(type.id());
+-            if (Files.exists(file)) {
+-                CompoundTag tag = this.readTagFromDisk(file, type.dataFixType(), SharedConstants.getCurrentVersion().dataVersion().version());
+-                RegistryOps<Tag> ops = this.registries.createSerializationContext(NbtOps.INSTANCE);
+-                return type.codec()
+-                    .parse(ops, tag.get("data"))
+-                    .resultOrPartial(error -> LOGGER.error("Failed to parse saved data for '{}': {}", type, error))
+-                    .orElse(null);
++            CompoundTag tag = null;
++            // MultiPaper start - read saved data via MultiPaper when possible
++            try {
++                byte[] data = MultiPaper.readData(file.toString());
++                if (data != null && data.length > 0) {
++                    try (PushbackInputStream inputStream = new PushbackInputStream(new java.io.ByteArrayInputStream(data), 2)) {
++                        if (this.isGzip(inputStream)) {
++                            tag = NbtIo.readCompressed(inputStream, NbtAccounter.unlimitedHeap());
++                        } else {
++                            try (DataInputStream dis = new DataInputStream(inputStream)) {
++                                tag = NbtIo.read(dis);
++                            }
++                        }
++                    }
++                }
++            } catch (Exception e) {
++                LOGGER.warn("Failed to read saved data {} via MultiPaper, falling back to local file", type.id(), e);
++            }
++            // MultiPaper end - read saved data via MultiPaper when possible
++            if (tag == null && !Files.exists(file)) {
++                return null;
++            }
++            if (tag == null) {
++                tag = this.readTagFromDisk(file, type.dataFixType(), SharedConstants.getCurrentVersion().dataVersion().version());
+             }
++            RegistryOps<Tag> ops = this.registries.createSerializationContext(NbtOps.INSTANCE);
++            return type.codec()
++                .parse(ops, tag.get("data"))
++                .resultOrPartial(error -> LOGGER.error("Failed to parse saved data for '{}': {}", type, error))
++                .orElse(null);
+         } catch (Exception e) {
+             LOGGER.error("Error loading saved data: {}", type, e);
+         }
+@@ -206,6 +229,15 @@ public class SavedDataStorage implements AutoCloseable {
+     private void tryWrite(final SavedDataType<?> type, final CompoundTag tag) {
+         Path path = this.getDataFile(type.id());
+ 
++        // MultiPaper start - write saved data via MultiPaper when possible
++        try {
++            MultiPaper.writeData(path.toString(), tag);
++            return;
++        } catch (Exception e) {
++            LOGGER.warn("Failed to save data {} via MultiPaper, falling back to local file", path.getFileName(), e);
++        }
++        // MultiPaper end - write saved data via MultiPaper when possible
++
+         try {
+             FileUtil.createDirectoriesSafe(path.getParent());
+             NbtIo.writeCompressed(tag, path);

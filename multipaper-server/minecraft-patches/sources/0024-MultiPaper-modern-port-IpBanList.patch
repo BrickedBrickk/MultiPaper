@@ -1,0 +1,18 @@
+--- a/net/minecraft/server/players/IpBanList.java
++++ b/net/minecraft/server/players/IpBanList.java
+@@ -48,6 +48,7 @@ public class IpBanList extends StoredUserList<String, IpBanListEntry> {
+         if (super.add(infos)) {
+             if (infos.getUser() != null) {
+                 this.notificationService.ipBanned(infos);
++                puregero.multipaper.externalserverprotocol.BanIpPacket.broadcast(infos.getUser(), infos.getCreated(), infos.getExpires(), infos.getReason(), infos.getSource()); // MultiPaper
+             }
+ 
+             return true;
+@@ -60,6 +61,7 @@ public class IpBanList extends StoredUserList<String, IpBanListEntry> {
+     public boolean remove(final String ip) {
+         if (super.remove(ip)) {
+             this.notificationService.ipUnbanned(ip);
++            puregero.multipaper.externalserverprotocol.PardonIpPacket.broadcast(ip); // MultiPaper
+             return true;
+         } else {
+             return false;

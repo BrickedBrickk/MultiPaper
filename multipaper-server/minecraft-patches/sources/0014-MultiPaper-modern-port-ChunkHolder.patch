@@ -1,0 +1,153 @@
+--- a/net/minecraft/server/level/ChunkHolder.java
++++ b/net/minecraft/server/level/ChunkHolder.java
+@@ -34,6 +34,10 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     private static final CompletableFuture<ChunkResult<LevelChunk>> UNLOADED_LEVEL_CHUNK_FUTURE = CompletableFuture.completedFuture(UNLOADED_LEVEL_CHUNK);
+     private final LevelHeightAccessor levelHeightAccessor;
+     // Paper - rewrite chunk system
++    public boolean addChangesToPlayersOnly = false; // MultiPaper
++    private boolean broadcastingToOtherServersOnly = false; // MultiPaper
++    private boolean broadcastingToPlayersOnly = false; // MultiPaper
++    private java.util.Set<BlockPos> blocksToBroadcastToPlayers = null; // MultiPaper
+     private boolean hasChangedSections;
+     private final @Nullable ShortSet[] changedBlocksPerSection;
+     private final BitSet blockChangedLightSectionFilter = new BitSet();
+@@ -221,7 +225,13 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     }
+ 
+     public boolean blockChanged(final BlockPos pos) {
+-        LevelChunk chunk = this.playersSentChunkTo.size() == 0 ? null : this.getChunkToSend(); // Paper - rewrite chunk system
++        if (addChangesToPlayersOnly && !puregero.multipaper.MultiPaper.isChunkLocal(this.getChunkMap().level.getChunkIfLoaded(pos))) { broadcastBlockToPlayersLater(pos); return true; } // MultiPaper
++        // MultiPaper start - save block changes even if there's no players, as there might be servers to send them to
++        // if (this.playersSentChunkTo.size() == 0) {
++        //     return;
++        // }
++        // MultiPaper end - save block changes even if there's no players, as there might be servers to send them to
++        LevelChunk chunk = this.getChunkMap().level.getChunkSource().getChunkAtIfLoadedImmediately(this.pos.x(), this.pos.z()); // this.getChunkToSend(); // MultiPaper - if we modify this chunk, even if it's not sent to players, we still need to send it to other servers
+         if (chunk == null) {
+             return false;
+         }
+@@ -237,6 +247,8 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+         }
+ 
+         changedBlocksInSection.add(SectionPos.sectionRelativePos(pos));
++
++        if (blocksToBroadcastToPlayers != null && !blocksToBroadcastToPlayers.isEmpty()) blocksToBroadcastToPlayers.remove(pos); // MultiPaper
+         return !hadChangedSections;
+     }
+ 
+@@ -272,7 +284,47 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+         return this.hasChangedSections || !this.skyChangedLightSectionFilter.isEmpty() || !this.blockChangedLightSectionFilter.isEmpty();
+     }
+ 
++    // MultiPaper start - sync block changes with external servers
++    private void addToBroadcastMap() {
++        this.getChunkMap().level.getChunkSource().onChunkReadyToSend(this);
++    }
++
++    public void broadcastChangesToOtherServers(LevelChunk chunk) {
++        if (newChunkHolder.externalSubscribers.isEmpty()) return; // No point running this if no one's listening
++        broadcastingToOtherServersOnly = true;
++        broadcastChanges(chunk);
++        broadcastingToOtherServersOnly = false;
++    }
++
++    private void broadcastBlockToPlayersLater(BlockPos blockPos) {
++        if (blocksToBroadcastToPlayers == null) {
++            blocksToBroadcastToPlayers = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<>();
++        }
++
++        if (blockPos instanceof BlockPos.MutableBlockPos) {
++            // Let's make it not mutable...
++            blockPos = blockPos.immutable();
++        }
++
++        this.addToBroadcastMap();
++        blocksToBroadcastToPlayers.add(blockPos);
++    }
++    // MultiPaper end - sync block changes with external servers
++
+     public void broadcastChanges(final LevelChunk chunk) {
++        // MultiPaper start - sync block changes with external servers
++        if (!broadcastingToOtherServersOnly && blocksToBroadcastToPlayers != null && !blocksToBroadcastToPlayers.isEmpty()) {
++            // Send blocks to players that shouldn't be sent to other servers as they've already been sent to other servers
++            broadcastingToPlayersOnly = true;
++            blocksToBroadcastToPlayers.forEach(blockPos -> {
++                BlockState blockState = chunk.getLevel().getBlockState(blockPos);
++                this.broadcast(this.moonrise$getPlayers(false), new ClientboundBlockUpdatePacket(blockPos, blockState), false);
++                this.broadcastBlockEntityIfNeeded(this.moonrise$getPlayers(false), chunk.getLevel(), blockPos, blockState);
++            });
++            broadcastingToPlayersOnly = false;
++            blocksToBroadcastToPlayers.clear();
++        }
++        // MultiPaper end
+         if (this.hasChangesToBroadcast()) {
+             Level level = chunk.getLevel();
+             if (!this.skyChangedLightSectionFilter.isEmpty() || !this.blockChangedLightSectionFilter.isEmpty()) {
+@@ -294,23 +346,29 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+                 for (int sectionIndex = 0; sectionIndex < this.changedBlocksPerSection.length; sectionIndex++) {
+                     ShortSet changedBlocks = this.changedBlocksPerSection[sectionIndex];
+                     if (changedBlocks != null) {
+-                        this.changedBlocksPerSection[sectionIndex] = null;
+-                        if (!players.isEmpty()) {
+-                            int sectionY = this.levelHeightAccessor.getSectionYFromSectionIndex(sectionIndex);
+-                            SectionPos sectionPos = SectionPos.of(chunk.getPos(), sectionY);
+-                            if (changedBlocks.size() == 1) {
+-                                BlockPos pos = sectionPos.relativeToBlockPos(changedBlocks.iterator().nextShort());
+-                                BlockState state = level.getBlockState(pos);
+-                                this.broadcast(players, new ClientboundBlockUpdatePacket(pos, state));
++                    this.changedBlocksPerSection[sectionIndex] = null;
++                    // if (!players.isEmpty()) { // MultiPaper - send block changes even if there's no players, as there might be servers to send them to
++                    if (true) {
++                        int sectionY = this.levelHeightAccessor.getSectionYFromSectionIndex(sectionIndex);
++                        SectionPos sectionPos = SectionPos.of(chunk.getPos(), sectionY);
++                        if (changedBlocks.size() == 1) {
++                            BlockPos pos = sectionPos.relativeToBlockPos(changedBlocks.iterator().nextShort());
++                            BlockState state = level.getBlockState(pos);
++                            if (broadcastingToOtherServersOnly) broadcastBlockToPlayersLater(pos); // MultiPaper
++                            this.broadcast(players, new ClientboundBlockUpdatePacket(pos, state));
++                            this.broadcastBlockEntityIfNeeded(players, level, pos, state);
++                        } else {
++                            LevelChunkSection section = chunk.getSection(sectionIndex);
++                            ClientboundSectionBlocksUpdatePacket packet = new ClientboundSectionBlocksUpdatePacket(sectionPos, changedBlocks, section);
++                            this.broadcast(players, packet);
++                            packet.runUpdates((pos, state) -> {
++                                if (broadcastingToOtherServersOnly) broadcastBlockToPlayersLater(pos); // MultiPaper
+                                 this.broadcastBlockEntityIfNeeded(players, level, pos, state);
+-                            } else {
+-                                LevelChunkSection section = chunk.getSection(sectionIndex);
+-                                ClientboundSectionBlocksUpdatePacket packet = new ClientboundSectionBlocksUpdatePacket(sectionPos, changedBlocks, section);
+-                                this.broadcast(players, packet);
+-                                packet.runUpdates((pos, state) -> this.broadcastBlockEntityIfNeeded(players, level, pos, state));
+-                            }
++                            });
+                         }
+                     }
++                    // } // MultiPaper - send block changes even if there's no players, as there might be servers to send them to
++                    }
+                 }
+ 
+                 this.hasChangedSections = false;
+@@ -331,10 +389,23 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+             if (packet != null) {
+                 this.broadcast(players, packet);
+             }
++
++            if (!broadcastingToPlayersOnly) puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(newChunkHolder, net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(blockEntity, BlockEntity::getUpdateTag, false)); // MultiPaper - sync the full block with external servers
+         }
++
+     }
+ 
+     private void broadcast(final List<ServerPlayer> players, final Packet<?> packet) {
++        this.broadcast(players, packet, true);
++    }
++
++    // MultiPaper start - Sync blocks with external servers
++    private void broadcast(final List<ServerPlayer> players, final Packet<?> packet, final boolean sendToOtherServers) {
++        if (sendToOtherServers && !broadcastingToPlayersOnly && !(packet instanceof net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket)) { // We handle block entities separately
++            puregero.multipaper.MultiPaperChunkHandler.onBlockUpdate(newChunkHolder, packet);
++        }
++        if (broadcastingToOtherServersOnly) return; // MultiPaper
++        // MultiPaper end
+         players.forEach(player -> player.connection.send(packet));
+     }
+ 

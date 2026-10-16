@@ -1,0 +1,19 @@
+--- a/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -71,6 +71,7 @@ import net.minecraft.world.level.storage.LevelData;
+ import net.minecraft.world.level.storage.LevelStorageSource;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ public class DedicatedServer extends MinecraftServer implements ServerInterface {
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -327,6 +328,8 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         }
+         // Purpur end - UPnP Port Forwarding
+ 
++        MultiPaper.onStart(bindAddress); // MultiPaper
++
+         // CraftBukkit start
+         this.server.loadPlugins();
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.STARTUP);

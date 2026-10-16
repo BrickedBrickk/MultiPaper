@@ -1,0 +1,59 @@
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -186,6 +186,7 @@ import net.minecraft.world.phys.Vec3;
+ import net.minecraft.world.scores.ScoreboardSaveData;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> implements CommandSource, ServerInfo, ChunkIOErrorReporter, ca.spottedleaf.moonrise.patches.chunk_system.server.ChunkSystemMinecraftServer { // Paper - rewrite chunk system
+     private static MinecraftServer SERVER; // Paper
+@@ -1025,6 +1026,22 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         }
+         // CraftBukkit end
+         this.getConnection().stop();
++
++        // MultiPaper start - unlock all externally locked chunks
++        for (ServerLevel world : this.getAllLevels()) {
++            final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.level.chunk.LevelChunk> entityTickingChunks = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)world).moonrise$getEntityTickingChunks();
++            final net.minecraft.world.level.chunk.LevelChunk[] raw = entityTickingChunks.getRawDataUnchecked();
++            final int size = entityTickingChunks.size();
++            for (int i = 0; i < size; ++i) {
++                final net.minecraft.world.level.chunk.LevelChunk chunk = raw[i];
++        final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder chunkHolder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)world).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(chunk.getPos().pack());
++                if (chunkHolder != null && chunkHolder.hasExternalLockRequest) {
++                    MultiPaper.unlockChunk(chunkHolder, chunkHolder.getCurrentChunk(), chunkHolder.getEntityChunk());
++                }
++            }
++        }
++        // MultiPaper end
++
+         this.isSaving = true;
+         if (this.playerList != null) {
+             LOGGER.info("Saving players");
+@@ -1084,6 +1101,8 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         LOGGER.info("Waiting for all RegionFile I/O tasks to complete...");
+         ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.flush((MinecraftServer)(Object)this);
+         LOGGER.info("All RegionFile I/O tasks to complete");
++        LOGGER.info("Flushing MultiPaper Master connection"); // MultiPaper
++        MultiPaper.flushMasterConnectionAsync().join(); // MultiPaper
+         if ((Object)this instanceof net.minecraft.server.dedicated.DedicatedServer) {
+             ca.spottedleaf.moonrise.common.util.MoonriseCommon.haltExecutors();
+         }
+@@ -1632,6 +1651,8 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             this.status = this.buildServerStatus();
+         }
+ 
++        MultiPaper.tick(); // MultiPaper
++
+         this.ticksUntilAutosave--;
+         // Paper start - Incremental chunk and player saving
+         int playerSaveInterval = io.papermc.paper.configuration.GlobalConfiguration.get().playerAutoSave.rate;
+@@ -1674,6 +1695,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         this.aggregatedTickTimesNanos += tickTime;
+         this.tickTimesNanos[tickIndex] = tickTime;
+         this.smoothedTickTimeMillis = this.smoothedTickTimeMillis * 0.8F + (float)tickTime / (float)TimeUtil.NANOSECONDS_PER_MILLISECOND * 0.19999999F;
++        MultiPaper.sendTickTime(tickTime / TimeUtil.NANOSECONDS_PER_MILLISECOND, getTPS()[0]); // MultiPaper
+         this.logTickMethodTime(nano);
+         profiler.pop();
+     }

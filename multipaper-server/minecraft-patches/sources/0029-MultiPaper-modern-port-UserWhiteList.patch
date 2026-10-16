@@ -1,0 +1,22 @@
+--- a/net/minecraft/server/players/UserWhiteList.java
++++ b/net/minecraft/server/players/UserWhiteList.java
+@@ -29,6 +29,9 @@ public class UserWhiteList extends StoredUserList<NameAndId, UserWhiteListEntry>
+         if (super.add(infos)) {
+             if (infos.getUser() != null) {
+                 this.notificationService.playerAddedToAllowlist(infos.getUser());
++                // MultiPaper start - broadcast whitelist adds
++                puregero.multipaper.externalserverprotocol.WhiteListPlayerPacket.broadcast(infos.getUser().name(), infos.getUser().id());
++                // MultiPaper end - broadcast whitelist adds
+             }
+ 
+             return true;
+@@ -46,6 +49,9 @@ public class UserWhiteList extends StoredUserList<NameAndId, UserWhiteListEntry>
+         // Paper end - Add whitelist events
+         if (super.remove(user)) {
+             this.notificationService.playerRemovedFromAllowlist(user);
++            // MultiPaper start - broadcast whitelist removes
++            puregero.multipaper.externalserverprotocol.RemoveWhiteListedPlayerPacket.broadcast(user.name(), user.id());
++            // MultiPaper end - broadcast whitelist removes
+             return true;
+         } else {
+             return false;

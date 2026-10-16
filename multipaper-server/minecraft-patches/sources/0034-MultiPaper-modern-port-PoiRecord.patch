@@ -1,0 +1,14 @@
+--- a/net/minecraft/world/entity/ai/village/poi/PoiRecord.java
++++ b/net/minecraft/world/entity/ai/village/poi/PoiRecord.java
+@@ -36,6 +36,11 @@ public class PoiRecord {
+         return this.freeTickets;
+     }
+ 
++    public void setFreeTickets(final int freeTickets) {
++        this.freeTickets = Math.max(0, Math.min(freeTickets, this.poiType.value().maxTickets()));
++        this.setDirty.run();
++    }
++
+     protected boolean acquireTicket() {
+         if (this.freeTickets <= 0) {
+             return false;

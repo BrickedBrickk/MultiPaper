@@ -1,0 +1,52 @@
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -154,8 +154,20 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     private static final Component DISABLED_ITEM_TOOLTIP = Component.translatable("item.disabled").withStyle(ChatFormatting.RED);
+     private int count;
+     private int popTime;
++    // MultiPaper start - track changes so they can be synced to other servers
++    public boolean dirty = true;
++    static { EMPTY.dirty = false; }
++        public puregero.multipaper.NonNullListFilter<? extends ItemStack> listeningComponent;
++
++    public void markDirty() {
++        if (this == EMPTY || this.listeningComponent == null || this.listeningComponent.markDirty()) {
++            this.dirty = true;
++        }
++    }
++    // MultiPaper end - track changes so they can be synced to other servers
+     @Deprecated
+     private @Nullable Holder<Item> item;
++
+     private PatchedDataComponentMap components;
+ 
+     public static DataResult<ItemStack> validateStrict(final ItemStack itemStack) {
+@@ -1036,10 +1048,12 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+ 
+     public void applyComponents(final DataComponentPatch patch) {
+         this.components.applyPatch(patch);
++        markDirty(); // MultiPaper
+     }
+ 
+     public void applyComponents(final DataComponentMap components) {
+         this.components.setAll(components);
++        markDirty(); // MultiPaper
+     }
+ 
+     public Component getHoverName() {
+@@ -1281,6 +1295,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     @Deprecated
+     public void setItem(Item item) {
+         this.item = item.builtInRegistryHolder();
++        markDirty(); // MultiPaper
+         // Paper start - change base component prototype
+         final DataComponentPatch patch = this.getComponentsPatch();
+         this.components = new PatchedDataComponentMap(this.item.components());
+@@ -1340,6 +1355,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+ 
+     public void setCount(final int count) {
+         this.count = count;
++        markDirty(); // MultiPaper
+     }
+ 
+     public void limitSize(final int maxStackSize) {

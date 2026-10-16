@@ -1,0 +1,45 @@
+--- a/net/minecraft/server/level/ChunkMap.java
++++ b/net/minecraft/server/level/ChunkMap.java
+@@ -107,6 +107,7 @@ import net.minecraft.world.phys.Vec3;
+ import org.apache.commons.lang3.mutable.MutableBoolean;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerProvider, GeneratingChunkMap {
+     private static final ChunkResult<List<ChunkAccess>> UNLOADED_CHUNK_LIST_RESULT = ChunkResult.error("Unloaded chunks found in range");
+@@ -891,7 +892,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+     }
+ 
+     private boolean skipPlayer(final ServerPlayer player) {
+-        return player.isSpectator() && !this.level.getGameRules().get(GameRules.SPECTATORS_GENERATE_CHUNKS);
++        return puregero.multipaper.MultiPaper.isExternalPlayer(player) || (player.isSpectator() && !this.level.getGameRules().get(GameRules.SPECTATORS_GENERATE_CHUNKS)); // MultiPaper - skip external players
+     }
+ 
+     private void updatePlayerStatus(final ServerPlayer player, final boolean added) {
+@@ -1094,6 +1095,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+     }
+ 
+     private void newTrackerTick() {
++        if (this.level.inactiveTracker.tick()) return; // MultiPaper - inactive entity tracker
+         this.iteratingTrackerEntities = true;
+         try {
+             final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.entity.Entity> trackerEntities = this.trackerEntities;
+@@ -1375,7 +1377,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+         @Override
+         public void sendToTrackingPlayersAndSelf(final Packet<? super ClientGamePacketListener> packet) {
+             this.sendToTrackingPlayers(packet);
+-            if (this.entity instanceof ServerPlayer player) {
++            if (this.entity instanceof ServerPlayer player && MultiPaper.isRealPlayer(player)) { // MultiPaper - only send to real player
+                 player.connection.send(packet);
+             }
+         }
+@@ -1407,7 +1409,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+ 
+         public void updatePlayer(final ServerPlayer player) {
+             org.spigotmc.AsyncCatcher.catchOp("player tracker update"); // Spigot
+-            if (player != this.entity) {
++            if (player != this.entity && puregero.multipaper.MultiPaper.isRealPlayer(player)) { // MultiPaper - don't track for external players
+                 // Paper start - remove allocation of Vec3 here
+                 // Vec3 deltaToPlayer = player.position().subtract(this.entity.position());
+                 double deltaToPlayerX = player.getX() - this.entity.getX();

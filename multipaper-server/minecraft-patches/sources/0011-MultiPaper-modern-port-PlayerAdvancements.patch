@@ -1,0 +1,49 @@
+--- a/net/minecraft/server/PlayerAdvancements.java
++++ b/net/minecraft/server/PlayerAdvancements.java
+@@ -111,10 +111,16 @@ public class PlayerAdvancements {
+     }
+ 
+     private void load(final ServerAdvancementManager manager) {
+-        if (Files.isRegularFile(this.playerSavePath)) {
+-            try (Reader reader = Files.newBufferedReader(this.playerSavePath, StandardCharsets.UTF_8)) {
+-                JsonElement json = StrictJsonParser.parse(reader);
+-                PlayerAdvancements.Data data = this.codec.parse(JsonOps.INSTANCE, json).getOrThrow(JsonParseException::new);
++        // MultiPaper start - load the advancements from the owning server
++        String json = puregero.multipaper.ExternalPlayer.loadedAdvancements.remove(this.player.getUUID());
++        if (json == null) json = puregero.multipaper.MultiPaper.readAdvancements(this.player.level().getServer().storageSource.getLevelId(), this.player.getStringUUID());
++        // MultiPaper end - load the advancements from the owning server
++        if ((json != null && !json.isEmpty()) || Files.isRegularFile(this.playerSavePath)) { // MultiPaper
++            try (Reader reader = json != null && !json.isEmpty()
++                    ? new java.io.StringReader(json) // MultiPaper
++                    : Files.newBufferedReader(this.playerSavePath, StandardCharsets.UTF_8)) {
++                JsonElement jsonElement = StrictJsonParser.parse(reader);
++                PlayerAdvancements.Data data = this.codec.parse(JsonOps.INSTANCE, jsonElement).getOrThrow(JsonParseException::new);
+                 this.applyFrom(manager, data);
+             } catch (IOException | JsonIOException e) {
+                 LOGGER.error("Couldn't access player advancements in {}", this.playerSavePath, e);
+@@ -131,6 +137,13 @@ public class PlayerAdvancements {
+         if (org.spigotmc.SpigotConfig.disableAdvancementSaving) return; // Spigot
+         JsonElement json = this.codec.encodeStart(JsonOps.INSTANCE, this.asData()).getOrThrow();
+ 
++        // MultiPaper start - write the advancements to the owning server
++        puregero.multipaper.MultiPaper.writeAdvancements(
++            this.player.level().getServer().storageSource.getLevelId(), this.player.getStringUUID(), PlayerAdvancements.GSON.toJson(json)
++        );
++        if (puregero.multipaper.MultiPaper.getConnection() != null) return;
++        // MultiPaper end - write the advancements to the owning server
++
+         try {
+             FileUtil.createDirectoriesSafe(this.playerSavePath.getParent());
+ 
+@@ -167,6 +180,11 @@ public class PlayerAdvancements {
+         return new PlayerAdvancements.Data(map);
+     }
+ 
++    public String toJson() {
++        JsonElement json = this.codec.encodeStart(JsonOps.INSTANCE, this.asData()).getOrThrow();
++        return GSON.toJson(json);
++    }
++
+     public boolean award(final AdvancementHolder holder, final String criterion) {
+         boolean result = false;
+         AdvancementProgress progress = this.getOrStartProgress(holder);

@@ -1,0 +1,46 @@
+--- a/net/minecraft/world/level/storage/LevelStorageSource.java
++++ b/net/minecraft/world/level/storage/LevelStorageSource.java
+@@ -85,6 +85,7 @@ import net.minecraft.world.level.validation.DirectoryValidator;
+ import net.minecraft.world.level.validation.ForbiddenSymlinkInfo;
+ import net.minecraft.world.level.validation.PathAllowList;
+ import org.apache.commons.io.function.IORunnable;
++import puregero.multipaper.MultiPaper;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+@@ -276,6 +277,8 @@ public class LevelStorageSource {
+     }
+ 
+     private static CompoundTag readLevelDataTagRaw(final Path dataFile) throws IOException {
++        final CompoundTag multiPaperTag = puregero.multipaper.MultiPaper.readLevel(dataFile.toFile().getParentFile().getName()); // MultiPaper
++        if (multiPaperTag != null) return multiPaperTag; // MultiPaper
+         return NbtIo.readCompressed(dataFile, NbtAccounter.uncompressedQuota());
+     }
+ 
+@@ -354,6 +357,10 @@ public class LevelStorageSource {
+     }
+ 
+     private static @Nullable Tag readLightweightData(final Path dataFile) throws IOException {
++        if (true) { // MultiPaper - read level.dat via MultiPaper when possible
++            final CompoundTag multiPaperTag = puregero.multipaper.MultiPaper.readLevel(dataFile.toFile().getParentFile().getName());
++            if (multiPaperTag != null) return multiPaperTag;
++        }
+         SkipFields parser = new SkipFields(
+             new FieldSelector("Data", CompoundTag.TYPE, "Player"), new FieldSelector("Data", CompoundTag.TYPE, "WorldGenSettings")
+         );
+@@ -599,6 +606,15 @@ public class LevelStorageSource {
+         private void saveLevelData(final CompoundTag root) {
+             Path worldDir = this.levelDirectory.path();
+ 
++            // MultiPaper start - sync level.dat with other servers
++            try {
++                puregero.multipaper.MultiPaper.writeLevel(this.getLevelDirectory().path().getFileName().toString(), root);
++                return;
++            } catch (Exception e) {
++                LevelStorageSource.LOGGER.error("Failed to save level {} via MultiPaper", worldDir, e);
++            }
++            // MultiPaper end - sync level.dat with other servers
++
+             try {
+                 Path dataFile = Files.createTempFile(worldDir, "level", ".dat");
+                 NbtIo.writeCompressed(root, dataFile);

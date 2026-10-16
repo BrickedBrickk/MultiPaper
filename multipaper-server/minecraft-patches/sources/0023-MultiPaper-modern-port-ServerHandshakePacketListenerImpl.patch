@@ -1,0 +1,57 @@
+--- a/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+@@ -11,6 +11,8 @@ import net.minecraft.network.protocol.login.LoginProtocols;
+ import net.minecraft.network.protocol.status.ServerStatus;
+ import net.minecraft.network.protocol.status.StatusProtocols;
+ import net.minecraft.server.MinecraftServer;
++import puregero.multipaper.ExternalServerConnection; // MultiPaper
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketListener {
+     private static final Component IGNORE_STATUS_REASON = Component.translatable("disconnect.ignoring_status_request");
+@@ -33,8 +35,24 @@ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketL
+         this.connection = connection;
+     }
+ 
++    static boolean isValidBungeeForwarding(String[] split) {
++        return (split.length == 2 || split.length == 3 || split.length == 4)
++            && (BYPASS_HOSTCHECK || HOST_PATTERN.matcher(split[1]).matches());
++    }
++
+     @Override
+     public void handleIntention(final ClientIntentionPacket packet) {
++        // MultiPaper start - Check if this is a MultiPaper peer connection
++        for (String part : packet.hostName().split("\00")) {
++            if (part.equals(MultiPaper.getConnection().secret)) {
++                this.server.getConnection().pendingConnections.remove(this.connection);
++                this.server.getConnection().getConnections().remove(this.connection);
++                new ExternalServerConnection(this.connection.channel);
++                return;
++            }
++        }
++        // MultiPaper end
++
+         this.connection.hostname = packet.hostName() + ":" + packet.port(); // CraftBukkit  - set hostname
+         switch (packet.intention()) {
+             case LOGIN:
+@@ -153,13 +171,18 @@ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketL
+             String[] split = packet.hostName().split("\00");
+             if (!handledByEvent && proxyLogicEnabled) { // Paper
+                 // if (org.spigotmc.SpigotConfig.bungee) { // Paper - comment out, we check above!
+-                if ((split.length == 3 || split.length == 4) && (ServerHandshakePacketListenerImpl.BYPASS_HOSTCHECK || ServerHandshakePacketListenerImpl.HOST_PATTERN.matcher(split[1]).matches())) { // Paper - Add bypass host check
++                if (isValidBungeeForwarding(split)) { // Paper - Add bypass host check
+                     // Paper start - Unix domain socket support
+                     java.net.SocketAddress socketAddress = this.connection.getRemoteAddress();
+                     this.connection.hostname = split[0];
+                     this.connection.address = new java.net.InetSocketAddress(split[1], socketAddress instanceof java.net.InetSocketAddress ? ((java.net.InetSocketAddress) socketAddress).getPort() : 0);
+                     // Paper end - Unix domain socket support
+-                    this.connection.spoofedUUID = com.mojang.util.UndashedUuid.fromStringLenient(split[2]);
++                    // MultiPaper start - its built-in proxy forwards the client IP but leaves
++                    // authentication to the backend, so this two-field form has no forwarded UUID.
++                    if (split.length >= 3) {
++                        this.connection.spoofedUUID = com.mojang.util.UndashedUuid.fromStringLenient(split[2]);
++                    }
++                    // MultiPaper end
+                 } else {
+                     Component message = Component.literal("If you wish to use IP forwarding, please enable it in your BungeeCord config as well!");
+                     this.connection.send(new ClientboundLoginDisconnectPacket(message));

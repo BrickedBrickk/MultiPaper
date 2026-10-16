@@ -1,0 +1,22 @@
+--- a/net/minecraft/network/Connection.java
++++ b/net/minecraft/network/Connection.java
+@@ -53,6 +53,7 @@ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ import org.slf4j.Marker;
+ import org.slf4j.MarkerFactory;
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+     private static final float AVERAGE_PACKETS_SMOOTHING = 0.75F;
+@@ -680,6 +681,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+     public void disconnect(final DisconnectionDetails details) {
+         this.preparing = false; // Spigot
+         this.clearPacketQueue(); // Paper - Optimize network
++        // MultiPaper start
++        if (getPlayer() != null && getPlayer().hasRegisteredOnMaster) {
++            MultiPaper.sendPlayerDisconnect(getPlayer()); // MultiPaper
++        }
++        // MultiPaper end
+         if (this.channel == null) {
+             this.delayedDisconnect = details;
+         }

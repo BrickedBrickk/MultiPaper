@@ -1,0 +1,29 @@
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -175,6 +175,18 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+ 
+         java.util.Objects.checkFromToIndex(0, size, raw.length);
+         for (int i = 0; i < size; ++i) {
++            final LevelChunk chunk1 = raw[i];
++            final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder holder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)world).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(chunk1.getPos().pack());
++
++            // MultiPaper start - Don't tick this chunk if we don't own it
++            final boolean isTicking = this.chunkMap.getDistanceManager().inEntityTickingRange(chunk1.getPos().pack());
++            if (holder != null) {
++                if (isTicking && !holder.hasExternalLockRequest) puregero.multipaper.MultiPaper.lockChunk(holder);
++                if (!isTicking && holder.hasExternalLockRequest) puregero.multipaper.MultiPaper.unlockChunk(holder, chunk1, holder.getEntityChunk());
++            }
++            if (!puregero.multipaper.MultiPaper.isChunkLocal(chunk1)) continue;
++            // MultiPaper end - Don't tick this chunk if we don't own it
++
+             world.tickChunk(raw[i], randomTickSpeed);
+ 
+             // call mid-tick tasks for chunk system
+@@ -619,6 +631,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+ 
+     private void tickSpawningChunk(final LevelChunk chunk, final List<MobCategory> spawningCategories, final NaturalSpawner.SpawnState spawnCookie) {
+         ChunkPos chunkPos = chunk.getPos();
++        if (!puregero.multipaper.MultiPaper.isChunkLocal(chunk)) return; // MultiPaper - Don't tick this chunk if we don't own it
+         chunk.incrementInhabitedTime();
+         if (true) { // Paper - rewrite chunk system
+             this.level.tickThunder(chunk);

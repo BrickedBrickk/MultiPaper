@@ -1,0 +1,27 @@
+--- a/net/minecraft/network/FriendlyByteBuf.java
++++ b/net/minecraft/network/FriendlyByteBuf.java
+@@ -60,6 +60,8 @@ public class FriendlyByteBuf extends ByteBuf {
+     public static final short MAX_STRING_LENGTH = 32767;
+     public static final int MAX_COMPONENT_STRING_LENGTH = 262144;
+     private static final Gson GSON = new Gson();
++
++    public long maxNbtSize = 2097152L; // MultiPaper
+     // Paper start - Track codec depth
+     public boolean trackCodecDepth;
+     public byte codecDepth;
+@@ -454,7 +456,14 @@ public class FriendlyByteBuf extends ByteBuf {
+     }
+ 
+     public @Nullable CompoundTag readNbt() {
+-        return readNbt(this);
++        // MultiPaper start - use configurable max nbt size
++        Tag result = readNbt(this, NbtAccounter.create(this.maxNbtSize));
++        if (result != null && !(result instanceof CompoundTag)) {
++            throw new DecoderException("Not a compound tag: " + result);
++        } else {
++            return (CompoundTag) result;
++        }
++        // MultiPaper end
+     }
+ 
+     public static @Nullable CompoundTag readNbt(final ByteBuf input) {

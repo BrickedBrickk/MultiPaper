@@ -1,0 +1,11 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
+@@ -186,7 +186,7 @@ public final class RegionizedPlayerChunkLoader {
+ 
+     public void addPlayer(final ServerPlayer player) {
+         TickThread.ensureTickThread(player, "Cannot add player to player chunk loader async");
+-        if (!((ChunkSystemServerPlayer)player).moonrise$isRealPlayer()) {
++        if (puregero.multipaper.MultiPaper.isExternalPlayer(player) || !((ChunkSystemServerPlayer)player).moonrise$isRealPlayer()) { // MultiPaper
+             return;
+         }
+ 

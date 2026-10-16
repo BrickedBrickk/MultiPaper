@@ -1,0 +1,18 @@
+--- a/net/minecraft/world/level/block/piston/PistonBaseBlock.java
++++ b/net/minecraft/world/level/block/piston/PistonBaseBlock.java
+@@ -394,6 +394,7 @@ public class PistonBaseBlock extends DirectionalBlock {
+             }
+             // Paper end - fix a variety of piston desync dupes
+             toUpdate[updateIndex++] = blockState;
++            ((ServerLevel) level).getChunkSource().blockChanged(pos); // MultiPaper
+         }
+ 
+         if (extending) {
+@@ -438,6 +439,7 @@ public class PistonBaseBlock extends DirectionalBlock {
+ 
+         for (int i = toPush.size() - 1; i >= 0; i--) {
+             level.updateNeighborsAt(toPush.get(i), toUpdate[updateIndex++].getBlock(), orientation);
++            ((ServerLevel) level).getChunkSource().blockChanged(toPush.get(i)); // MultiPaper
+         }
+ 
+         if (extending) {

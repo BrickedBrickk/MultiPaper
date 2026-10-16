@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/level/chunk/ProtoChunk.java
++++ b/net/minecraft/world/level/chunk/ProtoChunk.java
+@@ -46,8 +46,8 @@ public class ProtoChunk extends ChunkAccess implements ca.spottedleaf.moonrise.p
+     private volatile ChunkStatus status = ChunkStatus.EMPTY;
+     private final List<CompoundTag> entities = Lists.newArrayList();
+     private @Nullable BelowZeroRetrogen belowZeroRetrogen;
+-    private final ProtoChunkTicks<Block> blockTicks;
+-    private final ProtoChunkTicks<Fluid> fluidTicks;
++    public ProtoChunkTicks<Block> blockTicks; // MultiPaper - make public and non-final
++    public ProtoChunkTicks<Fluid> fluidTicks; // MultiPaper - make public and non-final
+     // Paper start - get block chunk optimisation
+     private static final BlockState AIR_BLOCKSTATE = Blocks.AIR.defaultBlockState();
+     private static final FluidState AIR_FLUIDSTATE = Fluids.EMPTY.defaultFluidState();

@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/chunk/ChunkAccess.java
++++ b/net/minecraft/world/level/chunk/ChunkAccess.java
+@@ -61,7 +61,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private static final LongSet EMPTY_REFERENCE_SET = new LongOpenHashSet();
+     protected final @Nullable ShortList[] postProcessing;
+-    private volatile boolean unsaved;
++    public volatile boolean unsaved; // MultiPaper - make public
+     private volatile boolean isLightCorrect;
+     protected final ChunkPos chunkPos; public final long coordinateKey; public final int locX; public final int locZ; // Paper - cache coordinate key
+     private long inhabitedTime;

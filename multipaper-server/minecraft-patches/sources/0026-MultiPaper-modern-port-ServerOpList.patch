@@ -1,0 +1,24 @@
+--- a/net/minecraft/server/players/ServerOpList.java
++++ b/net/minecraft/server/players/ServerOpList.java
+@@ -25,6 +25,11 @@ public class ServerOpList extends StoredUserList<NameAndId, ServerOpListEntry> {
+         if (super.add(infos)) {
+             if (infos.getUser() != null) {
+                 this.notificationService.playerOped(infos);
++                // MultiPaper start - broadcast ops
++                puregero.multipaper.externalserverprotocol.OpPlayerPacket.broadcast(
++                    infos.getUser().name(), infos.getUser().id(), infos.permissions().level().id(), infos.getBypassesPlayerLimit()
++                );
++                // MultiPaper end - broadcast ops
+             }
+ 
+             return true;
+@@ -39,6 +44,9 @@ public class ServerOpList extends StoredUserList<NameAndId, ServerOpListEntry> {
+         if (super.remove(user)) {
+             if (entry != null) {
+                 this.notificationService.playerDeoped(entry);
++                // MultiPaper start - broadcast deops
++                puregero.multipaper.externalserverprotocol.DeopPlayerPacket.broadcast(entry.getUser().name(), entry.getUser().id());
++                // MultiPaper end - broadcast deops
+             }
+ 
+             return true;
