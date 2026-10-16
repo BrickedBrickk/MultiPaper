@@ -1,0 +1,86 @@
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -46,6 +_,9 @@
+ import java.util.stream.Collectors;
+ import javax.imageio.ImageIO;
+ import net.md_5.bungee.api.chat.BaseComponent;
++import puregero.multipaper.MultiPaper; // MultiPaper
++import puregero.multipaper.externalserverprotocol.SubscribeToWorldPacket; // MultiPaper
++import puregero.multipaper.permissions.MultiPaperPermissions; // MultiPaper
+ import net.minecraft.Optionull;
+ import net.minecraft.advancements.AdvancementHolder;
+ import net.minecraft.commands.CommandSourceStack;
+@@ -247,6 +_,7 @@
+     private final String serverVersion;
+     private final String bukkitVersion = Versioning.getBukkitVersion();
+     private final Logger logger = Logger.getLogger("Minecraft");
++    private final puregero.multipaper.CraftMultiPaperNotificationManager multiPaperNotificationManager = new puregero.multipaper.CraftMultiPaperNotificationManager(); // MultiPaper
+     private final ServicesManager servicesManager = new SimpleServicesManager();
+     private final CraftScheduler scheduler = new CraftScheduler();
+     private final CraftCommandMap commandMap; // Paper - Move down
+@@ -389,6 +_,7 @@
+         // Paper start
+         this.commandMap = new CraftCommandMap(this);
+         this.pluginManager = new SimplePluginManager(this, commandMap);
++        this.commandMap.registerMultiPaperCommands(); // MultiPaper - command timings require the initialized plugin manager
+         this.paperPluginManager = new io.papermc.paper.plugin.manager.PaperPluginManagerImpl(this, this.commandMap, pluginManager);
+         this.pluginManager.paperPluginManager = this.paperPluginManager;
+          // Paper end
+@@ -592,6 +_,7 @@
+             // Spigot end
+             DefaultPermissions.registerCorePermissions();
+             CraftDefaultPermissions.registerCorePermissions();
++            MultiPaperPermissions.registerCorePermissions(); // MultiPaper
+             if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) this.loadCustomPermissions(); // Paper
+             this.syncCommands();
+         }
+@@ -637,6 +_,33 @@
+     }
+ 
+     @Override
++    public java.util.Collection<? extends Player> getLocalOnlinePlayers() {
++        return this.getOnlinePlayers().stream()
++            .filter(player -> !(player.getHandle() instanceof puregero.multipaper.ExternalPlayer))
++            .collect(java.util.stream.Collectors.toUnmodifiableList());
++    }
++
++    @Override
++    public java.util.Collection<? extends Player> getAllOnlinePlayers() {
++        return this.getOnlinePlayers();
++    }
++
++    @Override
++    public org.bukkit.MultiPaperNotificationManager getMultiPaperNotificationManager() {
++        return this.multiPaperNotificationManager;
++    }
++
++    @Override
++    public String getLocalServerName() {
++        return puregero.multipaper.config.MultiPaperConfiguration.get().masterConnection.myName;
++    }
++
++    @Override
++    public puregero.multipaper.MultiPaperDataStorage getMultiPaperDataStorage() {
++        return new puregero.multipaper.CraftMultiPaperDataStorage();
++    }
++
++    @Override
+     public String getVersion() {
+         return this.serverVersion + " (MC: " + this.console.getServerVersion() + ")";
+     }
+@@ -1407,6 +_,7 @@
+             return;
+         }
+         this.worlds.put(world.getName().toLowerCase(Locale.ROOT), world);
++        MultiPaper.broadcastPacketToExternalServers(new SubscribeToWorldPacket(world.getName())); // MultiPaper
+     }
+ 
+     @Override
+@@ -2912,6 +_,7 @@
+         if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions();
+         DefaultPermissions.registerCorePermissions();
+         CraftDefaultPermissions.registerCorePermissions();
++        MultiPaperPermissions.registerCorePermissions(); // MultiPaper
+     }
+ 
+     @Override

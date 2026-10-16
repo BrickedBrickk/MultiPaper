@@ -1,0 +1,19 @@
+--- a/src/main/java/org/bukkit/craftbukkit/CraftChunk.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftChunk.java
+@@ -174,6 +_,16 @@
+     }
+ 
+     @Override
++    public boolean isExternalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkExternal(this);
++    }
++
++    @Override
++    public boolean isLocalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkLocal(this);
++    }
++
++    @Override
+     public boolean load() {
+         return this.getWorld().loadChunk(this.getX(), this.getZ(), true);
+     }

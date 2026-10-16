@@ -1,0 +1,62 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -229,6 +_,8 @@
+ 
+ @DelegateDeserialization(CraftOfflinePlayer.class)
+ public class CraftPlayer extends CraftHumanEntity implements Player, PluginMessageBridgeImpl {
++    public final java.util.concurrent.ConcurrentHashMap<String, String> data = new java.util.concurrent.ConcurrentHashMap<>(); // MultiPaper
++    public final java.util.concurrent.ConcurrentHashMap<String, String> persistentData = new java.util.concurrent.ConcurrentHashMap<>(); // MultiPaper
+     private static final org.slf4j.Logger LOGGER = LogUtils.getClassLogger();
+     private static final PointersSupplier<Player> POINTERS_SUPPLIER = PointersSupplier.<Player>builder()
+         .parent(CraftEntity.POINTERS_SUPPLIER)
+@@ -543,6 +_,50 @@
+         getHandle().connection.send(new ClientboundClearTitlesPacket(false));
+     }
+     // Paper end
++
++    @Override
++    public String getExternalServerName() {
++        return this.getHandle() instanceof puregero.multipaper.ExternalPlayer externalPlayer
++            ? externalPlayer.externalServerConnection.externalServer.getName()
++            : null;
++    }
++
++    @Override
++    public void chatOnOtherServers(String msg) {
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerSayChatPacket(getHandle(), msg));
++    }
++
++    @Override
++    public boolean isExternalPlayer() {
++        return puregero.multipaper.MultiPaper.isExternalPlayer(this);
++    }
++
++    @Override
++    public boolean isLocalPlayer() {
++        return puregero.multipaper.MultiPaper.isRealPlayer(this);
++    }
++
++    @Override
++    public String getData(String key) {
++        return this.data.get(key);
++    }
++
++    @Override
++    public void setData(String key, String value) {
++        if (value == null) this.data.remove(key); else this.data.put(key, value);
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerDataUpdatePacket(this, false, key, value));
++    }
++
++    @Override
++    public String getPersistentData(String key) {
++        return this.persistentData.get(key);
++    }
++
++    @Override
++    public void setPersistentData(String key, String value) {
++        if (value == null) this.persistentData.remove(key); else this.persistentData.put(key, value);
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerDataUpdatePacket(this, true, key, value));
++    }
+ 
+     @Override
+     public String getDisplayName() {

@@ -1,0 +1,19 @@
+--- a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+@@ -379,6 +_,16 @@
+         return new CraftChunk(chunk);
+     }
+ 
++    @Override
++    public boolean isChunkExternal(int x, int z) {
++        return puregero.multipaper.MultiPaper.isChunkExternal(this.world, new net.minecraft.core.BlockPos(x << 4, this.world.getMinY(), z << 4));
++    }
++
++    @Override
++    public boolean isChunkLocal(int x, int z) {
++        return puregero.multipaper.MultiPaper.isChunkLocal(this.world, new net.minecraft.core.BlockPos(x << 4, this.world.getMinY(), z << 4));
++    }
++
+     @NotNull
+     @Override
+     public Chunk getChunkAt(int x, int z, boolean generate) {

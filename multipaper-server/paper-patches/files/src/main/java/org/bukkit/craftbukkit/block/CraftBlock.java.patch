@@ -1,0 +1,19 @@
+--- a/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
++++ b/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
+@@ -208,6 +_,16 @@
+     }
+ 
+     @Override
++    public boolean isInExternalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkExternal(this.level.getMinecraftWorld(), this.position);
++    }
++
++    @Override
++    public boolean isInLocalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkLocal(this.level.getMinecraftWorld(), this.position);
++    }
++
++    @Override
+     public byte getLightLevel() {
+         return (byte) this.level.getMinecraftWorld().getMaxLocalRawBrightness(this.position);
+     }

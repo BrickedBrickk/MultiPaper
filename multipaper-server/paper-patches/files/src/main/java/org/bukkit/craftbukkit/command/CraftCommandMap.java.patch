@@ -1,0 +1,33 @@
+--- a/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
++++ b/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
+@@ -4,12 +_,30 @@
+ import org.bukkit.Server;
+ import org.bukkit.command.Command;
+ import org.bukkit.command.SimpleCommandMap;
++import puregero.multipaper.commands.ServersCommand;
+ 
+ public class CraftCommandMap extends SimpleCommandMap {
+ 
+     public CraftCommandMap(Server server) {
+         super(server, io.papermc.paper.command.brigadier.bukkit.BukkitBrigForwardingMap.INSTANCE);
+     }
++
++    // MultiPaper start
++    @Override
++    public void clearCommands() {
++        super.clearCommands();
++
++        setDefaultCommands();
++    }
++
++    public void registerMultiPaperCommands() {
++        setDefaultCommands();
++    }
++
++    private void setDefaultCommands() {
++        register("multipaper", new ServersCommand("servers"));
++    }
++    // MultiPaper end
+ 
+     public Map<String, Command> getKnownCommands() {
+         return this.knownCommands;

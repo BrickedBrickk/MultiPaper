@@ -1,0 +1,31 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java
+@@ -203,6 +_,28 @@
+     }
+ 
+     @Override
++    public boolean isInExternalChunk() {
++        return this.entity.level() instanceof net.minecraft.server.level.ServerLevel level
++            && puregero.multipaper.MultiPaper.isChunkExternal(level, this.entity.blockPosition());
++    }
++
++    @Override
++    public boolean isInLocalChunk() {
++        return this.entity.level() instanceof net.minecraft.server.level.ServerLevel level
++            && puregero.multipaper.MultiPaper.isChunkLocal(level, this.entity.blockPosition());
++    }
++
++    @Override
++    public void setFake() {
++        this.entity.setFake();
++    }
++
++    @Override
++    public boolean isFake() {
++        return this.entity.isFake();
++    }
++
++    @Override
+     public Location getLocation(Location loc) {
+         if (loc != null) {
+             loc.setWorld(this.getWorld());

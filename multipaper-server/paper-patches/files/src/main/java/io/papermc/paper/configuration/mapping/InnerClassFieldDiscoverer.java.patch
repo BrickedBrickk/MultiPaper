@@ -1,0 +1,11 @@
+--- a/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java
++++ b/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java
+@@ -26,7 +_,7 @@
+     private final FieldDiscoverer<Map<Field, Object>> delegate;
+     private final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors;
+ 
+-    private InnerClassFieldDiscoverer(final InnerClassInstanceSupplier instanceSupplier, final FieldDiscoverer<Map<Field, Object>> delegate, final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors) {
++    public InnerClassFieldDiscoverer(final InnerClassInstanceSupplier instanceSupplier, final FieldDiscoverer<Map<Field, Object>> delegate, final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors) { // MultiPaper - make public
+         this.instanceSupplier = instanceSupplier;
+         this.delegate = delegate;
+         this.fieldProcessors = fieldProcessors;
