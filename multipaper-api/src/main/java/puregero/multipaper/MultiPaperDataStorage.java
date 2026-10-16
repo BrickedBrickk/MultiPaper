@@ -48,7 +48,7 @@ public interface MultiPaperDataStorage {
 
     CompletableFuture<Map<String, String>> list(@Nullable String prefix);
 
-    CompletableFuture<@Nullable String> set(String key, String value);
+    CompletableFuture<String> set(String key, String value);
 
     default CompletableFuture<Long> set(String key, long value) {
         return set(key, Long.toString(value)).thenApply(Long::parseLong);
@@ -62,7 +62,7 @@ public interface MultiPaperDataStorage {
         return set(key, Double.toString(value)).thenApply(Double::parseDouble);
     }
 
-    CompletableFuture<@Nullable String> add(String key, String increment);
+    CompletableFuture<String> add(String key, String increment);
 
     default CompletableFuture<Long> add(String key, long increment) {
         return add(key, Long.toString(increment)).thenApply(Long::parseLong);
