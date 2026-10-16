@@ -22,9 +22,9 @@
          // Paper start
          this.commandMap = new CraftCommandMap(this);
          this.pluginManager = new SimplePluginManager(this, commandMap);
-+        this.commandMap.registerMultiPaperCommands(); // MultiPaper - command timings require the initialized plugin manager
          this.paperPluginManager = new io.papermc.paper.plugin.manager.PaperPluginManagerImpl(this, this.commandMap, pluginManager);
          this.pluginManager.paperPluginManager = this.paperPluginManager;
++        this.commandMap.registerMultiPaperCommands(); // MultiPaper - command timings require the initialized plugin manager
           // Paper end
 @@ -592,6 +_,7 @@
              // Spigot end

@@ -17,6 +17,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLeve
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.StartMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SetPortMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnlockChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnsubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
@@ -113,6 +114,21 @@ class MasterIntegrationTest {
 
     @Test
     @Order(4)
+    void proxyBackendPortsAreRegisteredWithMaster() throws Exception {
+        serverA.send(new SetPortMessage(25566));
+        serverB.send(new SetPortMessage(25567));
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && (ServerConnection.getConnection(serverA.name).getPort() != 25566 || ServerConnection.getConnection(serverB.name).getPort() != 25567)) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(25566, ServerConnection.getConnection(serverA.name).getPort());
+        assertEquals(25567, ServerConnection.getConnection(serverB.name).getPort());
+    }
+
+    @Test
+    @Order(5)
     void firstLockerBecomesChunkOwner() throws Exception {
         serverA.send(new LockChunkMessage(WORLD, 0, 0));
         SetChunkOwnerMessage owner = serverA.chunkOwnerUpdates.poll(10, TimeUnit.SECONDS);
@@ -126,7 +142,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     void chunkOwnedByAnotherServerIsRedirected() throws Exception {
         ServerBoundMessage reply = serverB.request(new ReadChunkMessage(WORLD, "region", 0, 0));
         assertTrue(reply instanceof ChunkLoadedOnAnotherServerMessage, "Expected redirect, got " + reply.getClass());
@@ -134,7 +150,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     void chunkOwnershipCanBeRequestedForcedTransfer() throws Exception {
         ServerBoundMessage replyA = serverA.request(new RequestChunkOwnershipMessage(WORLD, new ChunkKey[]{
                 new ChunkKey(WORLD, 0, 0), new ChunkKey(WORLD, 2, 0)
@@ -169,7 +185,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(7)
+    @Order(8)
     void writtenChunkIsReadableAndVisibleAsLoaded() throws Exception {
         // Write directly without owning the chunk: the data goes to the master's storage.
         ServerBoundMessage writeReply = serverA.request(new WriteChunkMessage(WORLD, "region", 5, 0, CHUNK_PAYLOAD));
@@ -185,7 +201,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     void willSaveLaterBlocksReadersUntilTheChunkIsWritten() throws Exception {
         serverA.send(new WillSaveChunkLaterMessage(WORLD, 8, 0));
         // Ping server-a so we know the master has processed the WillSaveChunkLater
@@ -217,7 +233,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void entitiesChunksAreStoredPerChunk() throws Exception {
         ServerBoundMessage writeReply = serverA.request(new WriteChunkMessage(WORLD, "entities", 7, 0, ENTITIES_PAYLOAD));
         assertTrue(((BooleanMessageReply) writeReply).result);
@@ -232,7 +248,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     void levelDatIsSharedThroughTheMaster() throws Exception {
         ServerBoundMessage writeReply = serverA.request(new WriteLevelMessage(WORLD, LEVEL_PAYLOAD));
         assertTrue(((BooleanMessageReply) writeReply).result);
@@ -242,7 +258,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(11)
+    @Order(12)
     void playerDataIsSharedThroughTheMaster() throws Exception {
         String uuid = UUID.randomUUID().toString();
         ServerBoundMessage writeReply = serverA.request(new WritePlayerMessage(WORLD, uuid, PLAYER_PAYLOAD));
@@ -253,7 +269,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(12)
+    @Order(13)
     void playerCanOnlyConnectToOneServerAtATime() throws Exception {
         UUID player = UUID.randomUUID();
 
@@ -279,7 +295,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(13)
+    @Order(14)
     void crashRecoveryFreesOwnershipAndSubscriptions() throws Exception {
         // server-a currently owns (0, 0)/(2, 0) and is subscribed to the chunk at (5, 0).
         serverA.close();
@@ -320,7 +336,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(14)
+    @Order(15)
     void chunkDataWrittenBeforeRestartRemainsReadable() throws Exception {
         // server-a crashed in the previous test; its stored data must still be available.
         ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(WORLD, "region", 5, 0));

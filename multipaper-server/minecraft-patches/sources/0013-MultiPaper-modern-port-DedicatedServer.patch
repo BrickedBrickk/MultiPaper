@@ -8,10 +8,11 @@
  
  public class DedicatedServer extends MinecraftServer implements ServerInterface {
      private static final Logger LOGGER = LogUtils.getLogger();
-@@ -327,6 +328,8 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+@@ -327,6 +328,9 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
          }
          // Purpur end - UPnP Port Forwarding
  
++        MultiPaper.setPort(this.getPort()); // MultiPaper
 +        MultiPaper.onStart(bindAddress); // MultiPaper
 +
          // CraftBukkit start

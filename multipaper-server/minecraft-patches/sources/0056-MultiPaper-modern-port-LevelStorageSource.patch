@@ -8,7 +8,17 @@
  import org.jspecify.annotations.Nullable;
  import org.slf4j.Logger;
  
-@@ -276,6 +277,8 @@ public class LevelStorageSource {
+@@ -178,3 +179,8 @@
+         CompoundTag fileContents;
+         try {
++            byte[] multiPaperData = MultiPaper.readData(dataLocation.toString()); // MultiPaper
++            if (multiPaperData.length > 0) { // MultiPaper - load shared world generation settings on backend startup
++                Files.createDirectories(dataLocation.getParent());
++                Files.write(dataLocation, multiPaperData);
++            }
+             fileContents = NbtIo.readCompressed(dataLocation, NbtAccounter.unlimitedHeap());
+
+@@ -276,6 +282,8 @@ public class LevelStorageSource {
      }
  
      private static CompoundTag readLevelDataTagRaw(final Path dataFile) throws IOException {
@@ -17,7 +27,7 @@
          return NbtIo.readCompressed(dataFile, NbtAccounter.uncompressedQuota());
      }
  
-@@ -354,6 +357,10 @@ public class LevelStorageSource {
+@@ -354,6 +362,10 @@ public class LevelStorageSource {
      }
  
      private static @Nullable Tag readLightweightData(final Path dataFile) throws IOException {
@@ -28,7 +38,7 @@
          SkipFields parser = new SkipFields(
              new FieldSelector("Data", CompoundTag.TYPE, "Player"), new FieldSelector("Data", CompoundTag.TYPE, "WorldGenSettings")
          );
-@@ -599,6 +606,15 @@ public class LevelStorageSource {
+@@ -599,6 +611,15 @@ public class LevelStorageSource {
          private void saveLevelData(final CompoundTag root) {
              Path worldDir = this.levelDirectory.path();
  
