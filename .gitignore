@@ -46,8 +46,15 @@ out/
 # other stuff
 run/
 
-MultiPaper-Server
-MultiPaper-API
+# paperweight generated projects/sources
+/multipaper-server/build.gradle.kts
+/multipaper-server/src/minecraft
+/paper-server
+/purpur-server
+/multipaper-api/build.gradle.kts
+/paper-api
+/paper-api-generator
+/purpur-api
 
 *.sh
 multipaper.jar

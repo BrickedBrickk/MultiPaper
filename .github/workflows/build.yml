@@ -9,20 +9,23 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          cache: 'gradle'
+          java-version: '25'
           distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
       - name: Configure Git User Details
         run: git config --global user.email "actions@github.com" && git config --global user.name "Github Actions"
       - name: Apply Patches
-        run: ./gradlew applyPatches --stacktrace
+        run: ./gradlew applyAllPatches --stacktrace
       - name: Build Paperclip jar
-        run: ./gradlew shadowjar createReobfPaperclipJar --stacktrace
+        run: ./gradlew createPaperclipJar --stacktrace
+      - name: Build MultiPaper-Master jar
+        run: ./gradlew :multipaper-master:shadowJar --stacktrace
       - name: Upload Paperclip jar
         uses: actions/upload-artifact@v4
         with:
           name: multipaper.jar
-          path: build/libs/multipaper-paperclip-*-reobf.jar
+          path: multipaper-server/build/libs/multipaper-paperclip-*.jar
       - name: Upload MultiPaper-Master jar
         uses: actions/upload-artifact@v4
         with:

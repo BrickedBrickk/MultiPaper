@@ -1,0 +1,361 @@
+diff --git a/src/main/java/com/destroystokyo/paper/Metrics.java b/src/main/java/com/destroystokyo/paper/Metrics.java
+index 6194d6d89..fb031138d 100644
+--- a/src/main/java/com/destroystokyo/paper/Metrics.java
++++ b/src/main/java/com/destroystokyo/paper/Metrics.java
+@@ -3,11 +3,14 @@ package com.destroystokyo.paper;
+ import net.minecraft.server.MinecraftServer;
+ import org.bukkit.Bukkit;
+ import org.bukkit.configuration.file.YamlConfiguration;
++import org.bukkit.craftbukkit.CraftServer; // MultiPaper
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.plugin.Plugin;
+ 
+ import org.json.simple.JSONArray;
+ import org.json.simple.JSONObject;
++import puregero.multipaper.ExternalServer; // MultiPaper
++import puregero.multipaper.MultiPaper; // MultiPaper
+ 
+ import javax.net.ssl.HttpsURLConnection;
+ import java.io.ByteArrayOutputStream;
+@@ -593,7 +596,7 @@ public class Metrics {
+             boolean logFailedRequests = config.getBoolean("logFailedRequests", false);
+             // Only start Metrics, if it's enabled in the config
+             if (config.getBoolean("enabled", true)) {
+-                Metrics metrics = new Metrics("Purpur", serverUUID, logFailedRequests, Bukkit.getLogger()); // Purpur - Purpur config files
++                Metrics metrics = new Metrics("MultiPaper", serverUUID, logFailedRequests, Bukkit.getLogger()); // Purpur - Purpur config files // MultiPaper
+ 
+                 metrics.addCustomChart(new Metrics.SimplePie("minecraft_version", () -> {
+                     String minecraftVersion = Bukkit.getVersion();
+@@ -601,9 +604,11 @@ public class Metrics {
+                     return minecraftVersion;
+                 }));
+ 
+-                metrics.addCustomChart(new Metrics.SingleLineChart("players", () -> Bukkit.getOnlinePlayers().size()));
++                metrics.addCustomChart(new Metrics.SingleLineChart("players", () -> (int) Bukkit.getOnlinePlayers().stream().filter(MultiPaper::isRealPlayer).count())); // MultiPaper
+                 metrics.addCustomChart(new Metrics.SimplePie("online_mode", () -> Bukkit.getOnlineMode() ? "online" : (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.isProxyOnlineMode() ? "bungee" : "offline"))); // Purpur - Purpur config files
+                 metrics.addCustomChart(new Metrics.SimplePie("purpur_version", () -> (org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion() != null) ? org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion() : "unknown")); // Purpur - Purpur config files
++                metrics.addCustomChart(new Metrics.SimplePie("total_servers", () -> String.valueOf(MultiPaper.getConnection().getServersMap().values().stream().filter(ExternalServer::isAlive).count()))); // MultiPaper
++                metrics.addCustomChart(new Metrics.SimplePie("multipaper_version", () -> (CraftServer.class.getPackage().getImplementationVersion() != null) ? CraftServer.class.getPackage().getImplementationVersion() : "unknown")); // MultiPaper
+ 
+                 metrics.addCustomChart(new Metrics.DrilldownPie("java_version", () -> {
+                     Map<String, Map<String, Integer>> map = new HashMap<>();
+diff --git a/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java b/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java
+index a8a82aca7..e637ed128 100644
+--- a/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java
++++ b/src/main/java/io/papermc/paper/configuration/mapping/InnerClassFieldDiscoverer.java
+@@ -26,7 +26,7 @@ public final class InnerClassFieldDiscoverer implements FieldDiscoverer<Map<Fiel
+     private final FieldDiscoverer<Map<Field, Object>> delegate;
+     private final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors;
+ 
+-    private InnerClassFieldDiscoverer(final InnerClassInstanceSupplier instanceSupplier, final FieldDiscoverer<Map<Field, Object>> delegate, final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors) {
++    public InnerClassFieldDiscoverer(final InnerClassInstanceSupplier instanceSupplier, final FieldDiscoverer<Map<Field, Object>> delegate, final Map<Class<? extends Annotation>, List<Definition<?, ?, ? extends FieldProcessor.Factory<?, ?>>>> fieldProcessors) { // MultiPaper - make public
+         this.instanceSupplier = instanceSupplier;
+         this.delegate = delegate;
+         this.fieldProcessors = fieldProcessors;
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 3e4596905..20f7ac6fd 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -46,6 +46,9 @@ import java.util.logging.Logger;
+ import java.util.stream.Collectors;
+ import javax.imageio.ImageIO;
+ import net.md_5.bungee.api.chat.BaseComponent;
++import puregero.multipaper.MultiPaper; // MultiPaper
++import puregero.multipaper.externalserverprotocol.SubscribeToWorldPacket; // MultiPaper
++import puregero.multipaper.permissions.MultiPaperPermissions; // MultiPaper
+ import net.minecraft.Optionull;
+ import net.minecraft.advancements.AdvancementHolder;
+ import net.minecraft.commands.CommandSourceStack;
+@@ -247,6 +250,7 @@ public final class CraftServer implements Server {
+     private final String serverVersion;
+     private final String bukkitVersion = Versioning.getBukkitVersion();
+     private final Logger logger = Logger.getLogger("Minecraft");
++    private final puregero.multipaper.CraftMultiPaperNotificationManager multiPaperNotificationManager = new puregero.multipaper.CraftMultiPaperNotificationManager(); // MultiPaper
+     private final ServicesManager servicesManager = new SimpleServicesManager();
+     private final CraftScheduler scheduler = new CraftScheduler();
+     private final CraftCommandMap commandMap; // Paper - Move down
+@@ -592,6 +596,7 @@ public final class CraftServer implements Server {
+             // Spigot end
+             DefaultPermissions.registerCorePermissions();
+             CraftDefaultPermissions.registerCorePermissions();
++            MultiPaperPermissions.registerCorePermissions(); // MultiPaper
+             if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) this.loadCustomPermissions(); // Paper
+             this.syncCommands();
+         }
+@@ -636,6 +641,33 @@ public final class CraftServer implements Server {
+         return this.serverName;
+     }
+ 
++    @Override
++    public java.util.Collection<? extends Player> getLocalOnlinePlayers() {
++        return this.getOnlinePlayers().stream()
++            .filter(player -> !(player.getHandle() instanceof puregero.multipaper.ExternalPlayer))
++            .collect(java.util.stream.Collectors.toUnmodifiableList());
++    }
++
++    @Override
++    public java.util.Collection<? extends Player> getAllOnlinePlayers() {
++        return this.getOnlinePlayers();
++    }
++
++    @Override
++    public org.bukkit.MultiPaperNotificationManager getMultiPaperNotificationManager() {
++        return this.multiPaperNotificationManager;
++    }
++
++    @Override
++    public String getLocalServerName() {
++        return puregero.multipaper.config.MultiPaperConfiguration.get().masterConnection.myName;
++    }
++
++    @Override
++    public puregero.multipaper.MultiPaperDataStorage getMultiPaperDataStorage() {
++        return new puregero.multipaper.CraftMultiPaperDataStorage();
++    }
++
+     @Override
+     public String getVersion() {
+         return this.serverVersion + " (MC: " + this.console.getServerVersion() + ")";
+@@ -1407,6 +1439,7 @@ public final class CraftServer implements Server {
+             return;
+         }
+         this.worlds.put(world.getName().toLowerCase(Locale.ROOT), world);
++        MultiPaper.broadcastPacketToExternalServers(new SubscribeToWorldPacket(world.getName())); // MultiPaper
+     }
+ 
+     @Override
+@@ -2912,6 +2945,7 @@ public final class CraftServer implements Server {
+         if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions();
+         DefaultPermissions.registerCorePermissions();
+         CraftDefaultPermissions.registerCorePermissions();
++        MultiPaperPermissions.registerCorePermissions(); // MultiPaper
+     }
+ 
+     @Override
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+index 7ed2f9917..49d2b7c7d 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+@@ -379,6 +379,16 @@ public class CraftWorld extends CraftRegionAccessor implements World {
+         return new CraftChunk(chunk);
+     }
+ 
++    @Override
++    public boolean isChunkExternal(int x, int z) {
++        return puregero.multipaper.MultiPaper.isChunkExternal(this.world, new net.minecraft.core.BlockPos(x << 4, this.world.getMinY(), z << 4));
++    }
++
++    @Override
++    public boolean isChunkLocal(int x, int z) {
++        return puregero.multipaper.MultiPaper.isChunkLocal(this.world, new net.minecraft.core.BlockPos(x << 4, this.world.getMinY(), z << 4));
++    }
++
+     @NotNull
+     @Override
+     public Chunk getChunkAt(int x, int z, boolean generate) {
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index ca1a3e1b4..643027653 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -152,6 +152,14 @@ public class Main {
+                     .describedAs("Yml file");
+                 // Purpur end - Purpur config files
+ 
++                // MultiPaper start
++                this.acceptsAll(asList("multipaper", "multipaper-settings"), "File for multipaper settings")
++                    .withRequiredArg()
++                    .ofType(File.class)
++                    .defaultsTo(new File("multipaper.yml"))
++                    .describedAs("Yml file");
++                // MultiPaper end
++
+                 this.accepts("server-name", "Name of the server")
+                         .withRequiredArg()
+                         .ofType(String.class)
+diff --git a/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java b/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
+index 0ab39922e..5cdb5f4e8 100644
+--- a/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
++++ b/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
+@@ -207,6 +207,16 @@ public class CraftBlock implements Block {
+         return this.getBlockState().getBukkitMaterial();
+     }
+ 
++    @Override
++    public boolean isInExternalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkExternal(this.level.getMinecraftWorld(), this.position);
++    }
++
++    @Override
++    public boolean isInLocalChunk() {
++        return puregero.multipaper.MultiPaper.isChunkLocal(this.level.getMinecraftWorld(), this.position);
++    }
++
+     @Override
+     public byte getLightLevel() {
+         return (byte) this.level.getMinecraftWorld().getMaxLocalRawBrightness(this.position);
+diff --git a/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java b/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
+index 90ed57a7f..1ceed6b0a 100644
+--- a/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
++++ b/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
+@@ -4,13 +4,28 @@ import java.util.Map;
+ import org.bukkit.Server;
+ import org.bukkit.command.Command;
+ import org.bukkit.command.SimpleCommandMap;
++import puregero.multipaper.commands.ServersCommand;
+ 
+ public class CraftCommandMap extends SimpleCommandMap {
+ 
+     public CraftCommandMap(Server server) {
+         super(server, io.papermc.paper.command.brigadier.bukkit.BukkitBrigForwardingMap.INSTANCE);
++        setDefaultCommands(); // MultiPaper
+     }
+ 
++    // MultiPaper start
++    @Override
++    public void clearCommands() {
++        super.clearCommands();
++
++        setDefaultCommands();
++    }
++
++    private void setDefaultCommands() {
++        register("multipaper", new ServersCommand("servers"));
++    }
++    // MultiPaper end
++
+     public Map<String, Command> getKnownCommands() {
+         return this.knownCommands;
+     }
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java
+index d53d8917b..00be21814 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftEntity.java
+@@ -202,6 +202,18 @@ public abstract class CraftEntity implements org.bukkit.entity.Entity {
+         return CraftLocation.toBukkit(this.entity.position(), this.getWorld(), this.entity.getBukkitYaw(), this.entity.getXRot());
+     }
+ 
++    @Override
++    public boolean isInExternalChunk() {
++        return this.entity.level() instanceof net.minecraft.server.level.ServerLevel level
++            && puregero.multipaper.MultiPaper.isChunkExternal(level, this.entity.blockPosition());
++    }
++
++    @Override
++    public boolean isInLocalChunk() {
++        return this.entity.level() instanceof net.minecraft.server.level.ServerLevel level
++            && puregero.multipaper.MultiPaper.isChunkLocal(level, this.entity.blockPosition());
++    }
++
+     @Override
+     public Location getLocation(Location loc) {
+         if (loc != null) {
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+index 21c8826a0..d875aed9e 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -229,6 +229,8 @@ import org.jspecify.annotations.Nullable;
+ 
+ @DelegateDeserialization(CraftOfflinePlayer.class)
+ public class CraftPlayer extends CraftHumanEntity implements Player, PluginMessageBridgeImpl {
++    public final java.util.concurrent.ConcurrentHashMap<String, String> data = new java.util.concurrent.ConcurrentHashMap<>(); // MultiPaper
++    public final java.util.concurrent.ConcurrentHashMap<String, String> persistentData = new java.util.concurrent.ConcurrentHashMap<>(); // MultiPaper
+     private static final org.slf4j.Logger LOGGER = LogUtils.getClassLogger();
+     private static final PointersSupplier<Player> POINTERS_SUPPLIER = PointersSupplier.<Player>builder()
+         .parent(CraftEntity.POINTERS_SUPPLIER)
+@@ -544,6 +546,50 @@ public class CraftPlayer extends CraftHumanEntity implements Player, PluginMessa
+     }
+     // Paper end
+ 
++    @Override
++    public String getExternalServerName() {
++        return this.getHandle() instanceof puregero.multipaper.ExternalPlayer externalPlayer
++            ? externalPlayer.externalServerConnection.externalServer.getName()
++            : null;
++    }
++
++    @Override
++    public void chatOnOtherServers(String msg) {
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerSayChatPacket(getHandle(), msg));
++    }
++
++    @Override
++    public boolean isExternalPlayer() {
++        return puregero.multipaper.MultiPaper.isExternalPlayer(this);
++    }
++
++    @Override
++    public boolean isLocalPlayer() {
++        return puregero.multipaper.MultiPaper.isRealPlayer(this);
++    }
++
++    @Override
++    public String getData(String key) {
++        return this.data.get(key);
++    }
++
++    @Override
++    public void setData(String key, String value) {
++        if (value == null) this.data.remove(key); else this.data.put(key, value);
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerDataUpdatePacket(this, false, key, value));
++    }
++
++    @Override
++    public String getPersistentData(String key) {
++        return this.persistentData.get(key);
++    }
++
++    @Override
++    public void setPersistentData(String key, String value) {
++        if (value == null) this.persistentData.remove(key); else this.persistentData.put(key, value);
++        puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(getHandle(), new puregero.multipaper.externalserverprotocol.PlayerDataUpdatePacket(this, true, key, value));
++    }
++
+     @Override
+     public String getDisplayName() {
+         if (true) return io.papermc.paper.adventure.DisplayNames.getLegacy(this); // Paper
+diff --git a/src/main/java/org/spigotmc/WatchdogThread.java b/src/main/java/org/spigotmc/WatchdogThread.java
+index 6cf4abdde..3aa8dd67f 100644
+--- a/src/main/java/org/spigotmc/WatchdogThread.java
++++ b/src/main/java/org/spigotmc/WatchdogThread.java
+@@ -75,14 +75,14 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                 this.lastEarlyWarning = currentTime;
+                 if (isLongTimeout) {
+                     logger.log(Level.SEVERE, "------------------------------");
+-                    logger.log(Level.SEVERE, "The server has stopped responding! This is (probably) not a Purpur bug."); // Paper // Purpur - Rebrand
++                    logger.log(Level.SEVERE, "The server has stopped responding! This is (probably) not a MultiPaper bug."); // Paper // Purpur - Rebrand // MultiPaper
+                     logger.log(Level.SEVERE, "If you see a plugin in the Server thread dump below, then please report it to that author");
+                     logger.log(Level.SEVERE, "\t *Especially* if it looks like HTTP or MySQL operations are occurring");
+                     logger.log(Level.SEVERE, "If you see a world save or edit, then it means you did far more than your server can handle at once");
+                     logger.log(Level.SEVERE, "\t If this is the case, consider increasing timeout-time in spigot.yml but note that this will replace the crash with LARGE lag spikes");
+-                    logger.log(Level.SEVERE, "If you are unsure or still think this is a Purpur bug, please report this to https://github.com/PurpurMC/Purpur/issues"); // Purpur - Rebrand
++                    logger.log(Level.SEVERE, "If you are unsure or still think this is a MultiPaper bug, please report this to https://github.com/MultiPaper/MultiPaper/issues"); // Purpur - Rebrand // MultiPaper
+                     logger.log(Level.SEVERE, "Be sure to include ALL relevant console errors and Minecraft crash reports");
+-                    logger.log(Level.SEVERE, "Purpur version: " + Bukkit.getServer().getVersion()); // Purpur - Rebrand
++                    logger.log(Level.SEVERE, "MultiPaper version: " + Bukkit.getServer().getVersion()); // Purpur - Rebrand // MultiPaper
+ 
+                     if (net.minecraft.world.level.Level.lastPhysicsProblem != null) {
+                         logger.log(Level.SEVERE, "------------------------------");
+@@ -102,12 +102,12 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                     }
+                     // Paper end
+                 } else {
+-                    logger.log(Level.SEVERE, "--- DO NOT REPORT THIS TO PURPUR - THIS IS NOT A BUG OR A CRASH  - " + Bukkit.getServer().getVersion() + " ---"); // Purpur - Rebrand
++                    logger.log(Level.SEVERE, "--- DO NOT REPORT THIS TO MULTIPAPER - THIS IS NOT A BUG OR A CRASH  - " + Bukkit.getServer().getVersion() + " ---"); // Purpur - Rebrand // MultiPaper
+                     logger.log(Level.SEVERE, "The server has not responded for " + (currentTime - lastTick) / 1000 + " seconds! Creating thread dump");
+                 }
+                 // Paper end - Different message for short timeout
+                 logger.log(Level.SEVERE, "------------------------------");
+-                logger.log(Level.SEVERE, "Server thread dump (Look for plugins here before reporting to Purpur!):"); // Paper // Purpur - Rebrand
++                logger.log(Level.SEVERE, "Server thread dump (Look for plugins here before reporting to MultiPaper!):"); // Paper // Purpur - Rebrand // MultiPaper
+                 FeatureHooks.dumpAllChunkLoadInfo(MinecraftServer.getServer(), isLongTimeout); // Paper - log detailed tick information
+                 WatchdogThread.dumpThread(ManagementFactory.getThreadMXBean().getThreadInfo(MinecraftServer.getServer().getRunningThread().threadId(), Integer.MAX_VALUE), logger);
+                 logger.log(Level.SEVERE, "------------------------------");
+@@ -120,7 +120,7 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                         WatchdogThread.dumpThread(thread, logger);
+                     }
+                 } else {
+-                    logger.log(Level.SEVERE, "--- DO NOT REPORT THIS TO PURPUR - THIS IS NOT A BUG OR A CRASH ---"); // Purpur - Rebrand
++                    logger.log(Level.SEVERE, "--- DO NOT REPORT THIS TO MULTIPAPER - THIS IS NOT A BUG OR A CRASH ---"); // Purpur - Rebrand // MultiPaper
+                 }
+ 
+                 logger.log(Level.SEVERE, "------------------------------");

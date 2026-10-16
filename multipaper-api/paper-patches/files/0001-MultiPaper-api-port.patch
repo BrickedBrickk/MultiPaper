@@ -1,0 +1,560 @@
+diff --git a/src/main/java/org/bukkit/Bukkit.java b/src/main/java/org/bukkit/Bukkit.java
+index f84f0115b..1a85c3080 100644
+--- a/src/main/java/org/bukkit/Bukkit.java
++++ b/src/main/java/org/bukkit/Bukkit.java
+@@ -63,6 +63,7 @@ import org.jetbrains.annotations.ApiStatus;
+ import org.jetbrains.annotations.Contract;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
++import puregero.multipaper.MultiPaperDataStorage;
+ 
+ /**
+  * Represents the Bukkit core, for version and Server singleton handling
+@@ -173,8 +174,11 @@ public final class Bukkit {
+     }
+     // Paper end
+ 
++    // MultiPaper start
+     /**
+-     * Gets a view of all currently logged in players. This {@linkplain
++     * Gets a view of all currently logged in players on your local
++     * Multipaper instance. This method may return the logged in players
++     * across all instances when tab-completing a command. This {@linkplain
+      * Collections#unmodifiableCollection(Collection) view} is a reused
+      * object, making some operations like {@link Collection#size()}
+      * zero-allocation.
+@@ -205,6 +209,73 @@ public final class Bukkit {
+         return server.getOnlinePlayers();
+     }
+ 
++    /**
++     * Gets a view of all currently logged in players on your local
++     * Multipaper instance. This {@linkplain
++     * Collections#unmodifiableCollection(Collection) view} is a reused
++     * object, making some operations like {@link Collection#size()}
++     * zero-allocation.
++     * <p>
++     * The collection is a view backed by the internal representation, such
++     * that, changes to the internal state of the server will be reflected
++     * immediately. However, the reuse of the returned collection (identity)
++     * is not strictly guaranteed for future or all implementations. Casting
++     * the collection, or relying on interface implementations (like {@link
++     * Serializable} or {@link List}), is deprecated.
++     * <p>
++     * Iteration behavior is undefined outside of self-contained main-thread
++     * uses. Normal and immediate iterator use without consequences that
++     * affect the collection are fully supported. The effects following
++     * (non-exhaustive) {@link Entity#teleport(Location) teleportation},
++     * {@link Player#setHealth(double) death}, and {@link Player#kick(
++     * Component) kicking} are undefined. Any use of this collection from
++     * asynchronous threads is unsafe.
++     * <p>
++     * For safe consequential iteration or mimicking the old array behavior,
++     * using {@link Collection#toArray(Object[])} is recommended. For making
++     * snapshots, {@link ImmutableList#copyOf(Collection)} is recommended.
++     *
++     * @return a view of currently online players.
++     */
++    @NotNull
++    public static Collection<? extends Player> getLocalOnlinePlayers() {
++        return server.getLocalOnlinePlayers();
++    }
++
++    /**
++     * Gets a view of all currently logged in players across all
++     * MultiPaper instances. This {@linkplain
++     * Collections#unmodifiableCollection(Collection) view} is a reused
++     * object, making some operations like {@link Collection#size()}
++     * zero-allocation.
++     * <p>
++     * The collection is a view backed by the internal representation, such
++     * that, changes to the internal state of the server will be reflected
++     * immediately. However, the reuse of the returned collection (identity)
++     * is not strictly guaranteed for future or all implementations. Casting
++     * the collection, or relying on interface implementations (like {@link
++     * Serializable} or {@link List}), is deprecated.
++     * <p>
++     * Iteration behavior is undefined outside of self-contained main-thread
++     * uses. Normal and immediate iterator use without consequences that
++     * affect the collection are fully supported. The effects following
++     * (non-exhaustive) {@link Entity#teleport(Location) teleportation},
++     * {@link Player#setHealth(double) death}, and {@link Player#kick(
++     * Component) kicking} are undefined. Any use of this collection from
++     * asynchronous threads is unsafe.
++     * <p>
++     * For safe consequential iteration or mimicking the old array behavior,
++     * using {@link Collection#toArray(Object[])} is recommended. For making
++     * snapshots, {@link ImmutableList#copyOf(Collection)} is recommended.
++     *
++     * @return a view of currently online players.
++     */
++    @NotNull
++    public static Collection<? extends Player> getAllOnlinePlayers() {
++        return server.getAllOnlinePlayers();
++    }
++    // MultiPaper end
++
+     /**
+      * Get the maximum amount of players which can login to this server.
+      *
+@@ -789,6 +860,39 @@ public final class Bukkit {
+         return server.getServicesManager();
+     }
+ 
++    // MultiPaper start
++    /**
++     * Gets a multipaper notification manager.
++     *
++     * @return a multipaper notification manager
++     */
++    @NotNull
++    public static MultiPaperNotificationManager getMultiPaperNotificationManager() {
++        return server.getMultiPaperNotificationManager();
++    }
++
++    /**
++     * Get the MultiPaper name of this server.
++     *
++     * @return the MultiPaper name of this server
++     */
++    @NotNull
++    public static String getLocalServerName() {
++        return server.getLocalServerName();
++    }
++
++    /**
++     * Gets the multipaper key-value data storage. Accessing this data is
++     * asynchronous. This storage medium is hosted on the Master instance.
++     *
++     * @return the multipaper data storage
++     */
++    @NotNull
++    public static MultiPaperDataStorage getMultiPaperDataStorage() {
++        return server.getMultiPaperDataStorage();
++    }
++    // MultiPaper end
++
+     /**
+      * Gets a list of all worlds on this server.
+      *
+diff --git a/src/main/java/org/bukkit/Chunk.java b/src/main/java/org/bukkit/Chunk.java
+index d873b78f6..60db944c6 100644
+--- a/src/main/java/org/bukkit/Chunk.java
++++ b/src/main/java/org/bukkit/Chunk.java
+@@ -215,6 +215,26 @@ public interface Chunk extends PersistentDataHolder {
+      */
+     boolean unload();
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isExternalChunk();
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Checks if this chunk can spawn slimes without being a swamp biome.
+      *
+diff --git a/src/main/java/org/bukkit/Location.java b/src/main/java/org/bukkit/Location.java
+index 1a89e738b..72e8a13a5 100644
+--- a/src/main/java/org/bukkit/Location.java
++++ b/src/main/java/org/bukkit/Location.java
+@@ -344,6 +344,30 @@ public class Location implements Cloneable, ConfigurationSerializable, io.paperm
+         return this;
+     }
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isChunkExternal() {
++        return this.getWorld().isChunkExternal(locToBlock(x) >> 4, locToBlock(z) >> 4);
++    }
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isChunkLocal() {
++        return this.getWorld().isChunkLocal(locToBlock(x) >> 4, locToBlock(z) >> 4);
++    }
++
++    // MultiPaper end
++
+     /**
+      * Adds the location by another.
+      *
+diff --git a/src/main/java/org/bukkit/Server.java b/src/main/java/org/bukkit/Server.java
+index 9bb323838..d895be5cb 100644
+--- a/src/main/java/org/bukkit/Server.java
++++ b/src/main/java/org/bukkit/Server.java
+@@ -67,6 +67,7 @@ import org.jetbrains.annotations.ApiStatus;
+ import org.jetbrains.annotations.Contract;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
++import puregero.multipaper.MultiPaperDataStorage;
+ 
+ /**
+  * Represents a server implementation.
+@@ -135,8 +136,11 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+     String getMinecraftVersion();
+     // Paper end
+ 
++    // MultiPaper start
+     /**
+-     * Gets a view of all currently logged in players. This {@linkplain
++     * Gets a view of all currently logged in players on your local
++     * Multipaper instance. This method may return the logged in players
++     * across all instances when tab-completing a command. This {@linkplain
+      * Collections#unmodifiableCollection(Collection) view} is a reused
+      * object, making some operations like {@link Collection#size()}
+      * zero-allocation.
+@@ -165,6 +169,69 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+     @NotNull
+     public Collection<? extends Player> getOnlinePlayers();
+ 
++    /**
++     * Gets a view of all currently logged in players on your local
++     * Multipaper instance. This {@linkplain
++     * Collections#unmodifiableCollection(Collection) view} is a reused
++     * object, making some operations like {@link Collection#size()}
++     * zero-allocation.
++     * <p>
++     * The collection is a view backed by the internal representation, such
++     * that, changes to the internal state of the server will be reflected
++     * immediately. However, the reuse of the returned collection (identity)
++     * is not strictly guaranteed for future or all implementations. Casting
++     * the collection, or relying on interface implementations (like {@link
++     * Serializable} or {@link List}), is deprecated.
++     * <p>
++     * Iteration behavior is undefined outside of self-contained main-thread
++     * uses. Normal and immediate iterator use without consequences that
++     * affect the collection are fully supported. The effects following
++     * (non-exhaustive) {@link Entity#teleport(Location) teleportation},
++     * {@link Player#setHealth(double) death}, and {@link Player#kick(
++     * Component) kicking} are undefined. Any use of this collection from
++     * asynchronous threads is unsafe.
++     * <p>
++     * For safe consequential iteration or mimicking the old array behavior,
++     * using {@link Collection#toArray(Object[])} is recommended. For making
++     * snapshots, {@link ImmutableList#copyOf(Collection)} is recommended.
++     *
++     * @return a view of currently online players.
++     */
++    @NotNull
++    public Collection<? extends Player> getLocalOnlinePlayers();
++
++    /**
++     * Gets a view of all currently logged in players across all
++     * MultiPaper instances. This {@linkplain
++     * Collections#unmodifiableCollection(Collection) view} is a reused
++     * object, making some operations like {@link Collection#size()}
++     * zero-allocation.
++     * <p>
++     * The collection is a view backed by the internal representation, such
++     * that, changes to the internal state of the server will be reflected
++     * immediately. However, the reuse of the returned collection (identity)
++     * is not strictly guaranteed for future or all implementations. Casting
++     * the collection, or relying on interface implementations (like {@link
++     * Serializable} or {@link List}), is deprecated.
++     * <p>
++     * Iteration behavior is undefined outside of self-contained main-thread
++     * uses. Normal and immediate iterator use without consequences that
++     * affect the collection are fully supported. The effects following
++     * (non-exhaustive) {@link Entity#teleport(Location) teleportation},
++     * {@link Player#setHealth(double) death}, and {@link Player#kick(
++     * Component) kicking} are undefined. Any use of this collection from
++     * asynchronous threads is unsafe.
++     * <p>
++     * For safe consequential iteration or mimicking the old array behavior,
++     * using {@link Collection#toArray(Object[])} is recommended. For making
++     * snapshots, {@link ImmutableList#copyOf(Collection)} is recommended.
++     *
++     * @return a view of currently online players.
++     */
++    @NotNull
++    public Collection<? extends Player> getAllOnlinePlayers();
++    // MultiPaper end
++
+     /**
+      * Get the maximum amount of players which can login to this server.
+      *
+@@ -716,6 +783,33 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+     @NotNull
+     public ServicesManager getServicesManager();
+ 
++    // MultiPaper start
++    /**
++     * Gets a multipaper notification manager.
++     *
++     * @return a multipaper notification manager
++     */
++    @NotNull
++    public MultiPaperNotificationManager getMultiPaperNotificationManager();
++
++    /**
++     * Get the MultiPaper name of this server.
++     *
++     * @return the MultiPaper name of this server
++     */
++    @NotNull
++    public String getLocalServerName();
++
++    /**
++     * Gets the multipaper key-value data storage. Accessing this data is
++     * asynchronous. This storage medium is hosted on the Master instance.
++     *
++     * @return the multipaper data storage
++     */
++    @NotNull
++    public MultiPaperDataStorage getMultiPaperDataStorage();
++    // MultiPaper end
++
+     /**
+      * Gets a list of all worlds on this server.
+      *
+diff --git a/src/main/java/org/bukkit/World.java b/src/main/java/org/bukkit/World.java
+index 1debcd48c..b7556903e 100644
+--- a/src/main/java/org/bukkit/World.java
++++ b/src/main/java/org/bukkit/World.java
+@@ -409,6 +409,26 @@ public interface World extends RegionAccessor, WorldInfo, PluginMessageRecipient
+     @Deprecated(since = "1.14")
+     public boolean isChunkInUse(int x, int z);
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isChunkExternal(int x, int z);
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isChunkLocal(int x, int z);
++
++    // MultiPaper end
++
+     /**
+      * Loads the {@link Chunk} at the specified coordinates.
+      * <p>
+diff --git a/src/main/java/org/bukkit/block/Block.java b/src/main/java/org/bukkit/block/Block.java
+index 5c75b3d04..766e5b137 100644
+--- a/src/main/java/org/bukkit/block/Block.java
++++ b/src/main/java/org/bukkit/block/Block.java
+@@ -449,6 +449,28 @@ public interface Block extends Metadatable, Translatable, net.kyori.adventure.tr
+         return this.getBlockPower(BlockFace.SELF);
+     }
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the block is in a chunk that's running on an external
++     * server or not.
++     *
++     * @return True if the block is in an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isInExternalChunk();
++
++    /**
++     * Returns whether the block is in a chunk that's running on this server
++     * or not.
++     *
++     * @return True if the block is in a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isInLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Checks if this block is empty.
+      * <p>
+diff --git a/src/main/java/org/bukkit/entity/Entity.java b/src/main/java/org/bukkit/entity/Entity.java
+index 6866f1841..fd2a7ecdd 100644
+--- a/src/main/java/org/bukkit/entity/Entity.java
++++ b/src/main/java/org/bukkit/entity/Entity.java
+@@ -350,6 +350,26 @@ public interface Entity extends Metadatable, CommandSender, Nameable, Persistent
+      */
+     public int getEntityId();
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the entity is in a chunk that's running on an external
++     * server or not.
++     *
++     * @return True if the entity is in an external chunk.
++     */
++    public boolean isInExternalChunk();
++
++    /**
++     * Returns whether the entity is in a chunk that's running on this server
++     * or not.
++     *
++     * @return True if the entity is in a local chunk.
++     */
++    public boolean isInLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Returns the entity's current fire ticks (ticks before the entity stops
+      * being on fire).
+diff --git a/src/main/java/org/bukkit/entity/Player.java b/src/main/java/org/bukkit/entity/Player.java
+index 139aab86d..15a659cb5 100644
+--- a/src/main/java/org/bukkit/entity/Player.java
++++ b/src/main/java/org/bukkit/entity/Player.java
+@@ -66,6 +66,7 @@ import org.bukkit.potion.PotionEffect;
+ import org.bukkit.potion.PotionEffectType;
+ import org.bukkit.scoreboard.Scoreboard;
+ import org.jspecify.annotations.NullMarked;
++import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+ 
+ /**
+@@ -624,6 +625,84 @@ public interface Player extends HumanEntity, Conversable, OfflinePlayer, PluginM
+      */
+     public void setRespawnLocation(@Nullable Location location, boolean force);
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the player is on an external server or not.
++     *
++     * @return True if the player is on an external server.
++     */
++    public boolean isExternalPlayer();
++
++    /**
++     * Returns whether the player is on this server or not.
++     *
++     * @return True if the player is on this server.
++     */
++    public boolean isLocalPlayer();
++
++    /**
++     * Returns cross-server data that is stored under the specified key. Note
++     * that all plugins share the same set of keys. This data is
++     * non-persistent, it will be lost when the player disconnects.
++     *
++     * @param key The key the data is stored under.
++     * @return The data stored under the key, or null if the key isn't set.
++     */
++    @Nullable
++    public String getData(String key);
++
++    /**
++     * Store cross-server data under the specified key. Note that all plugins
++     * share the same set of keys. This data is non-persistent, it will be
++     * lost when the player disconnects.
++     *
++     * @param key The key to store the data under.
++     * @param value The data to store under the key.
++     */
++    public void setData(String key, String value);
++
++    /**
++     * Returns cross-server data that is stored under the specified key. Note
++     * that all plugins share the same set of keys. This data is persistent,
++     * it will be saved even if the player disconnects. This persistent data is
++     * saved onto the player's .dat file.
++     *
++     * @param key The key the data is stored under.
++     * @return The data stored under the key, or null if the key isn't set.
++     */
++    @Nullable
++    public String getPersistentData(String key);
++
++    /**
++     * Store cross-server data under the specified key. Note that all plugins
++     * share the same set of keys. This data is persistent, it will be saved
++     * even if the player disconnects. This persistent data is saved onto the
++     * player's .dat file.
++     *
++     * @param key The key to store the data under.
++     * @param value The data to store under the key.
++     */
++    public void setPersistentData(String key, String value);
++
++    /**
++     * Says a message (or runs a command) on other server excluding this one.
++     *
++     * @param msg chat message to say
++     */
++    public void chatOnOtherServers(@NonNull String msg);
++
++    /**
++     * Get the bungeecord name of the server that this player is on.
++     *
++     * @return The bungeecord name of the server the player is on for external
++     *         players, or null for local players.
++     */
++    @Nullable
++    public String getExternalServerName();
++
++    // MultiPaper end
++
+     /**
+      * Gets the ender pearls currently associated with this entity.
+      * <p>
+diff --git a/src/main/java/org/bukkit/permissions/PermissibleBase.java b/src/main/java/org/bukkit/permissions/PermissibleBase.java
+index 1aa3c6dbf..8d57b1213 100644
+--- a/src/main/java/org/bukkit/permissions/PermissibleBase.java
++++ b/src/main/java/org/bukkit/permissions/PermissibleBase.java
+@@ -21,6 +21,7 @@ public class PermissibleBase implements Permissible {
+     private final Permissible parent;
+     private final List<PermissionAttachment> attachments = new LinkedList<PermissionAttachment>();
+     private final Map<String, PermissionAttachmentInfo> permissions = new HashMap<String, PermissionAttachmentInfo>();
++    public boolean dirty = false; // MultiPaper
+ 
+     public PermissibleBase(@Nullable ServerOperator opable) {
+         this.opable = opable;
+@@ -177,6 +178,8 @@ public class PermissibleBase implements Permissible {
+         for (PermissionAttachment attachment : attachments) {
+             calculateChildPermissions(attachment.getPermissions(), false, attachment);
+         }
++
++        dirty = true; // MultiPaper
+     }
+ 
+     public synchronized void clearPermissions() {
+diff --git a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
+index a9fdb5f83..429358a57 100644
+--- a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
++++ b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
+@@ -92,7 +92,7 @@ public final class JavaPluginLoader implements PluginLoader {
+             throw new InvalidPluginException(ex);
+         }
+ 
+-        final File parentFile = this.server.getPluginsFolder(); // Paper
++        final File parentFile = file.getParentFile(); // Paper // MultiPaper
+         final File dataFolder = new File(parentFile, description.getName());
+         @SuppressWarnings("deprecation")
+         final File oldDataFolder = new File(parentFile, description.getRawName());
