@@ -2,6 +2,12 @@
 
 This guide is a deployment plan for the current fork. The two-server shared-world setup has **not** yet been verified end to end; follow the staged startup and recovery checks below before exposing it to players.
 
+## Build and test status
+
+On 2026-10-16, `:multipaper-server:createPaperclipJar` completed successfully from the repaired tracked patches, and the Master `shadowJar` task was rebuilt from source. The full Paper server suite passed 10,101 tests with 0 failures, 0 errors, and 86 skipped. The focused handshake-forwarding suite passed 4/4 tests. The Master integration suite passed 14/14 tests against an in-process Master and two protocol test clients, covering connection setup, ownership changes, chunk/level/player storage, disconnect recovery, and persistence across a Master restart.
+
+These checks do not exercise a real Minecraft backend or player client and do not verify cross-PC chunk ticking or shared-world gameplay. No Minecraft server has been started for the live test; explicit EULA acceptance is still required before doing so.
+
 ## Layout and network
 
 Reserve a fixed LAN address for PC1 (shown below as `192.168.1.10`) and record PC2's address (shown as `192.168.1.11`). Replace both examples with the addresses on your LAN. Use the same PC1 address in both servers' `multipaper.yml` files.
