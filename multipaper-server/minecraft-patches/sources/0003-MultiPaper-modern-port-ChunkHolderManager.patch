@@ -9,12 +9,12 @@
          holder.onUnload();
          this.autoSaveQueue.remove(holder);
          ((ChunkSystemServerChunkCache)this.world.getChunkSource()).moonrise$chunkHolderUnload(holder);
-@@ -1344,6 +1344,65 @@ public final class ChunkHolderManager {
+@@ -1344,6 +1344,69 @@ public final class ChunkHolderManager {
          }
      }
  
 +    // MultiPaper start - unload a chunk immediately without saving it
-+    public void unloadChunkNowNoSave(final NewChunkHolder chunkHolder) {
++    public boolean unloadChunkNowNoSave(final NewChunkHolder chunkHolder) {
 +        TickThread.ensureTickThread("Cannot unload chunks off-main");
 +
 +        if (BLOCK_TICKET_UPDATES.get() == Boolean.TRUE) {
@@ -33,11 +33,14 @@
 +        try {
 +            final ReentrantAreaLock.Node schedulingLock = this.taskScheduler.schedulingLockArea.lock(chunkHolder.chunkX, chunkHolder.chunkZ);
 +            try {
++                if (!chunkHolder.canBeForceUnloadedForMultiPaper()) {
++                    return false;
++                }
 +                state = chunkHolder.unloadStage1();
 +                if (state == null) {
 +                    // can unload immediately
 +                    this.removeChunkHolder(chunkHolder);
-+                    return;
++                    return true;
 +                }
 +            } finally {
 +                this.taskScheduler.schedulingLockArea.unlock(schedulingLock);
@@ -69,6 +72,7 @@
 +        } finally {
 +            this.ticketLockArea.unlock(ticketLock2);
 +        }
++        return true;
 +    }
 +    // MultiPaper end - unload a chunk immediately without saving it
 +

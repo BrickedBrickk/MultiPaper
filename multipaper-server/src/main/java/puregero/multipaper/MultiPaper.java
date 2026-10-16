@@ -266,12 +266,23 @@ public class MultiPaper {
     }
 
     public static CompoundTag itemStackToNBT(net.minecraft.world.item.ItemStack itemStack) {
+        // Empty stacks cannot be encoded by the 26.3 item codec (air with count 0 is invalid).
+        // An empty compound, with the inventory slot stored alongside it by callers, is the
+        // wire representation for clearing an inventory slot.
+        if (itemStack.isEmpty()) {
+            return new CompoundTag();
+        }
         return (CompoundTag) net.minecraft.world.item.ItemStack.CODEC.encodeStart(
             org.bukkit.craftbukkit.CraftRegistry.getMinecraftRegistry().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), itemStack
         ).getOrThrow();
     }
 
     public static net.minecraft.world.item.ItemStack itemStackFromNBT(CompoundTag tag) {
+        // Empty inventory entries only carry their Slot field. Older peers may also send an
+        // explicit air entry, which 26.3 no longer accepts through ItemStack.CODEC.
+        if (!tag.contains("id") || tag.getString("id").equals("minecraft:air")) {
+            return net.minecraft.world.item.ItemStack.EMPTY;
+        }
         return net.minecraft.world.item.ItemStack.CODEC.parse(
             org.bukkit.craftbukkit.CraftRegistry.getMinecraftRegistry().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), tag
         ).getOrThrow();

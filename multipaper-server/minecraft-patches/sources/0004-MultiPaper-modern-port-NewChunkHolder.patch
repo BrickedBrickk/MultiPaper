@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
-@@ -68,6 +68,11 @@ public final class NewChunkHolder {
+@@ -68,6 +68,25 @@ public final class NewChunkHolder {
  
      public final ChunkTaskScheduler scheduler;
  
@@ -9,10 +9,23 @@
 +    public java.util.Set<puregero.multipaper.ExternalServer> externalEntitiesSubscribers = java.util.concurrent.ConcurrentHashMap.newKeySet(); // MultiPaper - entity subscribers
 +    public boolean hasExternalLockRequest = false; // MultiPaper - Have we sent a request to lock this chunk?
 +
++    // MultiPaper start - guard forced remote chunk replacement against active generation
++    public boolean canBeForceUnloadedForMultiPaper() {
++        // Caller holds the scheduling lock.
++        return this.generationTask == null && this.requestedGenStatus == null
++                && !this.processingFullStatus && this.pendingFullChunkStatus == this.currentFullChunkStatus
++                && this.currentFullChunkStatus == net.minecraft.server.level.FullChunkStatus.INACCESSIBLE
++                && this.totalNeighboursUsingThisChunk == 0 && this.neighboursWaitingForUs.isEmpty()
++                && this.entityDataLoadTask == null && this.poiDataLoadTask == null
++                && this.chunkDataUnload == null && this.entityDataUnload == null && this.poiDataUnload == null
++                && this.unloadState == null;
++    }
++    // MultiPaper end
++
      // load/unload state
  
      // chunk data state
-@@ -451,6 +456,24 @@ public final class NewChunkHolder {
+@@ -451,6 +470,24 @@ public final class NewChunkHolder {
  
      private ChunkAccess currentChunk;
  
@@ -37,7 +50,7 @@
      // generation status state
  
      /**
-@@ -866,13 +889,14 @@ public final class NewChunkHolder {
+@@ -866,13 +903,14 @@ public final class NewChunkHolder {
          return this.unloadState = (chunk != null || entityChunk != null || poiChunk != null) ? new UnloadState(this, chunk, entityChunk, poiChunk) : null;
      }
  
@@ -54,7 +67,7 @@
  
          // unload chunk data
          if (chunk != null) {
-@@ -891,12 +915,15 @@ public final class NewChunkHolder {
+@@ -891,12 +929,15 @@ public final class NewChunkHolder {
              }
  
              this.asyncCompleteUnloadTask(MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, chunkWrite[0]);
@@ -71,7 +84,7 @@
  
              if (entityChunk.unload()) {
                  final ReentrantAreaLock.Node schedulingLock = this.scheduler.schedulingLockArea.lock(this.chunkX, this.chunkZ);
-@@ -1169,6 +1196,7 @@ public final class NewChunkHolder {
+@@ -1169,6 +1210,7 @@ public final class NewChunkHolder {
                  for (int dx = -NEIGHBOUR_RADIUS; dx <= NEIGHBOUR_RADIUS; ++dx) {
                      final NewChunkHolder holder = (dx | dz) == 0 ? this : this.scheduler.chunkHolderManager.getChunkHolder(dx + this.chunkX, dz + this.chunkZ);
                      if (loaded) {
@@ -79,7 +92,18 @@
                          if (holder.setNeighbourFullLoaded(-dx, -dz)) {
                              changedFullStatus.add(holder);
                          }
-@@ -1465,6 +1493,8 @@ public final class NewChunkHolder {
+@@ -1226,3 +1268,8 @@ public final class NewChunkHolder {
+     private void changeEntityChunkStatus(final FullChunkStatus toStatus) {
+-        ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup().chunkStatusChange(this.chunkX, this.chunkZ, toStatus);
++        final var entityLookup = ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup();
++        final var entityChunk = entityLookup.getChunk(this.chunkX, this.chunkZ);
++        // A forced remote replacement can remove empty entity slices before queued status work runs.
++        // A subsequently loaded slice is initialized from this holder's current status.
++        if (entityChunk != null) {
++            entityChunk.updateStatus(toStatus, entityLookup);
++        }
+     }
+@@ -1465,6 +1512,8 @@ public final class NewChunkHolder {
          CHUNK_COMPLETION_ARRAY_HANDLE.setVolatile(this.chunkCompletions, newStatus.getIndex(), completion);
          this.lastChunkCompletion = completion;
  
@@ -88,7 +112,7 @@
          final ChunkStatus requestedGenStatus = this.requestedGenStatus;
  
          List<NewChunkHolder> needsScheduling = null;
-@@ -1542,6 +1572,8 @@ public final class NewChunkHolder {
+@@ -1542,6 +1591,8 @@ public final class NewChunkHolder {
  
              this.scheduleNeighbours(needsScheduling, scheduleList);
          }

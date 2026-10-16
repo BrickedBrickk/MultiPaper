@@ -21,11 +21,16 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.function.Consumer;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.InflaterInputStream;
 
 public class SendChunkPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(SendChunkPacket.class.getSimpleName());
+    private static final Set<ChunkKey> pendingForcedUnloads = ConcurrentHashMap.newKeySet();
 
     private final String world;
     private final int cx;
@@ -108,7 +113,19 @@ public class SendChunkPacket extends ExternalServerPacket {
                 NewChunkHolder holder = MultiPaper.getChunkHolder(level, cx, cz);
 
                 if (holder != null) {
-                    ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.unloadChunkNowNoSave(holder);
+                    boolean unloaded = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.unloadChunkNowNoSave(holder);
+                    if (!unloaded) {
+                        ChunkKey key = new ChunkKey(world, cx, cz);
+                        if (pendingForcedUnloads.add(key)) {
+                            CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(() -> {
+                                pendingForcedUnloads.remove(key);
+                                net.minecraft.server.MinecraftServer server = net.minecraft.server.MinecraftServer.getServer();
+                                if (server != null && server.isRunning()) {
+                                    forceChunkUnsafeUnload(world, cx, cz);
+                                }
+                            });
+                        }
+                    }
                 }
             }
         });
