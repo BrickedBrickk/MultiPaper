@@ -1,0 +1,31 @@
+--- a/src/main/java/org/bukkit/block/Block.java
++++ b/src/main/java/org/bukkit/block/Block.java
+@@ -449,6 +449,28 @@ public interface Block extends Metadatable, Translatable, net.kyori.adventure.tr
+         return this.getBlockPower(BlockFace.SELF);
+     }
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the block is in a chunk that's running on an external
++     * server or not.
++     *
++     * @return True if the block is in an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isInExternalChunk();
++
++    /**
++     * Returns whether the block is in a chunk that's running on this server
++     * or not.
++     *
++     * @return True if the block is in a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isInLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Checks if this block is empty.
+      * <p>

@@ -1,0 +1,29 @@
+--- a/src/main/java/org/bukkit/Chunk.java
++++ b/src/main/java/org/bukkit/Chunk.java
+@@ -215,6 +215,26 @@ public interface Chunk extends PersistentDataHolder {
+      */
+     boolean unload();
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isExternalChunk();
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Checks if this chunk can spawn slimes without being a swamp biome.
+      *

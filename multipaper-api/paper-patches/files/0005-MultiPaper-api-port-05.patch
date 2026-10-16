@@ -1,0 +1,29 @@
+--- a/src/main/java/org/bukkit/World.java
++++ b/src/main/java/org/bukkit/World.java
+@@ -409,6 +409,26 @@ public interface World extends RegionAccessor, WorldInfo, PluginMessageRecipient
+     @Deprecated(since = "1.14")
+     public boolean isChunkInUse(int x, int z);
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isChunkExternal(int x, int z);
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isChunkLocal(int x, int z);
++
++    // MultiPaper end
++
+     /**
+      * Loads the {@link Chunk} at the specified coordinates.
+      * <p>

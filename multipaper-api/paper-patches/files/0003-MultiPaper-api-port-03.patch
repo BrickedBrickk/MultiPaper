@@ -1,0 +1,33 @@
+--- a/src/main/java/org/bukkit/Location.java
++++ b/src/main/java/org/bukkit/Location.java
+@@ -344,6 +344,30 @@ public class Location implements Cloneable, ConfigurationSerializable, io.paperm
+         return this;
+     }
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the chunk is running on an external server or not.
++     *
++     * @return True if the chunk is an external chunk, or false if the chunk
++     * is running on this server or if it's unloaded.
++     */
++    public boolean isChunkExternal() {
++        return this.getWorld().isChunkExternal(locToBlock(x) >> 4, locToBlock(z) >> 4);
++    }
++
++    /**
++     * Returns whether the chunk is running on this server or not.
++     *
++     * @return True if the chunk is a local chunk, or false if the chunk
++     * is running on an external server or if it's unloaded.
++     */
++    public boolean isChunkLocal() {
++        return this.getWorld().isChunkLocal(locToBlock(x) >> 4, locToBlock(z) >> 4);
++    }
++
++    // MultiPaper end
++
+     /**
+      * Adds the location by another.
+      *

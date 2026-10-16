@@ -1,0 +1,19 @@
+--- a/src/main/java/org/bukkit/permissions/PermissibleBase.java
++++ b/src/main/java/org/bukkit/permissions/PermissibleBase.java
+@@ -21,6 +21,7 @@ public class PermissibleBase implements Permissible {
+     private final Permissible parent;
+     private final List<PermissionAttachment> attachments = new LinkedList<PermissionAttachment>();
+     private final Map<String, PermissionAttachmentInfo> permissions = new HashMap<String, PermissionAttachmentInfo>();
++    public boolean dirty = false; // MultiPaper
+ 
+     public PermissibleBase(@Nullable ServerOperator opable) {
+         this.opable = opable;
+@@ -177,6 +178,8 @@ public class PermissibleBase implements Permissible {
+         for (PermissionAttachment attachment : attachments) {
+             calculateChildPermissions(attachment.getPermissions(), false, attachment);
+         }
++
++        dirty = true; // MultiPaper
+     }
+ 
+     public synchronized void clearPermissions() {

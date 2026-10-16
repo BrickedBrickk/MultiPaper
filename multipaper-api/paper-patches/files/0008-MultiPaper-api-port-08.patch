@@ -1,0 +1,95 @@
+--- a/src/main/java/org/bukkit/entity/Player.java
++++ b/src/main/java/org/bukkit/entity/Player.java
+@@ -66,6 +66,7 @@ import org.bukkit.potion.PotionEffect;
+ import org.bukkit.potion.PotionEffectType;
+ import org.bukkit.scoreboard.Scoreboard;
+ import org.jspecify.annotations.NullMarked;
++import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+ 
+ /**
+@@ -624,6 +625,84 @@ public interface Player extends HumanEntity, Conversable, OfflinePlayer, PluginM
+      */
+     public void setRespawnLocation(@Nullable Location location, boolean force);
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the player is on an external server or not.
++     *
++     * @return True if the player is on an external server.
++     */
++    public boolean isExternalPlayer();
++
++    /**
++     * Returns whether the player is on this server or not.
++     *
++     * @return True if the player is on this server.
++     */
++    public boolean isLocalPlayer();
++
++    /**
++     * Returns cross-server data that is stored under the specified key. Note
++     * that all plugins share the same set of keys. This data is
++     * non-persistent, it will be lost when the player disconnects.
++     *
++     * @param key The key the data is stored under.
++     * @return The data stored under the key, or null if the key isn't set.
++     */
++    @Nullable
++    public String getData(String key);
++
++    /**
++     * Store cross-server data under the specified key. Note that all plugins
++     * share the same set of keys. This data is non-persistent, it will be
++     * lost when the player disconnects.
++     *
++     * @param key The key to store the data under.
++     * @param value The data to store under the key.
++     */
++    public void setData(String key, String value);
++
++    /**
++     * Returns cross-server data that is stored under the specified key. Note
++     * that all plugins share the same set of keys. This data is persistent,
++     * it will be saved even if the player disconnects. This persistent data is
++     * saved onto the player's .dat file.
++     *
++     * @param key The key the data is stored under.
++     * @return The data stored under the key, or null if the key isn't set.
++     */
++    @Nullable
++    public String getPersistentData(String key);
++
++    /**
++     * Store cross-server data under the specified key. Note that all plugins
++     * share the same set of keys. This data is persistent, it will be saved
++     * even if the player disconnects. This persistent data is saved onto the
++     * player's .dat file.
++     *
++     * @param key The key to store the data under.
++     * @param value The data to store under the key.
++     */
++    public void setPersistentData(String key, String value);
++
++    /**
++     * Says a message (or runs a command) on other server excluding this one.
++     *
++     * @param msg chat message to say
++     */
++    public void chatOnOtherServers(@NonNull String msg);
++
++    /**
++     * Get the bungeecord name of the server that this player is on.
++     *
++     * @return The bungeecord name of the server the player is on for external
++     *         players, or null for local players.
++     */
++    @Nullable
++    public String getExternalServerName();
++
++    // MultiPaper end
++
+     /**
+      * Gets the ender pearls currently associated with this entity.
+      * <p>

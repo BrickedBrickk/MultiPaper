@@ -1,0 +1,52 @@
+--- a/src/main/java/org/bukkit/entity/Entity.java
++++ b/src/main/java/org/bukkit/entity/Entity.java
+@@ -350,6 +350,26 @@ public interface Entity extends Metadatable, CommandSender, Nameable, Persistent
+      */
+     public int getEntityId();
+ 
++    // MultiPaper start
++
++    /**
++     * Returns whether the entity is in a chunk that's running on an external
++     * server or not.
++     *
++     * @return True if the entity is in an external chunk.
++     */
++    public boolean isInExternalChunk();
++
++    /**
++     * Returns whether the entity is in a chunk that's running on this server
++     * or not.
++     *
++     * @return True if the entity is in a local chunk.
++     */
++    public boolean isInLocalChunk();
++
++    // MultiPaper end
++
+     /**
+      * Returns the entity's current fire ticks (ticks before the entity stops
+      * being on fire).
+@@ -1446,4 +1466,22 @@ public interface Entity extends Metadatable, CommandSender, Nameable, Persistent
+      */
+     void setImmuneToFire(@Nullable Boolean fireImmune);
+     // Purpur end - Fire Immunity API
++
++    // MultiPaper start - fake entity API
++    /**
++     * Marks this entity as fake. Fake entities are not synchronized to other
++     * MultiPaper servers and cannot be interacted with by external players.
++     * This setting cannot be reversed.
++     *
++     * @throws IllegalStateException if this is an online player
++     */
++    void setFake();
++
++    /**
++     * Returns whether this entity is fake.
++     *
++     * @return true if the entity is fake
++     */
++    boolean isFake();
++    // MultiPaper end
+ }
