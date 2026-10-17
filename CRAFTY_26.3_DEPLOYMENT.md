@@ -4,7 +4,7 @@ This guide describes deployment for the current fork. Two isolated MultiPaper 26
 
 ## Build and test status
 
-On 2026-10-16, `:multipaper-server:build` and `:multipaper-server:createPaperclipJar` completed successfully after the external-player client-loaded and hidden-entity synchronization changes. The server suite passed 10,103 tests with 0 failures, 0 errors, and 86 skipped; `scanJarForBadCalls` passed. Test output included the existing asynchronous inventory warning from `PlayerInventoryTest.testCanHold`. The focused handshake-forwarding suite passed 4/4 tests. On 2026-10-17, the Master suite passed 19 tests: 16 protocol/storage integration tests, one region-cache close/reopen test, one separate-process graceful-restart test, and one separate-process abrupt-termination recovery test after the Master acknowledged completed writes. Both process tests start the built Master JAR in isolated temporary directories and read back identical chunk, level, and player data after starting a second process. Abrupt termination while a write is still in flight remains untested. The paperclip artifact built from source commit `23425b8` is 66,657,344 bytes with SHA-256 `BEB1DC64831CBE1E33F39209E172A816F4BC9AEF57954B9A1CDB4D4030FD72A4`. The full server suite ran after the entity changes; the post-commit build reused those successful test results and regenerated the paperclip. The Master now closes its cached region files after async work and networking have drained during graceful shutdown.
+On 2026-10-16, `:multipaper-server:build` and `:multipaper-server:createPaperclipJar` completed successfully after the external-player client-loaded and hidden-entity synchronization changes. The server suite passed 10,103 tests with 0 failures, 0 errors, and 86 skipped; `scanJarForBadCalls` passed. Test output included the existing asynchronous inventory warning from `PlayerInventoryTest.testCanHold`. The focused handshake-forwarding suite passed 4/4 tests. On 2026-10-17, the Master suite passed 19 tests: 16 protocol/storage integration tests, one region-cache close/reopen test, one separate-process graceful-restart test, and one separate-process abrupt-termination recovery test after the Master acknowledged completed writes. Both process tests start the built Master JAR in isolated temporary directories and read back identical chunk, level, and player data after starting a second process. Abrupt termination while a write is still in flight remains untested. That historical paperclip artifact, built from source commit `23425b8`, was 66,657,344 bytes with SHA-256 `BEB1DC64831CBE1E33F39209E172A816F4BC9AEF57954B9A1CDB4D4030FD72A4`. It was later superseded by the inventory dirty-tracking build described below. The full server suite ran after the entity changes; the post-commit build reused those successful test results and regenerated the paperclip. The Master now closes its cached region files after async work and networking have drained during graceful shutdown.
 
 The live smoke root was `C:\Users\elibo\AppData\Local\Temp\MultiPaper-26.3-smoke-0c73a38-20261016-063616`. Master ran on `35353` with proxy `25565`; `smoke-server-1` and `smoke-server-2` ran on `25566` and `25567`. Both reached `Done` and connected to the Master. Status requests to all three ports returned MultiPaper 26.3, protocol 777; the Master logged proxy connections routed to both backends. After a graceful stop and restart, both backends loaded `world_gen_settings.dat` from the Master. Master and backend copies were each 242 bytes with matching SHA-256. The final `8ba9af3` JAR was used for the last two-backend startup and proxy status check.
 
@@ -34,7 +34,7 @@ A separate isolated recovery pair used a disposable Master on `35716`, with back
 
 ## Layout and network
 
-Reserve a fixed LAN address for PC1 (shown below as `192.168.1.10`) and record PC2's address (shown as `192.168.1.11`). Replace both examples with the addresses on your LAN. Use the same PC1 address in both servers' `multipaper.yml` files.
+Reserve fixed LAN addresses for PC1 and PC2 in the subnet used by those machines. The examples use `PC1_LAN_IP` and `PC2_LAN_IP`; replace those placeholders with the reserved addresses before configuring the firewall or starting servers. This development workstation currently has `192.168.0.103/24`, but that does not establish that it is either target PC. Use the same PC1 address in both servers' `multipaper.yml` files.
 
 | PC | Process | Bind/port | Access |
 | --- | --- | --- | --- |
@@ -61,7 +61,7 @@ Copy these built artifacts from the fork to the matching Crafty working director
 - PC1 Master: `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar`
 - PC1 Server 1 and PC2 Server 2: `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar`
 
-Use the same Paperclip build on both server PCs. The current Paperclip artifact was built from commit `23425b8` and includes the hidden external entity synchronization fix. The build version is `26.3-DEV-feature/port-26.3@23425b8`.
+Use the same Paperclip build on both server PCs. The current Paperclip artifact was rebuilt after the inventory dirty-tracking fix in commit `ac2ab2a`; the launcher reports `26.3-DEV-8dc9208`. Its SHA-256 is `263674BA91ABAE959DF21EEC78D3B7889D23E667533F15E8D2E38ADC61985F13`. The embedded implementation version is the upstream Paper checkout revision, not the MultiPaper fork commit. `java -jar multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar --version` prints this version but also extracts runtime libraries into the current working directory, so run it from a disposable directory or the server's working directory.
 
 | Artifact path | Use | Size | SHA-256 |
 | --- | --- | ---: | --- |
@@ -74,7 +74,7 @@ Keep a separate backup copy of the original world before migrating it.
 
 ### Local performance diagnostic — 2026-10-17
 
-Paper 26.3 build 200 and the MultiPaper `23425b8` pair were sampled on a Ryzen 9 7900X host (12 cores/24 threads, 32 GiB RAM, Java 25.0.3). Each run lasted about 90 seconds with nine 10-second samples, two offline protocol-777 test clients, and 40 persistent, invulnerable, AI-enabled zombies. The raw samples and method are recorded in [`benchmark-results/2026-10-17`](benchmark-results/2026-10-17/README.md).
+Paper 26.3 build 200 and the then-current MultiPaper `23425b8` pair were sampled on a Ryzen 9 7900X host (12 cores/24 threads, 32 GiB RAM, Java 25.0.3). Each run lasted about 90 seconds with nine 10-second samples, two offline protocol-777 test clients, and 40 persistent, invulnerable, AI-enabled zombies. The raw samples and method are recorded in [`benchmark-results/2026-10-17`](benchmark-results/2026-10-17/README.md).
 
 | System / layout | TPS | MSPT Server 1 | MSPT Server 2 | Combined CPU | Combined RSS |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -106,7 +106,7 @@ Set `multipaper.yml` on PC1:
 ```yaml
 master-connection:
   my-name: pc1-survival
-  master-address: 192.168.1.10:35353
+  master-address: "PC1_LAN_IP:35353"
   advertise-to-built-in-proxy: true
 ```
 
@@ -115,7 +115,7 @@ On PC2 use the same `master-address` and `advertise-to-built-in-proxy`, with a u
 ```yaml
 master-connection:
   my-name: pc2-survival
-  master-address: 192.168.1.10:35353
+  master-address: "PC1_LAN_IP:35353"
   advertise-to-built-in-proxy: true
 ```
 
