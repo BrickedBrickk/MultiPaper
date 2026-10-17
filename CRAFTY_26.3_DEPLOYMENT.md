@@ -72,11 +72,18 @@ Use the same Paperclip build on both server PCs. The current Paperclip artifact 
 
 Keep a separate backup copy of the original world before migrating it.
 
-### Local performance diagnostic — 2026-10-16
+### Local performance diagnostic — 2026-10-17
 
-On a Ryzen 9 7900X host (12 cores/24 threads, 32 GiB RAM), Paper 26.3 build 200 and the MultiPaper pair were sampled sequentially for 90 seconds with 40 persistent zombies and two test clients. The retained CSVs report CPU and RSS: Paper used about 28.43% of one logical core with mobs together and 25.06% with mobs split across two areas, at about 2.26 GiB RSS. MultiPaper used a combined 47.28% of one logical core and 4.85 GiB RSS with mobs together, and 34.54% and 4.88 GiB with mobs spread across backends. The benchmark notes recorded 20 TPS during the runs, but the exported CSV TPS columns contain `System.Object[]` rather than numeric samples. No MSPT samples were retained. Treat the TPS figures as console observations only; the CPU/RSS figures are the usable sampled measurements. These are light local diagnostic runs, not a capacity comparison or a prediction for the target i5-6700.
+Paper 26.3 build 200 and the MultiPaper `23425b8` pair were sampled on a Ryzen 9 7900X host (12 cores/24 threads, 32 GiB RAM, Java 25.0.3). Each run lasted about 90 seconds with nine 10-second samples, two offline protocol-777 test clients, and 40 persistent, invulnerable, AI-enabled zombies. The raw samples and method are recorded in [`benchmark-results/2026-10-17`](benchmark-results/2026-10-17/README.md).
 
-A 90-second JFR socket capture correlated MultiPaper's loopback backend-to-backend and backend-to-Master channels to about 405,295 application-payload bytes total (roughly 4.5 KiB/s). This excludes TCP/IP headers and physical LAN overhead; it does not measure traffic between two PCs. Repeat the benchmark on the target hardware and network with representative players and gameplay before drawing performance conclusions.
+| System / layout | TPS | MSPT Server 1 | MSPT Server 2 | Combined CPU | Combined RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Paper, players and mobs together | 20 | 0.69 ms | — | 12.38% | 2.23 GiB |
+| Paper, players and mobs spread | 20 | 1.00 ms | — | 13.77% | 2.41 GiB |
+| MultiPaper, players and mobs together on Server 1 | 20 / 20 | 3.03 ms | 0.71 ms | 40.78% | 4.60 GiB |
+| MultiPaper, 20 mobs and one player per backend | 20 / 20 | 1.21 ms | 1.13 ms | 37.19% | 4.73 GiB |
+
+These are light local diagnostics with static test bots; all runs stayed at 20 TPS, far from saturation. They do not predict performance on the target i5-6700 PCs. A separate JFR socket capture measured about 405,295 bytes of MultiPaper internal loopback application payload over 90 seconds (roughly 4.5 KiB/s), excluding TCP/IP headers and physical LAN traffic. Repeat on the target hardware and network with representative gameplay before drawing performance conclusions.
 
 ## Configure the Master
 
