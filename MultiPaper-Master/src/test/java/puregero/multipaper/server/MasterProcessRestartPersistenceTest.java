@@ -4,7 +4,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
@@ -25,29 +29,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MasterProcessRestartPersistenceTest {
 
     private static final String WORLD = "process-restart-world";
+    private static final String PLAYER_UUID = "c51c8d95-c2e8-4e7a-a0b6-03a2f6a44ec9";
     private static final int CHUNK_X = -33;
     private static final int CHUNK_Z = 48;
+    private static final byte[] CHUNK_DATA = "persisted-chunk-data".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] LEVEL_DATA = "persisted-level-data".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] PLAYER_DATA = "persisted-player-data".getBytes(StandardCharsets.UTF_8);
 
     @TempDir
     Path tempDir;
 
     @Test
     @Timeout(60)
-    void chunkDataSurvivesGracefulShutdownAndMasterJarRestart() throws Exception {
+    void worldAndPlayerDataSurviveGracefulShutdownAndMasterJarRestart() throws Exception {
         int masterPort = findFreePort();
         int proxyPort = findFreePort();
         assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
         Path masterDirectory = tempDir.resolve("master");
         masterDirectory.toFile().mkdirs();
 
-        byte[] expected = "persisted-across-master-process-restart".getBytes(StandardCharsets.UTF_8);
         Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
         TestServerClient firstClient = null;
         try {
             awaitListening(firstMaster, masterPort);
             firstClient = TestServerClient.connect(masterPort, "restart-writer");
-            ServerBoundMessage writeReply = firstClient.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, expected));
-            assertTrue(((BooleanMessageReply) writeReply).result, "Master must acknowledge the chunk write");
+            writePersistentData(firstClient);
             firstClient.close();
             firstClient = null;
 
@@ -64,9 +70,7 @@ class MasterProcessRestartPersistenceTest {
         try {
             awaitListening(secondMaster, masterPort);
             secondClient = TestServerClient.connect(masterPort, "restart-reader");
-            ServerBoundMessage readReply = secondClient.request(new ReadChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z));
-            assertTrue(readReply instanceof DataMessageReply, "Restarted Master should return stored chunk bytes");
-            assertArrayEquals(expected, ((DataMessageReply) readReply).data);
+            assertPersistentData(secondClient, "Restarted Master");
 
             secondClient.close();
             secondClient = null;
@@ -81,21 +85,19 @@ class MasterProcessRestartPersistenceTest {
 
     @Test
     @Timeout(60)
-    void chunkDataSurvivesUnexpectedMasterTerminationAfterWriteAcknowledgement() throws Exception {
+    void worldAndPlayerDataSurviveUnexpectedMasterTerminationAfterWriteAcknowledgement() throws Exception {
         int masterPort = findFreePort();
         int proxyPort = findFreePort();
         assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
         Path masterDirectory = tempDir.resolve("crashed-master");
         masterDirectory.toFile().mkdirs();
 
-        byte[] expected = "persisted-before-unexpected-master-termination".getBytes(StandardCharsets.UTF_8);
         Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
         TestServerClient firstClient = null;
         try {
             awaitListening(firstMaster, masterPort);
             firstClient = TestServerClient.connect(masterPort, "crash-writer");
-            ServerBoundMessage writeReply = firstClient.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, expected));
-            assertTrue(((BooleanMessageReply) writeReply).result, "Master must acknowledge the chunk write before termination");
+            writePersistentData(firstClient);
             firstClient.close();
             firstClient = null;
 
@@ -111,9 +113,7 @@ class MasterProcessRestartPersistenceTest {
         try {
             awaitListening(recoveredMaster, masterPort);
             reader = TestServerClient.connect(masterPort, "crash-reader");
-            ServerBoundMessage readReply = reader.request(new ReadChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z));
-            assertTrue(readReply instanceof DataMessageReply, "Recovered Master should return stored chunk bytes");
-            assertArrayEquals(expected, ((DataMessageReply) readReply).data);
+            assertPersistentData(reader, "Recovered Master");
 
             reader.close();
             reader = null;
@@ -124,6 +124,28 @@ class MasterProcessRestartPersistenceTest {
             closeClient(reader);
             stopIfRunning(recoveredMaster);
         }
+    }
+
+    private static void writePersistentData(TestServerClient client) throws Exception {
+        assertAcknowledged(client.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, CHUNK_DATA)), "chunk data");
+        assertAcknowledged(client.request(new WriteLevelMessage(WORLD, LEVEL_DATA)), "level data");
+        assertAcknowledged(client.request(new WritePlayerMessage(WORLD, PLAYER_UUID, PLAYER_DATA)), "player data");
+    }
+
+    private static void assertPersistentData(TestServerClient client, String masterDescription) throws Exception {
+        assertArrayEquals(CHUNK_DATA, readData(client.request(new ReadChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z)), masterDescription, "chunk data"));
+        assertArrayEquals(LEVEL_DATA, readData(client.request(new ReadLevelMessage(WORLD)), masterDescription, "level data"));
+        assertArrayEquals(PLAYER_DATA, readData(client.request(new ReadPlayerMessage(WORLD, PLAYER_UUID)), masterDescription, "player data"));
+    }
+
+    private static void assertAcknowledged(ServerBoundMessage reply, String dataType) {
+        assertTrue(reply instanceof BooleanMessageReply && ((BooleanMessageReply) reply).result,
+                "Master must acknowledge the " + dataType + " write before termination");
+    }
+
+    private static byte[] readData(ServerBoundMessage reply, String masterDescription, String dataType) {
+        assertTrue(reply instanceof DataMessageReply, masterDescription + " should return stored " + dataType);
+        return ((DataMessageReply) reply).data;
     }
 
     private static Process startMaster(Path workingDirectory, int masterPort, int proxyPort) throws IOException {
