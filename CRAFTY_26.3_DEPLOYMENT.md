@@ -46,6 +46,25 @@ Reserve fixed LAN addresses for PC1 and PC2 in the subnet used by those machines
 
 Do not forward the backend ports to the public internet. Allow TCP `35353` inbound on PC1 from PC1 and PC2. Allow `25567` inbound on PC2 from PC1. Allow `25565` inbound on PC1 from the players' LAN. Keep `25566` restricted to PC1. Outbound TCP from both PCs to PC1 port `35353` must be allowed. Use Windows Defender Firewall rules scoped to these LAN addresses; no router port forwarding is needed for LAN-only play.
 
+For example, after replacing the placeholders, run these in **elevated PowerShell** on PC1:
+
+```powershell
+$Pc1Ip = 'PC1_LAN_IP'
+$Pc2Ip = 'PC2_LAN_IP'
+$PlayerLanCidr = 'LAN_CIDR'
+New-NetFirewallRule -DisplayName 'MultiPaper Master' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 35353 -RemoteAddress $Pc1Ip,$Pc2Ip -Profile Private
+New-NetFirewallRule -DisplayName 'MultiPaper player proxy' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 25565 -RemoteAddress $PlayerLanCidr -Profile Private
+```
+
+Run this on PC2:
+
+```powershell
+$Pc1Ip = 'PC1_LAN_IP'
+New-NetFirewallRule -DisplayName 'MultiPaper Server 2' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 25567 -RemoteAddress $Pc1Ip -Profile Private
+```
+
+Windows permits outbound connections by default. If outbound policy is restricted, add outbound TCP rules from both backend PCs to PC1 port `35353`. Keep Crafty panel access (`8443`) limited to administrator devices; do not include it in the player-LAN rule.
+
 ## Install Crafty and Java
 
 Install Crafty's native Windows portable package on both PCs, or use its Windows Service package if you need Crafty to start before a user logs in. Crafty documents both Windows options. Do not run Crafty in Docker Desktop/WSL for this world: Crafty's documentation warns that Windows Docker volume handling can corrupt Minecraft chunks. See [Crafty's Windows installation guide](https://docs.craftycontrol.com/pages/getting-started/installation/windows/) and [Docker warning](https://docs.craftycontrol.com/pages/getting-started/installation/docker/).
