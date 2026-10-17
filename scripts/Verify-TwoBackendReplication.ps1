@@ -36,6 +36,18 @@ function Get-DuplicateEntityUuidWarningCount([string]$LogPath) {
     return (Select-String -LiteralPath $LogPath -SimpleMatch -Pattern 'Entity uuid already exists' | Measure-Object).Count
 }
 
+function Assert-NoNewDuplicateEntityUuidWarnings([int[]]$Before) {
+    if ([string]::IsNullOrWhiteSpace($Server1LogPath)) { return }
+    $after = @(
+        (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
+        (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
+    )
+    if ($after[0] -gt $Before[0] -or $after[1] -gt $Before[1]) {
+        throw "Duplicate entity UUID warnings increased during the probe: Server 1 $($Before[0]) -> $($after[0]); Server 2 $($Before[1]) -> $($after[1])."
+    }
+    Write-Output 'PASS: no new duplicate entity UUID warnings on either backend.'
+}
+
 $duplicateUuidWarningsBefore = @(
     (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
     (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
@@ -209,6 +221,7 @@ try {
     Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
 
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
+        Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
         Write-Output 'SKIP: pass -PlayerName for player inventory, entity, and dimension checks.'
         return
     }
@@ -286,17 +299,7 @@ try {
     Write-Output 'PASS: Nether entity removal replicated to Server 2.'
     Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null
 
-    if (-not [string]::IsNullOrWhiteSpace($Server1LogPath)) {
-        $duplicateUuidWarningsAfter = @(
-            (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
-            (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
-        )
-        if ($duplicateUuidWarningsAfter[0] -gt $duplicateUuidWarningsBefore[0] -or
-            $duplicateUuidWarningsAfter[1] -gt $duplicateUuidWarningsBefore[1]) {
-            throw "Duplicate entity UUID warnings increased during the probe: Server 1 $($duplicateUuidWarningsBefore[0]) -> $($duplicateUuidWarningsAfter[0]); Server 2 $($duplicateUuidWarningsBefore[1]) -> $($duplicateUuidWarningsAfter[1])."
-        }
-        Write-Output 'PASS: no new duplicate entity UUID warnings on either backend.'
-    }
+    Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
 } finally {
     try { Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=${tag}_nether] run kill @s" | Out-Null } catch { }
