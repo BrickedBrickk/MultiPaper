@@ -6,6 +6,8 @@ param(
     [int]$TestZ = 71,
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
     [string]$PlayerName,
+    [switch]$SkipContainerCheck,
+    [switch]$SkipRedstoneAndPistonCheck,
     [string]$Server1LogPath,
     [string]$Server2LogPath,
     [int]$TimeoutSeconds = 10
@@ -158,18 +160,22 @@ try {
 
     $containerX = $x + 4
     $containerCommand = "data get block $containerX $y $z Items"
-    Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:chest" | Out-Null
-    Send-Rcon $Server1RconPort "item replace block $containerX $y $z container.0 with minecraft:diamond 5" | Out-Null
-    Assert-Contains (Send-Rcon $Server1RconPort $containerCommand) 'minecraft:diamond' 'Server 1 could not read the container marker item.'
-    $containerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    $containerItems2 = ''
-    do {
-        $containerItems2 = Send-Rcon $Server2RconPort $containerCommand
-        if ($containerItems2.IndexOf('minecraft:diamond', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTime]::UtcNow -lt $containerDeadline)
-    Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 did not receive the chest block entity contents from Server 1.'
-    Write-Output 'PASS: chest block entity contents replicate to Server 2.'
+    if ($SkipContainerCheck) {
+        Write-Output 'SKIP: chest block entity contents check disabled by -SkipContainerCheck.'
+    } else {
+        Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:chest" | Out-Null
+        Send-Rcon $Server1RconPort "item replace block $containerX $y $z container.0 with minecraft:diamond 5" | Out-Null
+        Assert-Contains (Send-Rcon $Server1RconPort $containerCommand) 'minecraft:diamond' 'Server 1 could not read the container marker item.'
+        $containerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        $containerItems2 = ''
+        do {
+            $containerItems2 = Send-Rcon $Server2RconPort $containerCommand
+            if ($containerItems2.IndexOf('minecraft:diamond', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $containerDeadline)
+        Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 did not receive the chest block entity contents from Server 1.'
+        Write-Output 'PASS: chest block entity contents replicate to Server 2.'
+    }
 
     $circuitX = $x + 2
     $circuitY = $y + 1
@@ -177,53 +183,56 @@ try {
     $pistonX = $circuitX + 1
     $movedBlockX = $circuitX + 2
     $destinationX = $circuitX + 3
-    $pistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=true] run help"
-    $retractedPistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=false] run help"
-    $movedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
-    $retractedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
-    foreach ($clearX in $circuitX..$destinationX) {
-        Send-Rcon $Server1RconPort "setblock $clearX $circuitY $circuitZ minecraft:air" | Out-Null
-    }
-    Send-Rcon $Server1RconPort "setblock $movedBlockX $circuitY $circuitZ minecraft:stone" | Out-Null
-    Send-Rcon $Server1RconPort "setblock $pistonX $circuitY $circuitZ minecraft:piston[facing=east]" | Out-Null
-    Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:redstone_block" | Out-Null
-    $circuitDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        $pistonState1 = Send-Rcon $Server1RconPort $pistonCommand
-        $pistonState2 = Send-Rcon $Server2RconPort $pistonCommand
-        $movedBlock1 = Send-Rcon $Server1RconPort $movedBlockCommand
-        $movedBlock2 = Send-Rcon $Server2RconPort $movedBlockCommand
-        if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
-            $movedBlock1 -match 'Index \(\d+/\d+\)' -and $movedBlock2 -match 'Index \(\d+/\d+\)') { break }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTime]::UtcNow -lt $circuitDeadline)
-    Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not extend after receiving redstone power.'
-    Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the powered piston state.'
-    Assert-Contains $movedBlock1 'Index (' 'Server 1 piston did not move the stone block.'
-    Assert-Contains $movedBlock2 'Index (' 'Server 2 did not observe the piston-moved stone block.'
-    Write-Output 'PASS: redstone-powered piston extension and block movement replicate to Server 2.'
+    if ($SkipRedstoneAndPistonCheck) {
+        Write-Output 'SKIP: redstone and piston checks disabled by -SkipRedstoneAndPistonCheck.'
+    } else {
+        $pistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=true] run help"
+        $retractedPistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=false] run help"
+        $movedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
+        $retractedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
+        foreach ($clearX in $circuitX..$destinationX) {
+            Send-Rcon $Server1RconPort "setblock $clearX $circuitY $circuitZ minecraft:air" | Out-Null
+        }
+        Send-Rcon $Server1RconPort "setblock $movedBlockX $circuitY $circuitZ minecraft:stone" | Out-Null
+        Send-Rcon $Server1RconPort "setblock $pistonX $circuitY $circuitZ minecraft:piston[facing=east]" | Out-Null
+        Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:redstone_block" | Out-Null
+        $circuitDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $pistonState1 = Send-Rcon $Server1RconPort $pistonCommand
+            $pistonState2 = Send-Rcon $Server2RconPort $pistonCommand
+            $movedBlock1 = Send-Rcon $Server1RconPort $movedBlockCommand
+            $movedBlock2 = Send-Rcon $Server2RconPort $movedBlockCommand
+            if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
+                $movedBlock1 -match 'Index \(\d+/\d+\)' -and $movedBlock2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $circuitDeadline)
+        Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not extend after receiving redstone power.'
+        Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the powered piston state.'
+        Assert-Contains $movedBlock1 'Index (' 'Server 1 piston did not move the stone block.'
+        Assert-Contains $movedBlock2 'Index (' 'Server 2 did not observe the piston-moved stone block.'
+        Write-Output 'PASS: redstone-powered piston extension and block movement replicate to Server 2.'
 
-    Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:air" | Out-Null
-    $retractDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        $pistonState1 = Send-Rcon $Server1RconPort $retractedPistonCommand
-        $pistonState2 = Send-Rcon $Server2RconPort $retractedPistonCommand
-        $retractedBlock1 = Send-Rcon $Server1RconPort $retractedBlockCommand
-        $retractedBlock2 = Send-Rcon $Server2RconPort $retractedBlockCommand
-        if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
-            $retractedBlock1 -match 'Index \(\d+/\d+\)' -and $retractedBlock2 -match 'Index \(\d+/\d+\)') { break }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTime]::UtcNow -lt $retractDeadline)
-    Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not retract after redstone power was removed.'
-    Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the retracted piston state.'
-    Assert-Contains $retractedBlock1 'Index (' 'Server 1 did not keep the moved stone at its destination after piston retraction.'
-    Assert-Contains $retractedBlock2 'Index (' 'Server 2 did not observe the moved stone at its destination after piston retraction.'
-    Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
+        Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:air" | Out-Null
+        $retractDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $pistonState1 = Send-Rcon $Server1RconPort $retractedPistonCommand
+            $pistonState2 = Send-Rcon $Server2RconPort $retractedPistonCommand
+            $retractedBlock1 = Send-Rcon $Server1RconPort $retractedBlockCommand
+            $retractedBlock2 = Send-Rcon $Server2RconPort $retractedBlockCommand
+            if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
+                $retractedBlock1 -match 'Index \(\d+/\d+\)' -and $retractedBlock2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $retractDeadline)
+        Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not retract after redstone power was removed.'
+        Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the retracted piston state.'
+        Assert-Contains $retractedBlock1 'Index (' 'Server 1 did not keep the moved stone at its destination after piston retraction.'
+        Assert-Contains $retractedBlock2 'Index (' 'Server 2 did not observe the moved stone at its destination after piston retraction.'
+        Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
+    }
 
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
         Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
-        Write-Output 'SKIP: pass -PlayerName for player inventory, entity, and dimension checks.'
-        return
+        Write-Output 'SKIP: player inventory replication requires -PlayerName.'
     }
 
     if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
@@ -236,10 +245,9 @@ try {
         Assert-Contains (Send-Rcon $Server1RconPort $inventoryCommand) 'minecraft:cookie' 'Server 1 did not see the test item in the player inventory.'
         Assert-Contains (Send-Rcon $Server2RconPort $inventoryCommand) 'minecraft:cookie' 'Server 2 did not receive the player inventory update.'
         Write-Output "PASS: player inventory change replicated for $PlayerName."
+        Send-Rcon $Server1RconPort "tp $PlayerName $($x + 0.5) $($y + 1) $($z + 0.5)" | Out-Null
+        Start-Sleep -Seconds 1
     }
-
-    Send-Rcon $Server1RconPort "tp $PlayerName $($x + 0.5) $($y + 1) $($z + 0.5)" | Out-Null
-    Start-Sleep -Seconds 1
 
     Send-Rcon $Server1RconPort "summon minecraft:pig $($x + 0.5) $y $($z + 0.5) {Tags:[`"$tag`"],NoGravity:1b}" | Out-Null
     $uuidCommand = "data get entity @e[tag=$tag,limit=1] UUID"
@@ -253,15 +261,25 @@ try {
     }
     Write-Output "PASS: spawned entity subscription matches UUID $($uuidMatch1.Value)."
 
-    $targetX = $x + 1.5
-    $targetZ = $z + 1.5
+    $entityTargetBlockX = $x + 32
+    $entityTargetBlockZ = $z + 1
+    $targetX = $entityTargetBlockX + 0.5
+    $targetZ = $entityTargetBlockZ + 0.5
+    Send-Rcon $Server1RconPort "forceload add $entityTargetBlockX $entityTargetBlockZ" | Out-Null
+    Send-Rcon $Server2RconPort "forceload add $entityTargetBlockX $entityTargetBlockZ" | Out-Null
     Send-Rcon $Server1RconPort "tp @e[tag=$tag,limit=1] $targetX $y $targetZ" | Out-Null
-    Start-Sleep -Milliseconds 750
     $posCommand = "data get entity @e[tag=$tag,limit=1] Pos"
-    $pos1 = Send-Rcon $Server1RconPort $posCommand
-    $pos2 = Send-Rcon $Server2RconPort $posCommand
-    $positionMatch1 = [regex]::Match($pos1, '\[([^\]]+)\]')
-    $positionMatch2 = [regex]::Match($pos2, '\[([^\]]+)\]')
+    $positionDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $pos1 = Send-Rcon $Server1RconPort $posCommand
+        $pos2 = Send-Rcon $Server2RconPort $posCommand
+        $positionMatch1 = [regex]::Match($pos1, '\[([^\]]+)\]')
+        $positionMatch2 = [regex]::Match($pos2, '\[([^\]]+)\]')
+        if ($positionMatch1.Success -and $positionMatch2.Success -and
+            $positionMatch1.Value -ceq $positionMatch2.Value -and
+            $positionMatch1.Value.Contains("$targetX`d")) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $positionDeadline)
     if (-not $positionMatch1.Success -or -not $positionMatch2.Success) {
         throw "Could not read entity positions: Server 1 '$pos1', Server 2 '$pos2'."
     }
@@ -272,8 +290,12 @@ try {
     Write-Output "PASS: entity teleport position replicated as '$($positionMatch2.Value)'."
 
     Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null
-    Start-Sleep -Milliseconds 500
-    $removedEntity = Send-Rcon $Server2RconPort $uuidCommand
+    $removalDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $removedEntity = Send-Rcon $Server2RconPort $uuidCommand
+        if ($removedEntity.IndexOf('No entity was found', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $removalDeadline)
     Assert-Contains $removedEntity 'No entity was found' 'Entity removal did not reach Server 2.'
     Write-Output 'PASS: entity removal replicated to Server 2.'
 
@@ -305,6 +327,8 @@ try {
     try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=${tag}_nether] run kill @s" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
+    try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "forceload remove $x $z" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $x $z" | Out-Null } catch { }
 }
