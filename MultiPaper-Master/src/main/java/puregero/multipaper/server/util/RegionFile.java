@@ -379,7 +379,16 @@ public class RegionFile {
             sizeDelta += SECTOR_BYTES * sectorsNeeded;
         }
 
-        write(x, z, sectorNumber, data, length, externalFile);
+        try {
+            write(x, z, sectorNumber, data, length, externalFile);
+        } catch (IOException e) {
+            // The old offset still owns its sectors. Return the failed
+            // replacement allocation so later writes can reuse it.
+            for (int i = 0; i < sectorsNeeded; ++i) {
+                sectorFree.set(sectorNumber + i, true);
+            }
+            throw e;
+        }
         setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
         if (!externalFile) {
             try {
