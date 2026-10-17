@@ -267,6 +267,31 @@ try {
     $targetZ = $entityTargetBlockZ + 0.5
     Send-Rcon $Server1RconPort "forceload add $entityTargetBlockX $entityTargetBlockZ" | Out-Null
     Send-Rcon $Server2RconPort "forceload add $entityTargetBlockX $entityTargetBlockZ" | Out-Null
+
+    if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
+        Send-Rcon $Server1RconPort "tp $PlayerName $targetX $y $targetZ" | Out-Null
+        $playerPositionCommand = "data get entity $PlayerName Pos"
+        $playerPositionDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $playerPosition1 = Send-Rcon $Server1RconPort $playerPositionCommand
+            $playerPosition2 = Send-Rcon $Server2RconPort $playerPositionCommand
+            $playerPositionMatch1 = [regex]::Match($playerPosition1, '\[([^\]]+)\]')
+            $playerPositionMatch2 = [regex]::Match($playerPosition2, '\[([^\]]+)\]')
+            if ($playerPositionMatch1.Success -and $playerPositionMatch2.Success -and
+                $playerPositionMatch1.Value -ceq $playerPositionMatch2.Value -and
+                $playerPositionMatch1.Value.Contains("$targetX`d")) { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $playerPositionDeadline)
+        if (-not $playerPositionMatch1.Success -or -not $playerPositionMatch2.Success) {
+            throw "Could not read mirrored player positions: Server 1 '$playerPosition1', Server 2 '$playerPosition2'."
+        }
+        Assert-Contains $playerPositionMatch1.Value "$targetX`d" 'The player did not reach the cross-chunk test position on Server 1.'
+        if ($playerPositionMatch1.Value -cne $playerPositionMatch2.Value) {
+            throw "Player positions differ after crossing chunks: Server 1 '$($playerPositionMatch1.Value)', Server 2 '$($playerPositionMatch2.Value)' ."
+        }
+        Write-Output "PASS: player position replicated across chunks as '$($playerPositionMatch2.Value)'."
+    }
+
     Send-Rcon $Server1RconPort "tp @e[tag=$tag,limit=1] $targetX $y $targetZ" | Out-Null
     $posCommand = "data get entity @e[tag=$tag,limit=1] Pos"
     $positionDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -319,12 +344,60 @@ try {
         throw "Entity removal in the Nether did not reach Server 2. Remaining UUID response: '$dimensionRemoval'."
     }
     Write-Output 'PASS: Nether entity removal replicated to Server 2.'
+
+    if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
+        $playerInNetherCommand = "execute as $PlayerName at @s if dimension minecraft:the_nether run help"
+        Send-Rcon $Server1RconPort "execute in minecraft:the_nether run tp $PlayerName 0 80 0" | Out-Null
+        $playerDimensionDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $playerNether1 = Send-Rcon $Server1RconPort $playerInNetherCommand
+            $playerNether2 = Send-Rcon $Server2RconPort $playerInNetherCommand
+            if ($playerNether1 -match 'Index \(\d+/\d+\)' -and $playerNether2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $playerDimensionDeadline)
+        Assert-Contains $playerNether1 'Index (' 'Server 1 did not move the test player to the Nether.'
+        Assert-Contains $playerNether2 'Index (' "Server 2 did not receive the player's Nether dimension transfer."
+        $netherPlayerPosition1 = Send-Rcon $Server1RconPort $playerPositionCommand
+        $netherPlayerPosition2 = Send-Rcon $Server2RconPort $playerPositionCommand
+        $netherPlayerMatch1 = [regex]::Match($netherPlayerPosition1, '\[([^\]]+)\]')
+        $netherPlayerMatch2 = [regex]::Match($netherPlayerPosition2, '\[([^\]]+)\]')
+        if (-not $netherPlayerMatch1.Success -or -not $netherPlayerMatch2.Success -or
+            $netherPlayerMatch1.Value -cne $netherPlayerMatch2.Value) {
+            throw "Player positions differ in the Nether: Server 1 '$netherPlayerPosition1', Server 2 '$netherPlayerPosition2'."
+        }
+        Write-Output "PASS: player Nether transfer and position replicated as '$($netherPlayerMatch2.Value)'."
+
+        $playerInOverworldCommand = "execute as $PlayerName at @s if dimension minecraft:overworld run help"
+        Send-Rcon $Server1RconPort "execute in minecraft:overworld run tp $PlayerName $targetX $($y + 1) $targetZ" | Out-Null
+        $returnDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $playerOverworld1 = Send-Rcon $Server1RconPort $playerInOverworldCommand
+            $playerOverworld2 = Send-Rcon $Server2RconPort $playerInOverworldCommand
+            if ($playerOverworld1 -match 'Index \(\d+/\d+\)' -and $playerOverworld2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $returnDeadline)
+        Assert-Contains $playerOverworld1 'Index (' 'Server 1 did not return the test player to the Overworld.'
+        Assert-Contains $playerOverworld2 'Index (' "Server 2 did not receive the player's return to the Overworld."
+        $overworldPlayerPosition1 = Send-Rcon $Server1RconPort $playerPositionCommand
+        $overworldPlayerPosition2 = Send-Rcon $Server2RconPort $playerPositionCommand
+        $overworldPlayerMatch1 = [regex]::Match($overworldPlayerPosition1, '\[([^\]]+)\]')
+        $overworldPlayerMatch2 = [regex]::Match($overworldPlayerPosition2, '\[([^\]]+)\]')
+        if (-not $overworldPlayerMatch1.Success -or -not $overworldPlayerMatch2.Success -or
+            $overworldPlayerMatch1.Value -cne $overworldPlayerMatch2.Value) {
+            throw "Player positions differ after returning to the Overworld: Server 1 '$overworldPlayerPosition1', Server 2 '$overworldPlayerPosition2'."
+        }
+        Write-Output "PASS: player returned to the Overworld on both backends at '$($overworldPlayerMatch2.Value)'."
+    }
+
     Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null
 
     Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
 } finally {
     try { Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=${tag}_nether] run kill @s" | Out-Null } catch { }
+    if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
+        try { Send-Rcon $Server1RconPort "execute in minecraft:overworld run tp $PlayerName $($x + 0.5) $($y + 1) $($z + 0.5)" | Out-Null } catch { }
+    }
     try { Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
