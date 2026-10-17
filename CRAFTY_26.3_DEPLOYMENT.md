@@ -170,3 +170,7 @@ On the disposable pair under `C:\Users\elibo\AppData\Local\Temp\MultiPaper-26.3-
 ### Master persistence rerun — 2026-10-17
 
 Ran `.\gradlew.bat :multipaper-master:test --rerun-tasks --no-daemon` with Microsoft Java 25.0.3. All 19 tests executed successfully: 16 Master protocol/storage integration tests, 2 separate-process restart/recovery tests (graceful restart and unexpected termination after acknowledged writes), and 1 region file cache close/reopen test; 0 failures, 0 errors, 0 skipped. The Master JAR SHA-256 remained `A245AB56764EC5791FBFF07AFF362719F5E39F45C7A1A7994C1EA05B9AD6DDCA`. This does not cover process termination while a write is still in flight or corruption of the Master data directory.
+
+### Server test rerun attempt — 2026-10-17
+
+Attempted `.\gradlew.bat :multipaper-server:test --rerun --no-daemon` with Microsoft Java 25.0.3 to refresh the earlier full-suite result. The task printed through `:multipaper-server:processResources`, then made no further progress for several minutes: the test-result XML timestamps remained unchanged, no test worker appeared, and the active Gradle daemon's CPU increased by less than two seconds over multiple minutes. A thread dump showed the daemon waiting for an included-build controller. I stopped this stalled invocation; it is inconclusive and did not run or replace the previously recorded 10,103-test pass. Investigate the Paperweight/Purpur included-build task path before relying on another forced server-suite rerun.
