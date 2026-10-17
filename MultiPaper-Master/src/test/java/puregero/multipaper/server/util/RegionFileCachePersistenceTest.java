@@ -7,6 +7,8 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -57,6 +59,33 @@ class RegionFileCachePersistenceTest {
             RegionFileCache.closeAll();
 
             assertArrayEquals(third, RegionFileCache.getChunkDeflatedDataAsync(regionDirectory, 0, 0).join());
+        } finally {
+            RegionFileCache.closeAll();
+        }
+    }
+
+    @Test
+    void fragmentedRegionKeepsLatestChunkDataAfterRepeatedReplacementAndReopen() throws Exception {
+        File regionDirectory = tempDir.resolve("world").resolve("region").toFile();
+        Map<Integer, byte[]> expected = new HashMap<>();
+        Random random = new Random(0x26_03_17);
+
+        try {
+            for (int round = 0; round < 6; round++) {
+                for (int chunkX = 0; chunkX < 32; chunkX++) {
+                    byte[] payload = new byte[512 + random.nextInt(24_000)];
+                    random.nextBytes(payload);
+                    RegionFileCache.putChunkDeflatedDataAsync(regionDirectory, chunkX, 0, payload).join();
+                    expected.put(chunkX, payload);
+                }
+            }
+
+            RegionFileCache.closeAll();
+            for (Map.Entry<Integer, byte[]> chunk : expected.entrySet()) {
+                assertArrayEquals(chunk.getValue(),
+                        RegionFileCache.getChunkDeflatedDataAsync(regionDirectory, chunk.getKey(), 0).join(),
+                        "Latest payload should survive fragmented allocation for chunk " + chunk.getKey());
+            }
         } finally {
             RegionFileCache.closeAll();
         }
