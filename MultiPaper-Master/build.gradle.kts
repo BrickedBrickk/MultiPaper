@@ -45,6 +45,7 @@ tasks.shadowJar {
 }
 
 tasks.test {
+    dependsOn(tasks.shadowJar)
     // World files are stored relative to the working directory. Run tests in
     // a disposable directory so nothing outside the build directory is touched.
     val testRunDir = layout.buildDirectory.dir("test-run").get().asFile

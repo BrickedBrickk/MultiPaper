@@ -353,7 +353,7 @@ class MasterIntegrationTest {
 
     @Test
     @Order(15)
-    void chunkDataWrittenBeforeRestartRemainsReadable() throws Exception {
+    void chunkDataRemainsReadableAfterOwnerCrash() throws Exception {
         // server-a crashed in the previous test; its stored data must still be available.
         ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(WORLD, "region", 5, 0));
         if (readReply instanceof ChunkLoadedOnAnotherServerMessage redirect) {
