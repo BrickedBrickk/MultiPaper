@@ -79,6 +79,53 @@ class MasterProcessRestartPersistenceTest {
         }
     }
 
+    @Test
+    @Timeout(60)
+    void chunkDataSurvivesUnexpectedMasterTerminationAfterWriteAcknowledgement() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("crashed-master");
+        masterDirectory.toFile().mkdirs();
+
+        byte[] expected = "persisted-before-unexpected-master-termination".getBytes(StandardCharsets.UTF_8);
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient firstClient = null;
+        try {
+            awaitListening(firstMaster, masterPort);
+            firstClient = TestServerClient.connect(masterPort, "crash-writer");
+            ServerBoundMessage writeReply = firstClient.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, expected));
+            assertTrue(((BooleanMessageReply) writeReply).result, "Master must acknowledge the chunk write before termination");
+            firstClient.close();
+            firstClient = null;
+
+            firstMaster.destroyForcibly();
+            assertTrue(firstMaster.waitFor(10, TimeUnit.SECONDS), "Master process did not terminate forcibly");
+        } finally {
+            closeClient(firstClient);
+            stopIfRunning(firstMaster);
+        }
+
+        Process recoveredMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient reader = null;
+        try {
+            awaitListening(recoveredMaster, masterPort);
+            reader = TestServerClient.connect(masterPort, "crash-reader");
+            ServerBoundMessage readReply = reader.request(new ReadChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z));
+            assertTrue(readReply instanceof DataMessageReply, "Recovered Master should return stored chunk bytes");
+            assertArrayEquals(expected, ((DataMessageReply) readReply).data);
+
+            reader.close();
+            reader = null;
+            requestGracefulExit(recoveredMaster);
+            assertTrue(recoveredMaster.waitFor(15, TimeUnit.SECONDS), "Recovered Master did not stop after exit");
+            assertEquals(0, recoveredMaster.exitValue(), "Recovered Master process should exit successfully");
+        } finally {
+            closeClient(reader);
+            stopIfRunning(recoveredMaster);
+        }
+    }
+
     private static Process startMaster(Path workingDirectory, int masterPort, int proxyPort) throws IOException {
         Path jar = Path.of(System.getProperty("user.dir"), "..", "libs", "multipaper-master-3.0.0.jar").normalize().toAbsolutePath();
         assertTrue(jar.toFile().isFile(), "Master JAR not found: " + jar);
