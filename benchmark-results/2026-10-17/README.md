@@ -21,4 +21,36 @@ Values are means across the nine samples. MSPT columns show the average of the s
 
 RCON also reports min/max tick times. Individual samples, including TPS/MSPT ranges, CPU, working set, player lists, and mob counts, are in the four CSVs in this directory.
 
+## Re-run the collector
+
+The Windows PowerShell 5.1 collector is [`scripts/benchmark/Collect-MinecraftBenchmark.ps1`](../../scripts/benchmark/Collect-MinecraftBenchmark.ps1). It samples already-running disposable servers; prepare the clients, loaded chunks, and mobs first. Set the temporary server's RCON password in the environment so it is not stored in the script:
+
+```powershell
+$env:MULTIPAPER_RCON_PASSWORD = '<disposable RCON password>'
+```
+
+For Paper, pass its RCON port, Java PID, expected players, and mob count:
+
+```powershell
+.\scripts\benchmark\Collect-MinecraftBenchmark.ps1 `
+  -RconPort1 26051 -ProcessId1 1234 `
+  -ExpectedPlayers1 PaperA,PaperB -ExpectedZombieCount1 40 `
+  -SampleCount 9 -IntervalSeconds 10 `
+  -OutputPath .\paper-together.csv
+```
+
+For MultiPaper, add Server 2 and the Master process IDs. In a spread run, supply each backend's mob tag and expected count (the tags must already be applied to the prepared mobs):
+
+```powershell
+.\scripts\benchmark\Collect-MinecraftBenchmark.ps1 `
+  -RconPort1 26061 -ProcessId1 2345 -ExpectedPlayers1 SpreadA `
+  -ExpectedZombieCount1 20 -ZombieTag1 bench_a `
+  -RconPort2 26063 -ProcessId2 3456 -ExpectedPlayers2 BenchTwo `
+  -ExpectedZombieCount2 20 -ZombieTag2 bench_b -MasterProcessId 4567 `
+  -SampleCount 9 -IntervalSeconds 10 `
+  -OutputPath .\multipaper-spread.csv
+```
+
+The collector asserts player presence and configured mob counts on every sample, and aborts without writing a completed CSV if any check or parser fails. Process IDs and RCON ports must match the active disposable run. CPU and working-set values are local process measurements; the script does not collect remote-host CPU or RAM counters.
+
 A separate 90-second JFR capture correlated MultiPaper's internal backend-to-backend and backend-to-Master loopback sockets to about 405,295 application-payload bytes total (about 4.5 KiB/s). It excludes TCP/IP headers and physical LAN traffic and included a client reconnect during capture, so it is not a clean two-PC network benchmark.
