@@ -32,6 +32,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.IntegerP
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerStartedMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetChunkOwnerMessage;
+import puregero.multipaper.server.util.RegionFileCache;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -376,6 +377,36 @@ class MasterIntegrationTest {
         IntegerPairMessageReply second = (IntegerPairMessageReply) serverB.request(new RequestEntityIdBlock());
         assertEquals(first.y, second.x, "Sequential ID ranges must be contiguous");
         assertTrue(second.x > first.x, "The second allocated range must advance");
+    }
+
+    @Test
+    @Order(17)
+    void failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk() throws Exception {
+        String world = "write-failure-world";
+        int chunkX = 17;
+        int chunkZ = -21;
+        byte[] previousData = "previous-chunk-data".getBytes(StandardCharsets.UTF_8);
+        byte[] replacementData = "replacement-chunk-data".getBytes(StandardCharsets.UTF_8);
+
+        ServerBoundMessage initialReply = serverB.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, previousData));
+        assertTrue(initialReply instanceof BooleanMessageReply && ((BooleanMessageReply) initialReply).result,
+                "The initial chunk write should be acknowledged");
+
+        serverB.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+        assertTrue(((BooleanMessageReply) serverB.request(new PingMessage())).result,
+                "The Master should process the pending-save lock before the simulated write failure");
+        RegionFileCache.getRegionFile(Path.of(world, "region").toFile(), chunkX, chunkZ).close();
+
+        ServerBoundMessage failedReply = serverB.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, replacementData));
+        assertTrue(failedReply instanceof BooleanMessageReply, "A failed write should return a boolean reply");
+        assertFalse(((BooleanMessageReply) failedReply).result, "A failed disk write must not be acknowledged as successful");
+
+        RegionFileCache.closeAll();
+        ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(world, "region", chunkX, chunkZ));
+        assertTrue(readReply instanceof DataMessageReply, "The previous chunk data should remain readable");
+        assertArrayEquals(previousData, ((DataMessageReply) readReply).data,
+                "A failed replacement must leave the last acknowledged chunk data intact");
+        RegionFileCache.closeAll();
     }
 
     private static SetChunkOwnerMessage pollUntilOwner(TestServerClient client, int cx, int cz, String expectedOwner) throws InterruptedException {

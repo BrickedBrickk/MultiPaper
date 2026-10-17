@@ -19,7 +19,7 @@ public class EntitiesLockManager {
         }
     }
 
-    public static void writtenChunk(String world, int cx, int cz) {
+    public static void writeCompleted(String world, int cx, int cz) {
         CompletableFuture<Void> lock = locks.remove(new ChunkKey(world, cx, cz));
 
         if (lock != null) {

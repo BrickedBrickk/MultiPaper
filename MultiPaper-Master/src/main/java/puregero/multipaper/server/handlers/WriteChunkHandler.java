@@ -27,13 +27,19 @@ public class WriteChunkHandler {
     }
 
     private static void writeData(ServerConnection connection, WriteChunkMessage message, byte[] data) {
-        RegionFileCache.putChunkDeflatedDataAsync(ReadChunkHandler.getWorldDir(message.world, message.path), message.cx, message.cz, data).thenRun(() -> {
+        RegionFileCache.putChunkDeflatedDataAsync(ReadChunkHandler.getWorldDir(message.world, message.path), message.cx, message.cz, data).whenComplete((ignored, failure) -> {
             if (message.path.equals("region")) {
-                ChunkLockManager.writtenChunk(message.world, message.cx, message.cz);
+                ChunkLockManager.writeCompleted(message.world, message.cx, message.cz);
+            }
+            if (message.path.equals("entities")) {
+                EntitiesLockManager.writeCompleted(message.world, message.cx, message.cz);
             }
 
-            if (message.path.equals("entities")) {
-                EntitiesLockManager.writtenChunk(message.world, message.cx, message.cz);
+            if (failure != null) {
+                System.err.println("Failed to persist " + message.path + " chunk " + message.cx + "," + message.cz + " for world " + message.world);
+                failure.printStackTrace();
+                connection.sendReply(new BooleanMessageReply(false), message);
+                return;
             }
 
             connection.sendReply(new BooleanMessageReply(true), message);

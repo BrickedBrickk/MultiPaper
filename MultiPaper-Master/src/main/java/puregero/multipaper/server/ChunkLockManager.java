@@ -14,7 +14,7 @@ public class ChunkLockManager {
         locks.put(new ChunkKey(world, cx, cz), new CompletableFuture<Void>().completeOnTimeout(null, 60, TimeUnit.SECONDS));
     }
 
-    public static void writtenChunk(String world, int cx, int cz) {
+    public static void writeCompleted(String world, int cx, int cz) {
         CompletableFuture<Void> lock = locks.remove(new ChunkKey(world, cx, cz));
 
         if (lock != null) {

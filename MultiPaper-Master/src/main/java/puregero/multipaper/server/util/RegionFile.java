@@ -236,7 +236,11 @@ public class RegionFile {
     }
 
     public synchronized void putDeflatedBytes(int x, int z, byte[] b) {
-        write(x, z, b, b.length);
+        try {
+            write(x, z, b, b.length);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write chunk " + x + "," + z + " to " + directory, e);
+        }
     }
 
     /*
@@ -316,89 +320,85 @@ public class RegionFile {
             this.z = z;
         }
 
-        public void close() {
+        public void close() throws IOException {
             RegionFile.this.write(x, z, buf, count);
         }
     }
 
     /* write a chunk at (x,z) with length bytes of data to disk */
-    protected synchronized void write(int x, int z, byte[] data, int length) {        
-        try {
-            if (length == 0) {
-                clear(x, z);
-                return;
-            }
-            
-            int offset = getOffset(x, z);
-            int sectorNumber = offset >>> 8;
-            int sectorsAllocated = offset & 0xFF;
-            int sectorsNeeded = (length + CHUNK_HEADER_SIZE) / SECTOR_BYTES + 1;
-            boolean externalFile = false;
+    protected synchronized void write(int x, int z, byte[] data, int length) throws IOException {
+        if (length == 0) {
+            clear(x, z);
+            return;
+        }
 
-            // maximum chunk size is 1MB
-            if (sectorsNeeded >= 256) {
-                externalFile = true;
-                sectorsNeeded = 1;
+        int offset = getOffset(x, z);
+        int sectorNumber = offset >>> 8;
+        int sectorsAllocated = offset & 0xFF;
+        int sectorsNeeded = (length + CHUNK_HEADER_SIZE) / SECTOR_BYTES + 1;
+        boolean externalFile = false;
+
+        // maximum chunk size is 1MB
+        if (sectorsNeeded >= 256) {
+            externalFile = true;
+            sectorsNeeded = 1;
+        }
+
+        if (sectorNumber != 0 && sectorsAllocated == sectorsNeeded) {
+            /* we can simply overwrite the old sectors */
+            write(x, z, sectorNumber, data, length, externalFile);
+        } else {
+            /* we need to allocate new sectors */
+
+            /* mark the sectors previously used for this chunk as free */
+            for (int i = 0; i < sectorsAllocated; ++i) {
+                sectorFree.set(sectorNumber + i, true);
             }
 
-            if (sectorNumber != 0 && sectorsAllocated == sectorsNeeded) {
-                /* we can simply overwrite the old sectors */
+            /* scan for a free space large enough to store this chunk */
+            int runStart = sectorFree.indexOf(true);
+            int runLength = 0;
+            if (runStart != -1) {
+                for (int i = runStart; i < sectorFree.size(); ++i) {
+                    if (runLength != 0) {
+                        if (sectorFree.get(i)) runLength++;
+                        else runLength = 0;
+                    } else if (sectorFree.get(i)) {
+                        runStart = i;
+                        runLength = 1;
+                    }
+                    if (runLength >= sectorsNeeded) {
+                        break;
+                    }
+                }
+            }
+
+            if (runLength >= sectorsNeeded) {
+                /* we found a free space large enough */
+                sectorNumber = runStart;
+                setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
+                for (int i = 0; i < sectorsNeeded; ++i) {
+                    sectorFree.set(sectorNumber + i, false);
+                }
                 write(x, z, sectorNumber, data, length, externalFile);
             } else {
-                /* we need to allocate new sectors */
-
-                /* mark the sectors previously used for this chunk as free */
-                for (int i = 0; i < sectorsAllocated; ++i) {
-                    sectorFree.set(sectorNumber + i, true);
+                /*
+                 * no free space large enough found -- we need to grow the
+                 * file
+                 */
+                file.seek(file.length());
+                sectorNumber = sectorFree.size();
+                for (int i = 0; i < sectorsNeeded; ++i) {
+                    file.write(emptySector);
+                    sectorFree.add(false);
                 }
+                sizeDelta += SECTOR_BYTES * sectorsNeeded;
 
-                /* scan for a free space large enough to store this chunk */
-                int runStart = sectorFree.indexOf(true);
-                int runLength = 0;
-                if (runStart != -1) {
-                    for (int i = runStart; i < sectorFree.size(); ++i) {
-                        if (runLength != 0) {
-                            if (sectorFree.get(i)) runLength++;
-                            else runLength = 0;
-                        } else if (sectorFree.get(i)) {
-                            runStart = i;
-                            runLength = 1;
-                        }
-                        if (runLength >= sectorsNeeded) {
-                            break;
-                        }
-                    }
-                }
-
-                if (runLength >= sectorsNeeded) {
-                    /* we found a free space large enough */
-                    sectorNumber = runStart;
-                    setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
-                    for (int i = 0; i < sectorsNeeded; ++i) {
-                        sectorFree.set(sectorNumber + i, false);
-                    }
-                    write(x, z, sectorNumber, data, length, externalFile);
-                } else {
-                    /*
-                     * no free space large enough found -- we need to grow the
-                     * file
-                     */
-                    file.seek(file.length());
-                    sectorNumber = sectorFree.size();
-                    for (int i = 0; i < sectorsNeeded; ++i) {
-                        file.write(emptySector);
-                        sectorFree.add(false);
-                    }
-                    sizeDelta += SECTOR_BYTES * sectorsNeeded;
-
-                    write(x, z, sectorNumber, data, length, externalFile);
-                    setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
-                }
+                write(x, z, sectorNumber, data, length, externalFile);
+                setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
             }
-            setTimestamp(x, z, (int) (System.currentTimeMillis() / 1000L));
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+        setTimestamp(x, z, (int) (System.currentTimeMillis() / 1000L));
     }
 
     private Path getExternalChunkPath(int x, int z) {
