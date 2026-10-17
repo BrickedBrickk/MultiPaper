@@ -122,6 +122,29 @@ public class RegionFileCache {
         }
     }
 
+    public static synchronized void closeAll() throws IOException {
+        IOException failure = null;
+        for (Reference<RegionFile> reference : cache.values()) {
+            RegionFile regionFile = reference.get();
+            if (regionFile == null) {
+                continue;
+            }
+            try {
+                regionFile.close();
+            } catch (IOException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        cache.clear();
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
     public static int getSizeDelta(File basePath, int chunkX, int chunkZ) {
         RegionFile r = getRegionFile(basePath, chunkX, chunkZ);
         return r.getSizeDelta();

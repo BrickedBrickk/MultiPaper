@@ -9,6 +9,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBo
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundProtocol;
 import puregero.multipaper.server.proxy.ProxyServer;
 import puregero.multipaper.server.util.LogToFile;
+import puregero.multipaper.server.util.RegionFileCache;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -124,6 +125,12 @@ public class MultiPaperServer extends MessageBootstrap<MasterBoundMessage, Serve
             }
 
             awaitAsyncTasks();
+            try {
+                RegionFileCache.closeAll();
+            } catch (java.io.IOException e) {
+                System.err.println("Failed to close cached region files cleanly.");
+                e.printStackTrace();
+            }
         });
         Runtime.getRuntime().addShutdownHook(shutdownListener);
     }
