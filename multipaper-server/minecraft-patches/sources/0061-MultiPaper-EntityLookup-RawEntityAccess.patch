@@ -1,0 +1,13 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/EntityLookup.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/EntityLookup.java
+@@ -105,5 +105,10 @@
+     public Entity get(final UUID id) {
+         return maskNonAccessible(id == null ? null : this.entityByUUID.get(id));
+     }
+ 
++    /** Returns the entity mapping without filtering by chunk visibility for MultiPaper synchronization. */
++    public Entity getRawEntity(final UUID id) {
++        return id == null ? null : this.entityByUUID.get(id);
++    }
++
+     public boolean hasEntity(final int id) {

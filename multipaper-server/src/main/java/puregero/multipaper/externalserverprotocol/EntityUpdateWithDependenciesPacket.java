@@ -82,7 +82,7 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
 
         if (bukkitWorld instanceof CraftWorld craftWorld) {
             ServerLevel level = craftWorld.getHandle();
-            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
             if (entity == null) {
                 if (EntityRemovePacket.removedEntities.containsKey(uuid)) {
                     return;
@@ -110,7 +110,7 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
             Entity[] entities = new Entity[uuids.length];
 
             for (int i = 0; i < uuids.length; i++) {
-                entities[i] = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuids[i]);
+                entities[i] = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuids[i]);
 
                 if (entities[i] == null) {
                     if (EntityRemovePacket.removedEntities.containsKey(uuids[i])) {

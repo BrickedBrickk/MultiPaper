@@ -72,7 +72,7 @@ public class EntityPersistentDataUpdatePacket extends ExternalServerPacket {
                 if (bukkitWorld instanceof CraftWorld craftWorld) {
                     ServerLevel level = craftWorld.getHandle();
                     CompoundTag tag = MultiPaper.nbtFromBytes(data);
-                    Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+                    Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
                     if (entity != null) {
                         CraftEntity craftEntity = entity.getBukkitEntity();
                         for (String key : tag.keySet()) {

@@ -1,0 +1,15 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -3917,5 +3917,12 @@
+     public boolean hasClientLoaded() {
+         return !this.waitingForRespawn && this.clientLoadedTimeoutTimer <= 0;
+     }
+ 
++    public void markClientLoadedOnExternalServer() {
++        // External players already loaded the world on their connected backend.
++        // They do not tick this connection locally, so the normal timeout cannot expire.
++        this.waitingForRespawn = false;
++        this.clientLoadedTimeoutTimer = 0;
++    }
++
+     public void tickClientLoadTimeout() {

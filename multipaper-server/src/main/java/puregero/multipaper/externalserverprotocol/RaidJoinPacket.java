@@ -53,7 +53,7 @@ public class RaidJoinPacket extends ExternalServerPacket {
 
             if (bukkitWorld instanceof CraftWorld craftWorld) {
                 ServerLevel level = craftWorld.getHandle();
-                Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+                Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
                 Raid raid = level.getRaids().get(raidId);
                 if (raid != null && entity instanceof Raider raider) {
                     raid.joinRaid(level, raid.getGroupsSpawned(), raider, null, true);

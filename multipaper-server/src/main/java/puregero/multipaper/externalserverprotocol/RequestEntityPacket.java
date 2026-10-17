@@ -77,7 +77,7 @@ public class RequestEntityPacket extends ExternalServerPacket {
             CraftWorld craftWorld = ((CraftWorld) Bukkit.getWorld(world));
             if (craftWorld == null) return;
             ServerLevel level = craftWorld.getHandle();
-            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
             if (entity != null) {
                 if (entity.isFake()) return;
                 if (entity instanceof ServerPlayer serverPlayer) {

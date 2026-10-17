@@ -58,7 +58,7 @@ public class EntityRemovePacket extends ExternalServerPacket {
     private void removeEntity() {
         ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
 
-        Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+        Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
 
         if (entity != null) {
             MultiPaperEntitiesHandler.removingEntity = true;

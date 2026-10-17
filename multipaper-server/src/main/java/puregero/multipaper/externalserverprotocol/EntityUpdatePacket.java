@@ -70,7 +70,7 @@ public class EntityUpdatePacket extends ExternalServerPacket {
 
         if (bukkitWorld instanceof CraftWorld craftWorld) {
             ServerLevel level = craftWorld.getHandle();
-            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+            Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
             if (entity == null) {
                 if (EntityRemovePacket.removedEntities.containsKey(uuid)) {
                     return;

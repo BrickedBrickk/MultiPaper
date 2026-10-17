@@ -57,7 +57,7 @@ public class EntityUpdateEffectPacket extends ExternalServerPacket {
         MultiPaper.runSync(() -> {
             try {
                 ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
-                Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().get(uuid);
+                Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
                 CompoundTag tag = MultiPaper.nbtFromBytes(data);
                 MobEffectInstance effect = MobEffectInstance.CODEC.parse(
                     org.bukkit.craftbukkit.CraftRegistry.getMinecraftRegistry().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), tag
