@@ -67,6 +67,7 @@ public class ExternalPlayer extends ServerPlayer {
         this.valid = true;
         this.onGround = true;
         connection = new ServerGamePacketListenerImpl(this.level().getServer(), new ExternalPlayerConnection(PacketFlow.CLIENTBOUND), this, net.minecraft.server.network.CommonListenerCookie.createInitial(gameProfile, false));
+        connection.markClientLoadedOnExternalServer();
         setPos(x, y, z);
         setYRot(yaw);
         setXRot(pitch);
