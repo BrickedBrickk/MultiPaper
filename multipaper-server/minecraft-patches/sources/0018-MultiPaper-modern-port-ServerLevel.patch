@@ -19,21 +19,22 @@
      private final List<CustomSpawner> customSpawners;
      private @Nullable EnderDragonFight dragonFight;
      private final Int2ObjectMap<EnderDragonPart> dragonParts = new Int2ObjectOpenHashMap<>();
-@@ -1538,6 +1539,21 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -1538,6 +1539,22 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
          }
      }
  
 +    // MultiPaper start - run neighbour updates later if we're handling block changes
 +    @Override
 +    public void updateNeighborsAt(final BlockPos pos, final Block sourceBlock, final @Nullable Orientation orientation) {
++        if (captureBlockStates) { return; } // Paper - Cancel all physics during placement
 +        if (puregero.multipaper.MultiPaperChunkHandler.blockUpdateChunk != null) {
 +            // MultiPaper start - run neighbour updates later if we're handling block changes
 +            final BlockPos finalPos = pos;
 +            final Block finalSourceBlock = sourceBlock;
-+            io.papermc.paper.util.MCUtil.ensureMain(() -> super.updateNeighborsAt(finalPos, finalSourceBlock, orientation));
++            io.papermc.paper.util.MCUtil.ensureMain(() -> this.neighborUpdater.updateNeighborsAtExceptFromFacing(finalPos, finalSourceBlock, null, orientation));
 +            // MultiPaper end - run neighbour updates later if we're handling block changes
 +        } else {
-+            super.updateNeighborsAt(pos, sourceBlock, orientation);
++            this.neighborUpdater.updateNeighborsAtExceptFromFacing(pos, sourceBlock, null, orientation);
 +        }
 +    }
 +    // MultiPaper end - run neighbour updates later if we're handling block changes
@@ -41,12 +42,12 @@
      @Override
      public boolean mayInteract(final Entity entity, final BlockPos pos) {
          return !(entity instanceof Player player && (this.server.isUnderSpawnProtection(this, pos, player) || !this.getWorldBorder().isWithinBounds(pos)));
-@@ -1742,1 +1758,3 @@ private boolean addEntity(final Entity entity, final org.bukkit.event.entity.CreatureSpawnEvent.@Nullable SpawnReason spawnReason) {
+@@ -1742,1 +1759,3 @@ private boolean addEntity(final Entity entity, final org.bukkit.event.entity.CreatureSpawnEvent.@Nullable SpawnReason spawnReason) {
 -            return this.moonrise$getEntityLookup().addNewEntity(entity); // Paper - rewrite chunk system
 +            boolean added = this.moonrise$getEntityLookup().addNewEntity(entity); // Paper - rewrite chunk system
 +            if (added) puregero.multipaper.MultiPaperEntitiesHandler.onEntitySpawn(entity); // MultiPaper
 +            return added;
-@@ -1983,12 +2001,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -1983,12 +2002,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
          this.updateNeighborsAt(pos, sourceBlock, ExperimentalRedstoneUtils.initialOrientation(this, null, null));
      }
  
