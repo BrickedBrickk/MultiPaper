@@ -87,7 +87,7 @@ Use the same Paperclip build on both server PCs. The current Paperclip artifact 
 | `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,662 bytes | `263674BA91ABAE959DF21EEC78D3B7889D23E667533F15E8D2E38ADC61985F13` |
 | `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,086,478 bytes | `1A4C82FFD2D3FFA2A87292C78E9490FBA232D7D508CE35B90E45664ED7E6533C` |
 | `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,687,179 bytes | `088AC8778ED37669C7139AB07C0EC758A7ADD86764C46199F913A20D10AA0B20` |
-| `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,153,132 bytes | `A9DCFC59E623CEDC462F1DA760B422F381ECD66A2770FA74C13604268D3E91FF` |
+| `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,153,175 bytes | `8BEDD2ACF8E33F82AC77DC8F3208FD53B35CDF8D422CF8953B9E5E53D00D4A05` |
 
 Keep a separate backup copy of the original world before migrating it.
 
@@ -219,5 +219,11 @@ This checks recovery after an acknowledged save with no player or entity active.
 A new Master integration test first reproduced a false-success reply: after the cached region file was closed to simulate a disk I/O failure, the Master acknowledged a replacement chunk write even though it was not persisted. `RegionFile.write` had swallowed `IOException`, allowing its future to complete successfully. The write path now propagates I/O failures, and `WriteChunkHandler` returns `false` instead of acknowledging success. The test confirms the previously acknowledged chunk remains readable after the region cache is closed and reopened, and that readers blocked on the pending save are released to that last acknowledged data.
 
 Added a persistence test for a 1.1 MB external chunk and its `.mcc` sidecar across cache close/reopen. The full Master suite passed 21 tests: 17 protocol/integration tests, 2 separate-process restart/crash tests, and 2 region-file persistence tests; 0 failures, 0 errors, 0 skipped. The rebuilt Master JAR is 19,153,132 bytes with SHA-256 `A9DCFC59E623CEDC462F1DA760B422F381ECD66A2770FA74C13604268D3E91FF`. The final artifact also started on `127.0.0.1:35353` with proxy `35354` and stopped cleanly via `exit`.
+
+### Region replacement crash consistency — 2026-10-17
+
+Replaced in-place same-sized region writes with copy-on-write sector allocation. The Master writes replacement bytes to unused sectors, publishes the new location only after the write succeeds, and then frees the previous sectors for reuse. This keeps a previously acknowledged in-region chunk intact if the Master stops during a replacement write. The old `.mcc` sidecar is removed only after an in-region replacement has been published. A persistence regression verifies same-sized replacement uses new sectors, later updates reuse freed sectors, and the final data survives closing and reopening the region cache.
+
+The full Master suite passed 22 tests: 17 protocol/integration tests, 2 separate-process restart/crash tests, and 3 region-file persistence tests; 0 failures, 0 errors, 0 skipped. The rebuilt Master JAR is 19,153,175 bytes with SHA-256 `8BEDD2ACF8E33F82AC77DC8F3208FD53B35CDF8D422CF8953B9E5E53D00D4A05`. This provides copy-on-write recovery for in-region chunk payloads; physical disk loss and torn hardware writes remain untested.
 
 This does not simulate physical disk loss or a process crash at the exact moment of a region-file header update. The regression checks an I/O failure and verifies the protocol does not acknowledge it as saved.

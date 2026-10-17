@@ -344,59 +344,54 @@ public class RegionFile {
             sectorsNeeded = 1;
         }
 
-        if (sectorNumber != 0 && sectorsAllocated == sectorsNeeded) {
-            /* we can simply overwrite the old sectors */
-            write(x, z, sectorNumber, data, length, externalFile);
+        // Keep the acknowledged chunk intact until its replacement has been
+        // fully written and the new offset has been published.
+        int oldSectorNumber = sectorNumber;
+        int oldSectorsAllocated = sectorsAllocated;
+        int runStart = sectorFree.indexOf(true);
+        int runLength = 0;
+        if (runStart != -1) {
+            for (int i = runStart; i < sectorFree.size(); ++i) {
+                if (sectorFree.get(i)) {
+                    runLength++;
+                } else {
+                    runLength = 0;
+                    runStart = i + 1;
+                }
+                if (runLength >= sectorsNeeded) {
+                    break;
+                }
+            }
+        }
+
+        if (runLength >= sectorsNeeded) {
+            sectorNumber = runStart;
+            for (int i = 0; i < sectorsNeeded; ++i) {
+                sectorFree.set(sectorNumber + i, false);
+            }
         } else {
-            /* we need to allocate new sectors */
-
-            /* mark the sectors previously used for this chunk as free */
-            for (int i = 0; i < sectorsAllocated; ++i) {
-                sectorFree.set(sectorNumber + i, true);
+            file.seek(file.length());
+            sectorNumber = sectorFree.size();
+            for (int i = 0; i < sectorsNeeded; ++i) {
+                file.write(emptySector);
+                sectorFree.add(false);
             }
+            sizeDelta += SECTOR_BYTES * sectorsNeeded;
+        }
 
-            /* scan for a free space large enough to store this chunk */
-            int runStart = sectorFree.indexOf(true);
-            int runLength = 0;
-            if (runStart != -1) {
-                for (int i = runStart; i < sectorFree.size(); ++i) {
-                    if (runLength != 0) {
-                        if (sectorFree.get(i)) runLength++;
-                        else runLength = 0;
-                    } else if (sectorFree.get(i)) {
-                        runStart = i;
-                        runLength = 1;
-                    }
-                    if (runLength >= sectorsNeeded) {
-                        break;
-                    }
-                }
+        write(x, z, sectorNumber, data, length, externalFile);
+        setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
+        if (!externalFile) {
+            try {
+                Files.deleteIfExists(getExternalChunkPath(x, z));
+            } catch (IOException e) {
+                // The in-region data is already committed. A stale sidecar is
+                // harmless because the published header no longer references it.
+                e.printStackTrace();
             }
-
-            if (runLength >= sectorsNeeded) {
-                /* we found a free space large enough */
-                sectorNumber = runStart;
-                setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
-                for (int i = 0; i < sectorsNeeded; ++i) {
-                    sectorFree.set(sectorNumber + i, false);
-                }
-                write(x, z, sectorNumber, data, length, externalFile);
-            } else {
-                /*
-                 * no free space large enough found -- we need to grow the
-                 * file
-                 */
-                file.seek(file.length());
-                sectorNumber = sectorFree.size();
-                for (int i = 0; i < sectorsNeeded; ++i) {
-                    file.write(emptySector);
-                    sectorFree.add(false);
-                }
-                sizeDelta += SECTOR_BYTES * sectorsNeeded;
-
-                write(x, z, sectorNumber, data, length, externalFile);
-                setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
-            }
+        }
+        for (int i = 0; i < oldSectorsAllocated; ++i) {
+            sectorFree.set(oldSectorNumber + i, true);
         }
         setTimestamp(x, z, (int) (System.currentTimeMillis() / 1000L));
     }
@@ -433,7 +428,6 @@ public class RegionFile {
         file.writeInt(length + 1); // chunk length
         file.writeByte(VERSION_DEFLATE); // chunk version number
         file.write(data, 0, length); // chunk data
-        Files.deleteIfExists(getExternalChunkPath(x, z));
     }
 
     private int getOffset(int x, int z) {
@@ -445,9 +439,10 @@ public class RegionFile {
     }
 
     private void setOffset(int x, int z, int offset) throws IOException {
-        offsets[(x & 31) + (z & 31) * 32] = offset;
-        file.seek(((x & 31) + (z & 31) * 32) * 4);
+        int index = (x & 31) + (z & 31) * 32;
+        file.seek(index * 4);
         file.writeInt(offset);
+        offsets[index] = offset;
     }
 
     private void setTimestamp(int x, int z, int value) throws IOException {
