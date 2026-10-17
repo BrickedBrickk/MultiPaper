@@ -61,16 +61,22 @@ Copy these built artifacts from the fork to the matching Crafty working director
 - PC1 Master: `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar`
 - PC1 Server 1 and PC2 Server 2: `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar`
 
-Use the same Paperclip build on both server PCs. The server artifacts below were freshly built from commit `55c83f9`, including the block entity payload, command registration, neighbor-update, and external-player interaction fixes. The current Paperclip build is `26.3-DEV-feature/port-26.3@55c83f9`.
+Use the same Paperclip build on both server PCs. The current Paperclip artifact was built from commit `23425b8` and includes the hidden external entity synchronization fix. The build version is `26.3-DEV-feature/port-26.3@23425b8`.
 
 | Artifact path | Use | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,658,006 bytes | `CD7EB4A07C098D23FC4B83B4DBF51A52E991F0355FAC5ED489A8F0FFF096D953` |
+| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,344 bytes | `BEB1DC64831CBE1E33F39209E172A816F4BC9AEF57954B9A1CDB4D4030FD72A4` |
 | `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,086,322 bytes | `C69E8A4029343E505686AC93551878ACF248F2A1683E7BDB84ADAC9BAF3BE2C6` |
 | `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,687,093 bytes | `EAC23108D1ABFF86062C0798BDBC2F260D9002947ED8D0CD0C203BBAC7CCE878` |
 | `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,152,253 bytes | `252A5E986803C1244370B6038D71826EC1CDC0F9608CF5E4A71190DF499C874C` |
 
 Keep a separate backup copy of the original world before migrating it.
+
+### Local performance diagnostic — 2026-10-16
+
+On a Ryzen 9 7900X host (12 cores/24 threads, 32 GiB RAM), Paper 26.3 build 200 and the MultiPaper pair were sampled sequentially for 90 seconds with 40 persistent zombies and two test clients. Paper held 20 TPS at about 28.43% of one logical core with mobs together and 25.06% with mobs split across two areas; RSS was about 2.26 GiB. MultiPaper held 20 TPS on both backends at a combined 47.28% of one logical core and 4.85 GiB RSS with mobs together, and 34.54% and 4.88 GiB with mobs spread across backends. These are light local diagnostic runs, not a capacity comparison or a prediction for the target i5-6700.
+
+A 90-second JFR socket capture correlated MultiPaper's loopback backend-to-backend and backend-to-Master channels to about 405,295 application-payload bytes total (roughly 4.5 KiB/s). This excludes TCP/IP headers and physical LAN overhead; it does not measure traffic between two PCs. Repeat the benchmark on the target hardware and network with representative players and gameplay before drawing performance conclusions.
 
 ## Configure the Master
 
