@@ -6,6 +6,8 @@ param(
     [int]$TestZ = 71,
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
     [string]$PlayerName,
+    [string]$Server1LogPath,
+    [string]$Server2LogPath,
     [int]$TimeoutSeconds = 10
 )
 
@@ -18,6 +20,26 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($RconPassword)) {
     throw 'Pass -RconPassword or set MULTIPAPER_RCON_PASSWORD.'
 }
+
+if ([string]::IsNullOrWhiteSpace($Server1LogPath) -ne [string]::IsNullOrWhiteSpace($Server2LogPath)) {
+    throw 'Pass both -Server1LogPath and -Server2LogPath to check duplicate entity UUID warnings.'
+}
+
+foreach ($logPath in @($Server1LogPath, $Server2LogPath)) {
+    if (-not [string]::IsNullOrWhiteSpace($logPath) -and -not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
+        throw "Server log not found: $logPath"
+    }
+}
+
+function Get-DuplicateEntityUuidWarningCount([string]$LogPath) {
+    if ([string]::IsNullOrWhiteSpace($LogPath)) { return 0 }
+    return (Select-String -LiteralPath $LogPath -SimpleMatch -Pattern 'Entity uuid already exists' | Measure-Object).Count
+}
+
+$duplicateUuidWarningsBefore = @(
+    (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
+    (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
+)
 
 function Read-RconPacket([System.IO.Stream]$Stream) {
     $lengthBytes = [byte[]]::new(4)
@@ -263,6 +285,18 @@ try {
     }
     Write-Output 'PASS: Nether entity removal replicated to Server 2.'
     Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null
+
+    if (-not [string]::IsNullOrWhiteSpace($Server1LogPath)) {
+        $duplicateUuidWarningsAfter = @(
+            (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
+            (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
+        )
+        if ($duplicateUuidWarningsAfter[0] -gt $duplicateUuidWarningsBefore[0] -or
+            $duplicateUuidWarningsAfter[1] -gt $duplicateUuidWarningsBefore[1]) {
+            throw "Duplicate entity UUID warnings increased during the probe: Server 1 $($duplicateUuidWarningsBefore[0]) -> $($duplicateUuidWarningsAfter[0]); Server 2 $($duplicateUuidWarningsBefore[1]) -> $($duplicateUuidWarningsAfter[1])."
+        }
+        Write-Output 'PASS: no new duplicate entity UUID warnings on either backend.'
+    }
 } finally {
     try { Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=${tag}_nether] run kill @s" | Out-Null } catch { }
