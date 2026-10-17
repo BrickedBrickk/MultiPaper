@@ -277,6 +277,12 @@ public class MultiPaperInventoryHandler {
      * Returns true if the changes to the inventory component should be marked as dirty.
      */
     public static <E extends ItemStack> boolean markDirty(NonNullListFilter<E> inventoryComponent) {
+        // Standalone inventories (for example, the inventory math tests) are not
+        // mirrored between servers and have no player tick to flush their changes.
+        if (!(inventoryComponent.player instanceof ServerPlayer)) {
+            return false;
+        }
+
         if ( !ca.spottedleaf.moonrise.common.util.TickThread.isTickThread() ) {
             LOGGER.warn("Asynchronous inventory modification. This is unsafe and will eventually cause an issue.", new IllegalStateException("Async access"));
         }
