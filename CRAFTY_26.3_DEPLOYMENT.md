@@ -65,9 +65,9 @@ Use the same Paperclip build on both server PCs. The current Paperclip artifact 
 
 | Artifact path | Use | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,344 bytes | `BEB1DC64831CBE1E33F39209E172A816F4BC9AEF57954B9A1CDB4D4030FD72A4` |
-| `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,086,322 bytes | `C69E8A4029343E505686AC93551878ACF248F2A1683E7BDB84ADAC9BAF3BE2C6` |
-| `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,687,093 bytes | `EAC23108D1ABFF86062C0798BDBC2F260D9002947ED8D0CD0C203BBAC7CCE878` |
+| `multipaper-server/build/libs/multipaper-paperclip-26.3-R0.1-SNAPSHOT.jar` | PC1 Server 1 and PC2 Server 2 | 66,657,662 bytes | `263674BA91ABAE959DF21EEC78D3B7889D23E667533F15E8D2E38ADC61985F13` |
+| `multipaper-server/build/libs/multipaper-bundler-26.3-R0.1-SNAPSHOT.jar` | Bundled server distribution | 110,086,478 bytes | `1A4C82FFD2D3FFA2A87292C78E9490FBA232D7D508CE35B90E45664ED7E6533C` |
+| `multipaper-server/build/libs/multipaper-server-26.3-R0.1-SNAPSHOT.jar` | Extracted server runtime | 31,687,179 bytes | `088AC8778ED37669C7139AB07C0EC758A7ADD86764C46199F913A20D10AA0B20` |
 | `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` | PC1 Master | 19,152,695 bytes | `A245AB56764EC5791FBFF07AFF362719F5E39F45C7A1A7994C1EA05B9AD6DDCA` |
 
 Keep a separate backup copy of the original world before migrating it.
@@ -174,3 +174,9 @@ Ran `.\gradlew.bat :multipaper-master:test --rerun-tasks --no-daemon` with Micro
 ### Server test rerun — 2026-10-17
 
 Ran `.\gradlew.bat :multipaper-server:test --rerun --no-daemon --console=plain` with Microsoft Java 25.0.3. The first invocation was stopped while Gradle was rebuilding `processResources`. Isolating that task showed it copying and hashing 9,932 resource files; it completed successfully in 9m23s. With that output snapshot warm, the server test task completed successfully in 2m33s. Current test XML reports 10,103 tests, 0 failures, 0 errors, and 86 skipped. The pre-existing asynchronous inventory warning from `PlayerInventoryTest.testCanHold` appeared again. The Paperclip SHA-256 remains `BEB1DC64831CBE1E33F39209E172A816F4BC9AEF57954B9A1CDB4D4030FD72A4`. This is the same suite scope as the previous full pass; it does not replace the need for two-physical-PC verification.
+
+### Inventory dirty-tracking regression — 2026-10-17
+
+Commit `ac2ab2a` changes `MultiPaperInventoryHandler.markDirty` to ignore inventory lists not owned by a `ServerPlayer`. The warning in `PlayerInventoryTest.testCanHold` came from constructing a standalone `Inventory` with a null player; those lists cannot be broadcast by MultiPaper and were being added to the synchronization queue anyway. Added `MultiPaperInventoryHandlerTest` to assert these standalone list changes remain unmarked. The focused test passed, then the full server suite passed with 10,104 tests, 0 failures, 0 errors, and 86 skipped. The suite output and XML no longer contain the asynchronous inventory modification warning. `:multipaper-server:createPaperclipJar` and `:multipaper-server:scanJarForBadCalls` both passed.
+
+The rebuilt Paperclip was started with a disposable Master and two independent backends. The updated artifact passed bidirectional block sync, cross-chunk entity spawn/teleport/removal, Nether entity creation/removal, and no-new-duplicate-UUID-warning checks. The player-free verifier run skipped inventory, container, and redstone/piston checks; earlier online-player probes remain the evidence for those gameplay features. Both backends were stopped through RCON after the probe.
