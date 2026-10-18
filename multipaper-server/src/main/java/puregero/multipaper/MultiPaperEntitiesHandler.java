@@ -279,6 +279,11 @@ public class MultiPaperEntitiesHandler {
             if (trackedEntity != null) {
                 trackedEntity.sendToTrackingPlayers(new ClientboundAnimatePacket(entity, animatePacket.getAction()));
             }
+        } else if (packet instanceof ClientboundSwingAnimationPacket swingAnimationPacket) {
+            ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
+            if (trackedEntity != null) {
+                trackedEntity.sendToTrackingPlayers(copySwingAnimationForEntity(entity.getId(), swingAnimationPacket));
+            }
         } else if (packet instanceof ClientboundDamageEventPacket damageEventPacket) {
             ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
             if (trackedEntity != null) {
@@ -299,6 +304,10 @@ public class MultiPaperEntitiesHandler {
         } else {
             LOGGER.warn("Unhandled packet " + packet);
         }
+    }
+
+    static ClientboundSwingAnimationPacket copySwingAnimationForEntity(int entityId, ClientboundSwingAnimationPacket packet) {
+        return new ClientboundSwingAnimationPacket(entityId, packet.hand(), packet.animation());
     }
 
     private static ClientboundTeleportEntityPacket teleportPacket(Entity entity) {
