@@ -42,6 +42,18 @@ public class ExternalPlayer extends ServerPlayer {
     private boolean sendPackets = true;
     public boolean updatingData = false;
 
+    static boolean shouldForwardPacketToOwningServer(Packet<?> packet) {
+        return !(packet instanceof ClientboundSetTimePacket)
+                && !(packet instanceof ClientboundPlayerAbilitiesPacket)
+                && !(packet instanceof ClientboundSetPlayerTeamPacket)
+                && !(packet instanceof ClientboundCommandsPacket)
+                && !(packet instanceof ClientboundSetScorePacket)
+                && !(packet instanceof ClientboundSetObjectivePacket)
+                && !(packet instanceof ClientboundSetDisplayObjectivePacket)
+                && !(packet instanceof ClientboundSetChunkCacheCenterPacket)
+                && !(packet instanceof ClientboundSetChunkCacheRadiusPacket);
+    }
+
     public static ExternalPlayer create(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, String advancements, String stats, int entityId) {
         loadedAdvancements.put(gameProfile.id(), advancements);
         loadedStats.put(gameProfile.id(), stats);
@@ -133,14 +145,7 @@ public class ExternalPlayer extends ServerPlayer {
 
         @Override
         public void send(Packet<?> packet, @Nullable ChannelFutureListener packetsendlistener) {
-            if (sendPackets && !(packet instanceof ClientboundPlayerAbilitiesPacket)
-                    && !(packet instanceof ClientboundSetPlayerTeamPacket)
-                    && !(packet instanceof ClientboundCommandsPacket)
-                    && !(packet instanceof ClientboundSetScorePacket)
-                    && !(packet instanceof ClientboundSetObjectivePacket)
-                    && !(packet instanceof ClientboundSetDisplayObjectivePacket)
-                    && !(packet instanceof ClientboundSetChunkCacheCenterPacket)
-                    && !(packet instanceof ClientboundSetChunkCacheRadiusPacket)) {
+            if (sendPackets && shouldForwardPacketToOwningServer(packet)) {
 //                LOGGER.info("Forwarding packet " + packet);
                 externalServerConnection.sendPacket(ExternalPlayer.this, packet);
             } else {

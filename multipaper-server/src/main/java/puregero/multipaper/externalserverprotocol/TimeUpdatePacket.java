@@ -3,7 +3,6 @@ package puregero.multipaper.externalserverprotocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
@@ -23,7 +22,7 @@ public class TimeUpdatePacket extends ExternalServerPacket {
     public TimeUpdatePacket(Level level, boolean force) {
         this.world = level.getWorld().getName();
         this.gameTime = level.getGameTime();
-        this.dayTime = level.getGameTime(); // Minecraft 26.3 stores game and day time together
+        this.dayTime = level.getDefaultClockTime();
         this.force = force;
     }
 
@@ -47,10 +46,20 @@ public class TimeUpdatePacket extends ExternalServerPacket {
         World bukkitWorld = Bukkit.getWorld(world);
         if (bukkitWorld != null) {
             ServerLevel level = ((CraftWorld) bukkitWorld).getHandle();
-            if (force || level.getGameTime() < gameTime - 20) {
+            if (shouldUpdateTime(level.getGameTime(), gameTime, force)) {
                 // We're more than a second behind, update us
                 level.serverLevelData.setGameTime(gameTime);
             }
+            level.dimensionType().defaultClock().ifPresent(clock -> {
+                long currentClockTime = level.clockManager().getInstance(clock).totalTicks();
+                if (shouldUpdateTime(currentClockTime, dayTime, force)) {
+                    level.clockManager().setTotalTicks(clock, dayTime);
+                }
+            });
         }
+    }
+
+    public static boolean shouldUpdateTime(long localTime, long receivedTime, boolean force) {
+        return force || localTime < receivedTime - 20;
     }
 }
