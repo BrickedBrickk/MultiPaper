@@ -22,6 +22,7 @@
      protected static void setChanged(final Level level, final BlockPos worldPosition, final BlockState blockState) {
 +        if (level instanceof net.minecraft.server.level.ServerLevel) {
 +            ((net.minecraft.server.level.ServerLevel) level).getChunkSource().blockChanged(worldPosition); // MultiPaper
++            puregero.multipaper.MultiPaperChunkHandler.broadcastBlockEntityChange(level, worldPosition); // MultiPaper - sync block entity data with external servers
 +        }
          level.blockEntityChanged(worldPosition);
          if (!blockState.isAir()) {

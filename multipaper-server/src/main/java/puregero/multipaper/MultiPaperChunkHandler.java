@@ -74,11 +74,21 @@ public class MultiPaperChunkHandler {
         MultiPaper.runSync(() -> {
             for (BlockEntity blockEntity : blockEntitiesToBroadcast) {
                 if (blockEntity != null && blockEntity.getLevel() != null) {
-                    onBlockUpdate(MultiPaper.getChunkHolder(blockEntity.getLevel().getWorld().getName(), blockEntity.getBlockPos()), ClientboundBlockEntityDataPacket.create(blockEntity, BlockEntity::saveWithFullMetadata, false));
+                    NewChunkHolder holder = MultiPaper.getChunkHolder(blockEntity.getLevel().getWorld().getName(), blockEntity.getBlockPos());
+                    onBlockUpdate(holder, new ClientboundBlockUpdatePacket(blockEntity.getBlockPos(), blockEntity.getBlockState()));
+                    onBlockUpdate(holder, ClientboundBlockEntityDataPacket.create(blockEntity, BlockEntity::saveWithFullMetadata, false));
                 }
             }
             blockEntitiesToBroadcast.clear();
         });
+    }
+
+    public static void broadcastBlockEntityChange(Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel serverLevel) || blockUpdateChunk != null) return;
+        BlockEntity entity = serverLevel.getBlockEntity(pos);
+        if (entity != null) {
+            broadcastBlockEntityChange(entity);
+        }
     }
 
     public static void onBlockUpdate(NewChunkHolder newChunkHolder, Packet<?> packet) {
