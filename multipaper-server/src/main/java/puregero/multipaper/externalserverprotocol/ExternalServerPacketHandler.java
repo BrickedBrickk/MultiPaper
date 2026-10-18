@@ -40,6 +40,7 @@ public class ExternalServerPacketHandler extends SimpleChannelInboundHandler<Ext
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         connection.nanoTime = 0;
+        connection.failPendingDataRequests();
         if (!disconnectedWithException && connection.externalServer != null) {
             LOGGER.info("External server " + connection.externalServer.getName() + " has disconnected");
         }

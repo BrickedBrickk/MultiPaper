@@ -16,7 +16,9 @@ public final class SharedDataPath {
     public static String fromLocalPath(String localPath) throws IOException {
         final Path path = Path.of(localPath).toAbsolutePath().normalize();
         Path worldDirectory = path.getParent();
-        while (worldDirectory != null && !Files.isRegularFile(worldDirectory.resolve("level.dat"))) {
+        while (worldDirectory != null
+            && !Files.isRegularFile(worldDirectory.resolve("level.dat"))
+            && !Files.isRegularFile(worldDirectory.resolve("session.lock"))) {
             worldDirectory = worldDirectory.getParent();
         }
         if (worldDirectory == null || worldDirectory.getFileName() == null) {

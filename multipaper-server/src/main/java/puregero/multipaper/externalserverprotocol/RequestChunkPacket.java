@@ -27,7 +27,7 @@ import java.util.concurrent.TimeoutException;
 public class RequestChunkPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(RequestChunkPacket.class.getSimpleName());
-    public static ExternalServer blocker = null;
+    public static volatile ExternalServer blocker = null;
 
     private final String world;
     private final int cx;

@@ -343,8 +343,12 @@ try {
     }
     Write-Output "PASS: entity dimension transfer replicated with UUID $($dimensionUuid1.Value)."
     Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=$dimensionTag] run kill @s" | Out-Null
-    Start-Sleep -Seconds 2
-    $dimensionRemoval = Send-Rcon $Server2RconPort $dimensionUuidCommand
+    $dimensionRemovalDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $dimensionRemoval = Send-Rcon $Server2RconPort $dimensionUuidCommand
+        if (-not [regex]::IsMatch($dimensionRemoval, '\[I;[^\]]+\]')) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $dimensionRemovalDeadline)
     if ([regex]::IsMatch($dimensionRemoval, '\[I;[^\]]+\]')) {
         throw "Entity removal in the Nether did not reach Server 2. Remaining UUID response: '$dimensionRemoval'."
     }

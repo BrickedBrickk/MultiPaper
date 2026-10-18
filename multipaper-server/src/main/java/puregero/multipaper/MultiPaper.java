@@ -352,6 +352,19 @@ public class MultiPaper {
         return getConnection().sendAndAwaitReply(new ForceReadChunkMessage(world, path, cx, cz), DataMessageReply.class).thenApply(message -> message.data);
     }
 
+    static CompletableFuture<DataInputStream> readPeerDataOrMaster(CompletableFuture<DataInputStream> peerRead, Supplier<CompletableFuture<byte[]>> masterRead) {
+        return peerRead.handle((data, error) -> {
+            if (error == null && data != null) {
+                return CompletableFuture.completedFuture(data);
+            }
+            return masterRead.get().thenApply(MultiPaper::dataInputStreamFromDeflatedBytes);
+        }).thenCompose(future -> future);
+    }
+
+    private static DataInputStream dataInputStreamFromDeflatedBytes(byte[] data) {
+        return data.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data)));
+    }
+
     public static CompletableFuture<DataInputStream> readRegionFileAsync(String world, String path, int cx, int cz) {
         if (path.equals("region")) {
             World bukkitWorld = Bukkit.getWorld(world);
@@ -362,33 +375,39 @@ public class MultiPaper {
                 }
 
                 debug("read " + world + "," + path + "," + cx + "," + cz + " -> forceRead (worldLoaded=" + (bukkitWorld != null) + ", holder=" + (MultiPaper.getChunkHolder(world, cx, cz) != null) + ")");
-                return forceReadChunk(world, path, cx, cz).thenApply(data -> data.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data))));
+                return forceReadChunk(world, path, cx, cz).thenApply(MultiPaper::dataInputStreamFromDeflatedBytes);
             }
         }
 
         debug("read " + world + "," + path + "," + cx + "," + cz + " -> master");
         return getConnection().sendAndAwaitReply(new ReadChunkMessage(world, path, cx, cz), ServerBoundMessage.class).thenCompose(message -> {
             if (message instanceof ChunkLoadedOnAnotherServerMessage chunkLoadedOnAnotherServerMessage) {
+                if (!path.equals("region") && !path.equals("entities")) {
+                    throw new IllegalArgumentException("Cannot load a " + path + " chunk from an external server");
+                }
                 debug("read " + world + "," + path + "," + cx + "," + cz + " -> peer " + chunkLoadedOnAnotherServerMessage.server);
                 ExternalServer server = getConnection().getServersMap().get(chunkLoadedOnAnotherServerMessage.server);
-                CompletableFuture<DataInputStream> future = new CompletableFuture<>();
-                if (server.getConnection() == null) {
-                    // Don't throw the exception as that will cause the chunk to get corrupted and regenerate, losing data. Instead, allow the chunk loader to naturally timeout and try again.
+                ExternalServerConnection peerConnection = server == null ? null : server.getConnection();
+                if (peerConnection == null || !peerConnection.getChannel().isActive()) {
                     LOGGER.warn("Tried to request a chunk " + world + "," + path + "," + cx + "," + cz + " from " + chunkLoadedOnAnotherServerMessage.server + ", but we are not connected to them!");
-                } else if (path.equals("region")) {
-                    server.getConnection().requestChunk(world, cx, cz, inputStream -> {
+                    return readPeerDataOrMaster(CompletableFuture.completedFuture(null), () -> forceReadChunk(world, path, cx, cz));
+                }
+
+                CompletableFuture<DataInputStream> future = new CompletableFuture<>();
+                if (path.equals("region")) {
+                    peerConnection.requestChunk(world, cx, cz, inputStream -> {
                         RequestChunkPacket.blocker = null;
                         future.complete(inputStream);
                     });
                 } else if (path.equals("entities")) {
-                    server.getConnection().requestEntities(world, cx, cz, future::complete);
+                    peerConnection.requestEntities(world, cx, cz, future::complete);
                 } else {
                     throw new IllegalArgumentException("Cannot load a " + path + " chunk from an external server");
                 }
-                return future;
+                return readPeerDataOrMaster(future, () -> forceReadChunk(world, path, cx, cz));
             } else if (message instanceof DataMessageReply dataMessageReply) {
                 debug("read " + world + "," + path + "," + cx + "," + cz + " -> master data len=" + dataMessageReply.data.length);
-                return CompletableFuture.completedFuture(dataMessageReply.data.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(dataMessageReply.data))));
+                return CompletableFuture.completedFuture(dataInputStreamFromDeflatedBytes(dataMessageReply.data));
             } else {
                 throw new IllegalArgumentException("Unexpected message reply " + message);
             }

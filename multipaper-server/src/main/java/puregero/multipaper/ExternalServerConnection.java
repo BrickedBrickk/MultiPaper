@@ -149,6 +149,26 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
         return channel;
     }
 
+    public void failPendingDataRequests() {
+        if (externalServer != null && RequestChunkPacket.blocker == externalServer) {
+            RequestChunkPacket.blocker = null;
+        }
+        failPendingDataRequests(chunkCallbacks);
+        failPendingDataRequests(entitiesCallbacks);
+    }
+
+    private static void failPendingDataRequests(ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> callbacks) {
+        callbacks.forEach((key, callback) -> {
+            if (callbacks.remove(key, callback)) {
+                try {
+                    callback.accept(null);
+                } catch (RuntimeException exception) {
+                    LOGGER.warn("Failed to complete a pending peer data request after disconnect", exception);
+                }
+            }
+        });
+    }
+
     @Override
     public void close() throws IOException {
         channel.close();
