@@ -5,7 +5,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -15,7 +14,6 @@ import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
-import puregero.multipaper.ExternalServer;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 
@@ -27,8 +25,6 @@ import java.util.concurrent.TimeoutException;
 public class RequestChunkPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(RequestChunkPacket.class.getSimpleName());
-    public static volatile ExternalServer blocker = null;
-
     private final String world;
     private final int cx;
     private final int cz;
@@ -75,7 +71,7 @@ public class RequestChunkPacket extends ExternalServerPacket {
         CompletableFuture<ChunkAccess> future = newChunkHolder.onCurrentChunkLoaded();
 
         CompletableFuture<ChunkAccess> futureToWaitOn = future;
-        if (blocker == connection.externalServer) {
+        if (connection.isWaitingForChunkData()) {
             ChunkAccess access = newChunkHolder.getCurrentChunk();
             if (access != null) {
                 futureToWaitOn = CompletableFuture.completedFuture(newChunkHolder.getCurrentChunk());

@@ -396,7 +396,6 @@ public class MultiPaper {
                 CompletableFuture<DataInputStream> future = new CompletableFuture<>();
                 if (path.equals("region")) {
                     peerConnection.requestChunk(world, cx, cz, inputStream -> {
-                        RequestChunkPacket.blocker = null;
                         future.complete(inputStream);
                     });
                 } else if (path.equals("entities")) {

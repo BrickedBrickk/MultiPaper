@@ -20,12 +20,10 @@ import puregero.multipaper.MultiPaper;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.function.Consumer;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.InflaterInputStream;
 
 public class SendChunkPacket extends ExternalServerPacket {
 
@@ -71,33 +69,31 @@ public class SendChunkPacket extends ExternalServerPacket {
     @Override
     public void handle(ExternalServerConnection connection) {
         try {
-            Consumer<DataInputStream> callback = connection.chunkCallbacks.remove(new ChunkKey(world, cx, cz));
-            if (callback != null) {
+            DataInputStream input = data.length == 0 ? null : new DataInputStream(new ByteArrayInputStream(data));
+            if (connection.completeChunkRequest(world, cx, cz, input)) {
                 if (data.length == 0) {
-                    LOGGER.warn(connection.externalServer.getName() + " sent us an empty chunk for " + world + "," + cx + "," + cz + ", force loading it from disk");
-                    MultiPaper.forceReadChunk(world, "region", cx, cz).thenAccept(data2 -> callback.accept(data2.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data2)))));
-                } else {
-                    callback.accept(new DataInputStream(new ByteArrayInputStream(data)));
+                    LOGGER.warn(connection.externalServer.getName() + " sent us an empty chunk for " + world + "," + cx + "," + cz + ", falling back to Master storage");
                 }
-            } else {
-                if (data.length == 0) {
-                    return;
-                }
+                return;
+            }
 
-                CompoundTag tag = MultiPaper.nbtFromBytes(data);
-                CraftWorld craftWorld = ((CraftWorld) Bukkit.getWorld(world));
-                ServerLevel level = craftWorld != null ? craftWorld.getHandle() : null;
-                NewChunkHolder holder = MultiPaper.getChunkHolder(world, cx, cz);
-                if (level == null) {
-                    LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " but we don't have world loaded.");
-                } else if (holder == null) {
-                    LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " but no chunk is loaded here");
-                } else if (holder.getCurrentChunk() instanceof LevelChunk) {
-                    LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " (" + tag.getString("Status") + "), but it is a level chunk (" + holder.getCurrentGenStatus() + ")");
-                } else {
-                    LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " (" + tag.getString("Status") + "), but we have a " + holder.getCurrentGenStatus() + " chunk, forcing reload from disk.");
-                    forceChunkUnsafeUnload(world, cx, cz);
-                }
+            if (data.length == 0) {
+                return;
+            }
+
+            CompoundTag tag = MultiPaper.nbtFromBytes(data);
+            CraftWorld craftWorld = ((CraftWorld) Bukkit.getWorld(world));
+            ServerLevel level = craftWorld != null ? craftWorld.getHandle() : null;
+            NewChunkHolder holder = MultiPaper.getChunkHolder(world, cx, cz);
+            if (level == null) {
+                LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " but we don't have world loaded.");
+            } else if (holder == null) {
+                LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " but no chunk is loaded here");
+            } else if (holder.getCurrentChunk() instanceof LevelChunk) {
+                LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " (" + tag.getString("Status") + "), but it is a level chunk (" + holder.getCurrentGenStatus() + ")");
+            } else {
+                LOGGER.warn("Received chunk data " + world + "," + cx + "," + cz + " (" + tag.getString("Status") + "), but we have a " + holder.getCurrentGenStatus() + " chunk, forcing reload from disk.");
+                forceChunkUnsafeUnload(world, cx, cz);
             }
         } catch (IOException e) {
             e.printStackTrace();

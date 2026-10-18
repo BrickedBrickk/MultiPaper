@@ -34,6 +34,7 @@ import java.util.function.Consumer;
 public class ExternalServerConnection extends ChannelInitializer<SocketChannel> implements Closeable {
 
     private static final Logger LOGGER = LogManager.getLogger(ExternalServerConnection.class.getSimpleName());
+    private static final long CHUNK_REQUEST_TIMEOUT_MILLIS = Long.getLong("multipaper.peer.chunkRequestTimeoutMillis", 15_000L);
 
     private Channel channel;
     public long nanoTime = 0;
@@ -43,6 +44,8 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     private static final Queue<List<ExternalPlayer>> externalPlayerListPool = new LinkedList<>();
     private final HashMap<Packet<?>, List<ExternalPlayer>> packetsToSend = new LinkedHashMap<>();
     public final ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> chunkCallbacks = new ConcurrentHashMap<>();
+    private final Set<ChunkKey> pendingChunkRequests = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<ChunkKey, Object> timedOutChunkRequests = new ConcurrentHashMap<>();
     public long lastPacketSent = 0;
     public long lastPacketReceived = 0;
     public final ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> entitiesCallbacks = new ConcurrentHashMap<>();
@@ -150,11 +153,33 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     }
 
     public void failPendingDataRequests() {
-        if (externalServer != null && RequestChunkPacket.blocker == externalServer) {
-            RequestChunkPacket.blocker = null;
-        }
+        pendingChunkRequests.clear();
+        timedOutChunkRequests.clear();
         failPendingDataRequests(chunkCallbacks);
         failPendingDataRequests(entitiesCallbacks);
+    }
+
+    public boolean isWaitingForChunkData() {
+        return !pendingChunkRequests.isEmpty();
+    }
+
+    public boolean completeChunkRequest(String world, int cx, int cz, DataInputStream data) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        Consumer<DataInputStream> callback;
+        synchronized (this) {
+            if (timedOutChunkRequests.remove(key) != null) {
+                return true;
+            }
+            callback = chunkCallbacks.remove(key);
+            if (callback != null) {
+                pendingChunkRequests.remove(key);
+            }
+        }
+        if (callback != null) {
+            callback.accept(data);
+            return true;
+        }
+        return false;
     }
 
     private static void failPendingDataRequests(ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> callbacks) {
@@ -229,15 +254,54 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     }
 
     public void requestChunk(String world, int cx, int cz, Consumer<DataInputStream> callback) {
-        if (callback != null) {
-            if (chunkCallbacks.put(new ChunkKey(world, cx, cz), callback) != null) {
-                LOGGER.warn("A chunk callback already existed for " + world + ", " + cx + ", " + cz + " (new request is to " + externalServer.getName() + ")");
-                LOGGER.warn("Stats for " + externalServer.getName() + ": last packet sent=" + (System.currentTimeMillis() - lastPacketSent) + "ms ago; last packet received=" + (System.currentTimeMillis() - lastPacketReceived) + "ms ago");
+        requestChunk(world, cx, cz, callback, CHUNK_REQUEST_TIMEOUT_MILLIS);
+    }
+
+    void requestChunk(String world, int cx, int cz, Consumer<DataInputStream> callback, long timeoutMillis) {
+        if (callback != null && !registerChunkRequest(world, cx, cz, callback, timeoutMillis)) {
+            return;
+        }
+        send(new RequestChunkPacket(world, cx, cz));
+    }
+
+    boolean registerChunkRequest(String world, int cx, int cz, Consumer<DataInputStream> callback, long timeoutMillis) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        boolean timedOut;
+        boolean duplicate;
+        synchronized (this) {
+            timedOut = timedOutChunkRequests.containsKey(key);
+            duplicate = !timedOut && chunkCallbacks.putIfAbsent(key, callback) != null;
+            if (!timedOut && !duplicate) {
+                pendingChunkRequests.add(key);
             }
         }
-
-        RequestChunkPacket.blocker = externalServer;
-        send(new RequestChunkPacket(world, cx, cz));
+        if (timedOut) {
+            callback.accept(null);
+            return false;
+        }
+        if (duplicate) {
+            LOGGER.warn("A chunk callback already existed for " + world + ", " + cx + ", " + cz + " (new request is to " + externalServer.getName() + ")");
+            LOGGER.warn("Stats for " + externalServer.getName() + ": last packet sent=" + (System.currentTimeMillis() - lastPacketSent) + "ms ago; last packet received=" + (System.currentTimeMillis() - lastPacketReceived) + "ms ago");
+            callback.accept(null);
+            return false;
+        }
+        CompletableFuture.delayedExecutor(timeoutMillis, TimeUnit.MILLISECONDS).execute(() -> {
+            Consumer<DataInputStream> timedOutCallback;
+            Object timeoutMarker = new Object();
+            synchronized (this) {
+                timedOutCallback = chunkCallbacks.remove(key);
+                if (timedOutCallback != null) {
+                    pendingChunkRequests.remove(key);
+                    timedOutChunkRequests.put(key, timeoutMarker);
+                }
+            }
+            if (timedOutCallback != null) {
+                LOGGER.warn("Timed out waiting for chunk " + world + "," + cx + "," + cz + " from " + externalServer.getName() + "; falling back to Master storage");
+                timedOutCallback.accept(null);
+                CompletableFuture.delayedExecutor(2, TimeUnit.MINUTES).execute(() -> timedOutChunkRequests.remove(key, timeoutMarker));
+            }
+        });
+        return true;
     }
 
     public void requestEntities(String world, int cx, int cz, Consumer<DataInputStream> callback) {
