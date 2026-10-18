@@ -1,11 +1,13 @@
 --- a/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
 +++ b/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
-@@ -4,13 +_,35 @@
+@@ -4,13 +_,39 @@
  import org.bukkit.Server;
  import org.bukkit.command.Command;
  import org.bukkit.command.SimpleCommandMap;
 +import puregero.multipaper.commands.MPDebugCommand;
 +import puregero.multipaper.commands.MPMapCommand;
++import puregero.multipaper.commands.EntitiesMapCommand;
++import puregero.multipaper.commands.SListCommand;
 +import puregero.multipaper.commands.ServersCommand;
  
  public class CraftCommandMap extends SimpleCommandMap {
@@ -30,6 +32,8 @@
 +        register("multipaper", new MPDebugCommand("mpdebug"));
 +        register("multipaper", new ServersCommand("servers"));
 +        register("multipaper", new MPMapCommand("mpmap"));
++        register("multipaper", new SListCommand("slist"));
++        register("multipaper", new EntitiesMapCommand("entitiesmap"));
 +    }
 +    // MultiPaper end
  

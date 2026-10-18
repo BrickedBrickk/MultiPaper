@@ -32,6 +32,7 @@ import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import puregero.multipaper.config.MultiPaperConfiguration;
+import puregero.multipaper.commands.MPDebugCommand;
 import puregero.multipaper.externalserverprotocol.*;
 import puregero.multipaper.externalserverprotocol.ExternalServerPacket;
 import puregero.multipaper.externalserverprotocol.PlayerCreatePacket;
@@ -91,6 +92,8 @@ public class MultiPaper {
     }
 
     public static void tick() {
+        MPDebugCommand.tick();
+
         for (ServerPlayer player : MinecraftServer.getServer().getPlayerList().getPlayers()) {
             if (player instanceof ExternalPlayer externalPlayer) {
                 // Copied from Paper start - Configurable container update tick rate

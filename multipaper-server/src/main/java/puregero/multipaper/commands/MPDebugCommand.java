@@ -6,14 +6,14 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
-import org.bukkit.craftbukkit.scheduler.CraftScheduler;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import puregero.multipaper.ExternalServer;
 import puregero.multipaper.MultiPaper;
@@ -21,13 +21,22 @@ import puregero.multipaper.MultiPaper;
 import java.util.HashSet;
 import java.util.Iterator;
 
-public class MPDebugCommand extends Command implements Runnable {
+public class MPDebugCommand extends Command {
+    private static final Logger LOGGER = LogManager.getLogger(MPDebugCommand.class);
+    private static MPDebugCommand instance;
     private final HashSet<Player> debugEnabled = new HashSet<>();
-    private BukkitTask task = null;
+    private int ticksUntilUpdate;
 
     public MPDebugCommand(String command) {
         super(command);
         setPermission("multipaper.command.mpdebug");
+        instance = this;
+    }
+
+    public static void tick() {
+        if (instance != null) {
+            instance.tickPlayers();
+        }
     }
 
     @Override
@@ -41,23 +50,22 @@ public class MPDebugCommand extends Command implements Runnable {
 
         if (debugEnabled.remove(player)) {
             player.sendMessage("MultiPaper debug disabled");
-            return false;
+            return true;
         }
 
         debugEnabled.add(player);
 
         sender.sendMessage("MultiPaper debug enabled");
-
-        if (task == null) {
-            run();
-        }
+        run(player);
 
         return true;
     }
 
-    @Override
-    public void run() {
-        task = null;
+    private void tickPlayers() {
+        if (--ticksUntilUpdate > 0) {
+            return;
+        }
+        ticksUntilUpdate = 5;
 
         Iterator<Player> iterator = debugEnabled.iterator();
         while (iterator.hasNext()) {
@@ -68,11 +76,13 @@ public class MPDebugCommand extends Command implements Runnable {
                 continue;
             }
 
-            run(player);
-        }
-
-        if (!debugEnabled.isEmpty()) {
-                task = Bukkit.getScheduler().runTaskLater(Bukkit.getPluginManager().getPlugins()[0], this, 5L);
+            try {
+                run(player);
+            } catch (RuntimeException exception) {
+                iterator.remove();
+                player.sendMessage(ChatColor.RED + "MultiPaper debug stopped because it could not inspect the current chunks.");
+                LOGGER.warn("Could not update MultiPaper debug overlay for {}", player.getName(), exception);
+            }
         }
     }
 
