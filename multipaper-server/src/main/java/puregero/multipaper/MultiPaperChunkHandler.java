@@ -98,7 +98,23 @@ public class MultiPaperChunkHandler {
             return;
         }
         if (blockUpdateChunk == null) { // Don't broadcast the update to other servers if we're handling an update
+            MultiPaper.debug("bcast " + packet.getClass().getSimpleName() + " " + newChunkHolder.world.getWorld().getName() + "," + newChunkHolder.chunkX + "," + newChunkHolder.chunkZ + " subs=" + newChunkHolder.externalSubscribers.size()); // MultiPaper
             MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalSubscribers, () -> new SendUpdatePacket(newChunkHolder.world.uuid, packet));
+        }
+    }
+
+    public static void broadcastChangesToOtherServers(ServerLevel level, BlockPos pos) {
+        NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(level, pos);
+        if (newChunkHolder == null || newChunkHolder.externalSubscribers.isEmpty()) {
+            return;
+        }
+
+        ChunkAccess chunk = newChunkHolder.getCurrentChunk();
+        if (chunk instanceof ImposterProtoChunk imposterProtoChunk) {
+            chunk = imposterProtoChunk.getWrapped();
+        }
+        if (chunk instanceof LevelChunk levelChunk) {
+            newChunkHolder.vanillaChunkHolder.broadcastChangesToOtherServers(levelChunk);
         }
     }
 
@@ -111,6 +127,7 @@ public class MultiPaperChunkHandler {
         CraftWorld bukkitWorld = ((CraftWorld) Bukkit.getWorld(world));
         ServerLevel level = bukkitWorld != null ? bukkitWorld.getHandle() : null;
         if (level == null) {
+            MultiPaper.debug("handleBlockUpdate dropped " + packet.getClass().getSimpleName() + ": unknown world uuid " + world); // MultiPaper
             return;
         } else if (packet instanceof ClientboundBlockUpdatePacket update) {
             holder = MultiPaper.getChunkHolder(world, update.getPos());

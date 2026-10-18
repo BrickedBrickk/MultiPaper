@@ -14,6 +14,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerCo
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerDisconnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadDataMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestEntityIdBlock;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
@@ -24,10 +25,11 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.Unsubscr
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteDataMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
-import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ChunkLoadedOnAnotherServerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.IntegerPairMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerStartedMessage;
@@ -419,5 +421,33 @@ class MasterIntegrationTest {
         }
         fail("Timed out waiting for owner update of chunk " + cx + "," + cz + " with owner '" + expectedOwner + "'");
         return null;
+    }
+
+    @Test
+    @Order(18)
+    void savedDataUsesSharedWorldRelativePathsAcrossBackends() throws Exception {
+        final Path temporaryWorld = Path.of("build", "tmp", "multipaper-shared-data-" + UUID.randomUUID());
+        final String sharedPath = temporaryWorld.resolve("world/dimensions/minecraft/overworld/data/paper/metadata.dat")
+            .toString().replace('\\', '/');
+        final byte[] firstBackendData = "metadata-from-backend-one".getBytes(StandardCharsets.UTF_8);
+        final byte[] secondBackendData = "metadata-from-backend-two".getBytes(StandardCharsets.UTF_8);
+        final TestServerClient dataPeer = TestServerClient.connect(port, "saved-data-peer");
+
+        try {
+            assertTrue(((BooleanMessageReply) serverB.request(new WriteDataMessage(sharedPath, firstBackendData))).result);
+            assertArrayEquals(firstBackendData, ((DataMessageReply) dataPeer.request(new ReadDataMessage(sharedPath))).data);
+
+            assertTrue(((BooleanMessageReply) dataPeer.request(new WriteDataMessage(sharedPath, secondBackendData))).result);
+            assertArrayEquals(secondBackendData, ((DataMessageReply) serverB.request(new ReadDataMessage(sharedPath))).data);
+        } finally {
+            dataPeer.close();
+            if (Files.exists(temporaryWorld)) {
+                try (var paths = Files.walk(temporaryWorld)) {
+                    for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                        Files.deleteIfExists(path);
+                    }
+                }
+            }
+        }
     }
 }

@@ -1,0 +1,30 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2442,11 +2442,18 @@ public class ServerGamePacketListenerImpl
+     public void ackBlockChangesUpTo(final int packetSequenceNr) {
+         if (packetSequenceNr < 0) {
+             this.disconnect(Component.literal("Expected packet sequence nr >= 0"), org.bukkit.event.player.PlayerKickEvent.Cause.ILLEGAL_ACTION); // Paper - Treat sequence violations like they should be
+             throw new IllegalArgumentException("Expected packet sequence nr >= 0");
+         }
+ 
+         this.ackBlockChangesUpTo = Math.max(packetSequenceNr, this.ackBlockChangesUpTo);
+     }
+ 
++    public void sendPendingMultiPaperBlockChangesAck() {
++        if (this.ackBlockChangesUpTo > -1) {
++            this.send(new net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket(this.ackBlockChangesUpTo));
++            this.ackBlockChangesUpTo = -1;
++        }
++    }
++
+     @Override
+     public void handleSetCarriedItem(final ServerboundSetCarriedItemPacket packet) {
+@@ -3912,1 +3919,8 @@ public class ServerGamePacketListenerImpl
++    public void markClientLoadedOnExternalServer() {
++        // External players already loaded the world on their connected backend.
++        // They do not tick this connection locally, so the normal timeout cannot expire.
++        this.waitingForRespawn = false;
++        this.clientLoadedTimeoutTimer = 0;
++    }
++
+     public void tickClientLoadTimeout() {

@@ -1,25 +1,25 @@
 package puregero.multipaper.event.player;
 
+import java.util.UUID;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NullMarked;
-
-import java.util.UUID;
 
 /**
- * Called when a player leave an external MultiPaper instance.
+ * Called when a player leaves an external MultiPaper instance.
  */
-@NullMarked
 public class PlayerLeaveExternalServerEvent extends Event {
-
-
-    private static final HandlerList handlers = new HandlerList();
+    private static final HandlerList HANDLERS = new HandlerList();
     private final UUID playerUniqueId;
     private final String playerName;
     private final String localServerName;
 
-
+    /**
+     * Creates an event for a player leaving this server for another MultiPaper server.
+     *
+     * @param playerUniqueId  the player's UUID
+     * @param playerName      the player's name
+     * @param localServerName the local server name
+     */
     public PlayerLeaveExternalServerEvent(UUID playerUniqueId, String playerName, String localServerName) {
         super(false);
         this.playerUniqueId = playerUniqueId;
@@ -28,14 +28,18 @@ public class PlayerLeaveExternalServerEvent extends Event {
     }
 
     /**
-     * Returns the name of this player
+     * Returns the name of this player.
+     *
+     * @return the player's name
      */
     public String getPlayerName() {
         return this.playerName;
     }
 
     /**
-     * Returns a unique and persistent id for this entity
+     * Returns a unique and persistent ID for this player.
+     *
+     * @return the player's UUID
      */
     public UUID getPlayerUniqueId() {
         return this.playerUniqueId;
@@ -51,12 +55,11 @@ public class PlayerLeaveExternalServerEvent extends Event {
     }
 
     @Override
-    public @NotNull HandlerList getHandlers() {
-        return handlers;
+    public HandlerList getHandlers() {
+        return HANDLERS;
     }
 
-    @NotNull
     public static HandlerList getHandlerList() {
-        return handlers;
+        return HANDLERS;
     }
 }

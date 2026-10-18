@@ -1,7 +1,6 @@
 package puregero.multipaper;
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
-import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Set;
@@ -12,10 +11,7 @@ public class MultiPaperAckBlockChangesHandler {
     public static void tick() {
         if (!ackBlockChangesQueue.isEmpty()) {
             for (ExternalPlayer player : ackBlockChangesQueue) {
-                if (player.connection.ackBlockChangesUpTo > -1) {
-                    player.connection.send(new ClientboundBlockChangedAckPacket(player.connection.ackBlockChangesUpTo));
-                    player.connection.ackBlockChangesUpTo = -1;
-                }
+                player.connection.sendPendingMultiPaperBlockChangesAck();
             }
             ackBlockChangesQueue.clear();
         }

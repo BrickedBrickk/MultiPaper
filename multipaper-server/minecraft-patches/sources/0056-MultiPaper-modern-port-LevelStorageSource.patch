@@ -17,7 +17,6 @@
 +                Files.write(dataLocation, multiPaperData);
 +            }
              fileContents = NbtIo.readCompressed(dataLocation, NbtAccounter.unlimitedHeap());
-
 @@ -276,6 +282,8 @@ public class LevelStorageSource {
      }
  

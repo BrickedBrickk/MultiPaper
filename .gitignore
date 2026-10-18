@@ -59,4 +59,11 @@ run/
 *.sh
 multipaper.jar
 
+# paperclip / server runtime extraction and local logs
+/cache/
+/libraries/
+/versions/
+*.log
+*.lnk
+
 !gradle/wrapper/gradle-wrapper.jar

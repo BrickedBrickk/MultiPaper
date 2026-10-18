@@ -13,12 +13,15 @@ public class WriteUidHandler {
     public static void handle(ServerConnection connection, WriteUidMessage message) {
         CompletableFuture.runAsync(() -> {
             try {
-                File worldDir = new File(message.world);
-                if (!worldDir.exists()) worldDir.mkdirs();
-                Files.write(new File(worldDir, "uid.dat").toPath(), message.data);
+                synchronized (ReadUidHandler.UID_LOCK) {
+                    File worldDir = new File(message.world);
+                    if (!worldDir.exists()) worldDir.mkdirs();
+                    Files.write(new File(worldDir, "uid.dat").toPath(), message.data);
+                }
                 connection.sendReply(new BooleanMessageReply(true), message);
             } catch (IOException e) {
                 e.printStackTrace();
+                connection.sendReply(new BooleanMessageReply(false), message);
             }
         });
     }

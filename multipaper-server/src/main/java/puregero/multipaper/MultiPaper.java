@@ -36,6 +36,7 @@ import puregero.multipaper.externalserverprotocol.*;
 import puregero.multipaper.externalserverprotocol.ExternalServerPacket;
 import puregero.multipaper.externalserverprotocol.PlayerCreatePacket;
 import puregero.multipaper.externalserverprotocol.PlayerRemovePacket;
+import puregero.multipaper.mastermessagingprotocol.SharedDataPath;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.*;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ChunkLoadedOnAnotherServerMessage;
@@ -66,6 +67,17 @@ public class MultiPaper {
 
     private static MultiPaperConnection multiPaperConnection = null;
     private static final Logger LOGGER = LogManager.getLogger(MultiPaper.class.getSimpleName());
+
+    // MultiPaper start - opt-in protocol tracing, enabled with -Dmultipaper.debug=true
+    public static final boolean DEBUG = Boolean.getBoolean("multipaper.debug");
+
+    public static void debug(final String message) {
+        if (DEBUG) {
+            LOGGER.info("[MP] " + message);
+        }
+    }
+    // MultiPaper end - opt-in protocol tracing
+
     public static boolean levelDatNeedsSaving = false;
     private static long last1Seconds = System.currentTimeMillis();
     private static long last10Seconds = System.currentTimeMillis();
@@ -346,17 +358,20 @@ public class MultiPaper {
                     LOGGER.warn(Thread.currentThread() + " has no chunk holder for reading chunk " + world + "," + path + "," + cx + "," + cz + ", reading it straight from disk instead");
                 }
 
+                debug("read " + world + "," + path + "," + cx + "," + cz + " -> forceRead (worldLoaded=" + (bukkitWorld != null) + ", holder=" + (MultiPaper.getChunkHolder(world, cx, cz) != null) + ")");
                 return forceReadChunk(world, path, cx, cz).thenApply(data -> data.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data))));
             }
         }
 
+        debug("read " + world + "," + path + "," + cx + "," + cz + " -> master");
         return getConnection().sendAndAwaitReply(new ReadChunkMessage(world, path, cx, cz), ServerBoundMessage.class).thenCompose(message -> {
             if (message instanceof ChunkLoadedOnAnotherServerMessage chunkLoadedOnAnotherServerMessage) {
+                debug("read " + world + "," + path + "," + cx + "," + cz + " -> peer " + chunkLoadedOnAnotherServerMessage.server);
                 ExternalServer server = getConnection().getServersMap().get(chunkLoadedOnAnotherServerMessage.server);
                 CompletableFuture<DataInputStream> future = new CompletableFuture<>();
                 if (server.getConnection() == null) {
                     // Don't throw the exception as that will cause the chunk to get corrupted and regenerate, losing data. Instead, allow the chunk loader to naturally timeout and try again.
-                    new Exception("Tried to request a chunk " + world + "," + path + "," + cx + "," + cz + " from " + chunkLoadedOnAnotherServerMessage.server + ", but we are not connected to them!").printStackTrace();
+                    LOGGER.warn("Tried to request a chunk " + world + "," + path + "," + cx + "," + cz + " from " + chunkLoadedOnAnotherServerMessage.server + ", but we are not connected to them!");
                 } else if (path.equals("region")) {
                     server.getConnection().requestChunk(world, cx, cz, inputStream -> {
                         RequestChunkPacket.blocker = null;
@@ -369,6 +384,7 @@ public class MultiPaper {
                 }
                 return future;
             } else if (message instanceof DataMessageReply dataMessageReply) {
+                debug("read " + world + "," + path + "," + cx + "," + cz + " -> master data len=" + dataMessageReply.data.length);
                 return CompletableFuture.completedFuture(dataMessageReply.data.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(dataMessageReply.data))));
             } else {
                 throw new IllegalArgumentException("Unexpected message reply " + message);
@@ -491,24 +507,51 @@ public class MultiPaper {
         return getConnection().sendAndAwaitReply(new ReadUidMessage(world), DataMessageReply.class).thenApply(message -> new DataInputStream(new ByteArrayInputStream(message.data))).join();
     }
 
+    // MultiPaper start - every backend must agree on a world's UUID, or packets that address worlds by UUID cannot be routed
+    private static final Map<String, UUID> worldUids = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static UUID getWorldUid(String world, UUID fallback) {
+        return worldUids.computeIfAbsent(world, key -> resolveWorldUid(key, fallback));
+    }
+
+    private static UUID resolveWorldUid(String world, UUID fallback) {
+        try (DataInputStream in = readUid(world)) {
+            if (in.available() >= 16) {
+                UUID uuid = new UUID(in.readLong(), in.readLong());
+                if (!uuid.equals(fallback)) {
+                    debug("world uid for '" + world + "' resolved to " + uuid + " (local was " + fallback + ")");
+                }
+                return uuid;
+            }
+        } catch (Throwable t) {
+            LOGGER.warn("Failed to read the shared uid of world '" + world + "', falling back to " + fallback, t);
+        }
+        return fallback;
+    }
+    // MultiPaper end - every backend must agree on a world's UUID
+
     public static void writeUid(String world, byte[] data) throws IOException {
         getConnection().send(new WriteUidMessage(world, data), message -> { /* do nothing */ });
     }
 
     public static byte[] readData(String path) {
-        File pathFile = new File(path);
-        String file = pathFile.getName().substring(0, pathFile.getName().length() - 4); // Remove .dat suffix
-        if (getConnection().dataCache.containsKey(file)) {
-            return getConnection().dataCache.remove(file);
+        final String sharedPath;
+        try {
+            sharedPath = SharedDataPath.fromLocalPath(path);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to map saved-data path to the shared world", e);
+        }
+        if (getConnection().dataCache.containsKey(sharedPath)) {
+            return getConnection().dataCache.remove(sharedPath);
         }
 
-        return getConnection().sendAndAwaitReply(new ReadDataMessage(path), DataMessageReply.class).thenApply(message -> message.data).join();
+        return getConnection().sendAndAwaitReply(new ReadDataMessage(sharedPath), DataMessageReply.class).thenApply(message -> message.data).join();
     }
 
     public static void writeData(String path, CompoundTag compoundTag) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         NbtIo.writeCompressed(compoundTag, buffer);
-        getConnection().send(new WriteDataMessage(path, buffer.toByteArray()), message -> { /* do nothing */ });
+        getConnection().send(new WriteDataMessage(SharedDataPath.fromLocalPath(path), buffer.toByteArray()), message -> { /* do nothing */ });
     }
 
     private static String getWorld(File path) {

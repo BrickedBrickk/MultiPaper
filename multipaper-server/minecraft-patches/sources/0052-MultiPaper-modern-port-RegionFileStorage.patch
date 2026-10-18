@@ -1,19 +1,170 @@
 --- a/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
 +++ b/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
-@@ -333,6 +333,7 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+@@ -108,91 +108,52 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+         final int chunkX, final int chunkZ, final CompoundTag compound
+     ) throws IOException {
+         if (compound == null) {
++            // MultiPaper start - persist the deletion on the master instead of a local RegionFile
++            puregero.multipaper.MultiPaper.writeRegionFileNBT(this.multiPaperWorldName(), this.multiPaperPathName(), chunkX, chunkZ, null);
+             return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData(
+                 compound, ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.DELETE,
+                 null, null
+             );
++            // MultiPaper end - persist the deletion on the master instead of a local RegionFile
+         }
+ 
+-        final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+-        final RegionFile regionFile = this.getRegionFile(pos, true);
++        // MultiPaper start - the master owns every region file, so compress and send it from here.
++        // This runs on the compression executor, so it must not touch a local RegionFile.
++        puregero.multipaper.MultiPaper.writeRegionFileNBT(this.multiPaperWorldName(), this.multiPaperPathName(), chunkX, chunkZ, compound);
+ 
+-        // note: not required to keep regionfile loaded after this call, as the write param takes a regionfile as input
+-        // (and, the regionfile parameter is unused for writing until the write call)
+-        final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData writeData = ((ca.spottedleaf.moonrise.patches.chunk_system.storage.ChunkSystemRegionFile)regionFile).moonrise$startWrite(compound, pos);
+-
+-        try { // Paper - implement RegionFileSizeException
+-        try {
+-            NbtIo.write(compound, writeData.output());
+-        } finally {
+-            writeData.output().close();
+-        }
+-        // Paper start - implement RegionFileSizeException
+-        } catch (final RegionFileSizeException ex) {
+-            // note: it's OK if close() is called, as close() here will not issue a write to the RegionFile
+-            // see startWrite
+-            final int maxSize = RegionFile.MAX_CHUNK_SIZE / (1024 * 1024);
+-            LOGGER.error("Chunk at (" + chunkX + "," + chunkZ + ") in regionfile '" + regionFile.getPath().toString() + "' exceeds max size of " + maxSize + "MiB, it has been deleted from disk.");
+-            return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData(
+-                compound, ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.DELETE,
+-                null, null
+-            );
+-        }
+-        // Paper end - implement RegionFileSizeException
+-
+-        return writeData;
++        return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData(
++            compound, ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.WRITE,
++            null, null
++        );
++        // MultiPaper end - the master owns every region file, so compress and send it from here.
+     }
+ 
+     @Override
+     public final void moonrise$finishWrite(
+         final int chunkX, final int chunkZ, final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData writeData
+     ) throws IOException {
+-        final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+-        if (writeData.result() == ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.DELETE) {
+-            final RegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ);
+-            if (regionFile != null) {
+-                regionFile.clear(pos);
+-            } // else: didn't exist
+-
+-            return;
+-        }
+-
+-        writeData.write().run(this.getRegionFile(pos, true));
++        // MultiPaper start - the write already went to the master in moonrise$startWrite
++        return;
++        // MultiPaper end - the write already went to the master in moonrise$startWrite
+     }
+ 
+     @Override
+     public final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData moonrise$readData(
+         final int chunkX, final int chunkZ
+     ) throws IOException {
+-        final RegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ);
+-
+-        final DataInputStream input = regionFile == null ? null : regionFile.getChunkDataInputStream(new ChunkPos(chunkX, chunkZ));
++        // MultiPaper start - read through the master (and, if it lives there, its peer owner)
++        final CompoundTag tag = puregero.multipaper.MultiPaper.readRegionFileNBT(this.multiPaperWorldName(), this.multiPaperPathName(), chunkX, chunkZ);
+ 
+-        if (input == null) {
++        if (tag == null) {
+             return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData(
+-                ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.NO_DATA, null, null, regionFile == null ? 0 : regionFile.getRecalculateCount() // Paper - Attempt to recalculate regionfile header if it is corrupt
++                ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.NO_DATA, null, null, 0
+             );
+         }
+ 
+-        final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData ret = new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData(
+-            ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.HAS_DATA, input, null, regionFile.getRecalculateCount() // Paper - Attempt to recalculate regionfile header if it is corrupt
+-        );
+-
+-        if (!(input instanceof ca.spottedleaf.moonrise.patches.chunk_system.util.stream.ExternalChunkStreamMarker)) {
+-            // internal stream, which is fully read
+-            return ret;
+-        }
+-
+-        final CompoundTag syncRead = this.moonrise$finishRead(chunkX, chunkZ, ret);
+-
+-        if (syncRead == null) {
+-            // need to try again
+-            return this.moonrise$readData(chunkX, chunkZ);
+-        }
+-
+         return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData(
+-            ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.SYNC_READ, null, syncRead, regionFile.getRecalculateCount() // Paper - Attempt to recalculate regionfile header if it is corrupt
++            ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.SYNC_READ, null, tag, 0
+         );
++        // MultiPaper end - read through the master (and, if it lives there, its peer owner)
+     }
+ 
+     // if the return value is null, then the caller needs to re-try with a new call to readData()
+@@ -200,6 +161,11 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+     public final CompoundTag moonrise$finishRead(
+         final int chunkX, final int chunkZ, final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData readData
+     ) throws IOException {
++        // MultiPaper start - moonrise$readData never produces a stream to decode
++        if (readData.result() != ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData.ReadResult.HAS_DATA) {
++            return readData.syncRead();
++        }
++        // MultiPaper end - moonrise$readData never produces a stream to decode
+         try {
+             // Paper start - Attempt to recalculate regionfile header if it is corrupt
+             final CompoundTag ret = NbtIo.read(readData.input());
+@@ -332,7 +298,34 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+     }
      // Paper end
  
++    // MultiPaper start - shared world storage on the master
++    // The Master stores chunks under the same names the backends' Bukkit worlds use, so that
++    // ReadChunkHandler's world-directory mapping (world, world_nether -> DIM-1, world_the_end -> DIM1)
++    // resolves without any 26.3 dimension-path knowledge on the Master's side.
++    private String multiPaperWorldName() {
++        final net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension = this.info.dimension();
++        final String levelId = this.info.level();
++
++        if (dimension == net.minecraft.world.level.Level.OVERWORLD) {
++            return levelId;
++        }
++        if (dimension == net.minecraft.world.level.Level.NETHER) {
++            return levelId + "_nether";
++        }
++        if (dimension == net.minecraft.world.level.Level.END) {
++            return levelId + "_the_end";
++        }
++
++        return levelId + "_" + dimension.identifier().getNamespace() + "_" + dimension.identifier().getPath();
++    }
++
++    private String multiPaperPathName() {
++        return this.folder.getFileName().toString();
++    }
++    // MultiPaper end - shared world storage on the master
++
      public @Nullable CompoundTag read(final ChunkPos pos) throws IOException {
-+        if (true) return puregero.multipaper.MultiPaper.readRegionFileNBT(this.folder.toFile(), pos); // MultiPaper
++        if (true) return puregero.multipaper.MultiPaper.readRegionFileNBT(this.multiPaperWorldName(), this.multiPaperPathName(), pos.x(), pos.z()); // MultiPaper
          RegionFile region = this.getRegionFile(pos, false);
          if (region == null) {
              return null;
-@@ -379,6 +380,10 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+@@ -379,6 +372,10 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
      }
  
      public void write(final ChunkPos pos, final @Nullable CompoundTag value) throws IOException {
 +        if (true) { // MultiPaper - always route writes through MultiPaper
-+            puregero.multipaper.MultiPaper.writeRegionFileNBT(this.folder.toFile(), pos, value);
++            puregero.multipaper.MultiPaper.writeRegionFileNBT(this.multiPaperWorldName(), this.multiPaperPathName(), pos.x(), pos.z(), value);
 +            return;
 +        }
          // Paper start - rewrite chunk system

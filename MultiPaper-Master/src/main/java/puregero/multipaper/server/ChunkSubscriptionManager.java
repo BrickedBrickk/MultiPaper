@@ -12,6 +12,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkSubscriptionManager {
 
+    // MultiPaper start - opt-in protocol tracing, enabled with -Dmultipaper.debug=true
+    private static final boolean DEBUG = Boolean.getBoolean("multipaper.debug");
+
+    public static void debug(String message) {
+        if (DEBUG) {
+            System.out.println("[MP] " + message);
+        }
+    }
+    // MultiPaper end - opt-in protocol tracing
+
     private static final Queue<List<ServerConnection>> objectPool = new LinkedList<>();
 
     // Index 0 in the list is the current chunk owning it
@@ -78,6 +88,8 @@ public class ChunkSubscriptionManager {
                 }
 
                 lockedChunks.computeIfAbsent(serverConnection, k -> ConcurrentHashMap.newKeySet()).add(key);
+
+                debug("lock " + world + "," + cx + "," + cz + " by " + serverConnection.getBungeeCordName() + " force=" + force + " -> owner=" + serverConnections.get(0).getBungeeCordName());
 
                 if (serverConnections.size() == 1 || force) {
                     if (chunkSubscribers.get(key) != null) {
@@ -162,6 +174,7 @@ public class ChunkSubscriptionManager {
                 updateSubscriberAdd(serverConnections, serverConnection, world, cx, cz);
                 serverConnections.add(serverConnection);
                 subscribedChunks.computeIfAbsent(serverConnection, k -> ConcurrentHashMap.newKeySet()).add(key);
+                debug("subscribe " + world + "," + cx + "," + cz + " by " + serverConnection.getBungeeCordName());
             }
 
             if (chunkLocks.get(key) != null && !chunkLocks.get(key).isEmpty()) {
@@ -200,6 +213,7 @@ public class ChunkSubscriptionManager {
         String subscriber = serverConnection.getBungeeCordName();
         for (ServerConnection connection : serverConnections) {
             if (connection != serverConnection) {
+                debug("addSub " + world + "," + cx + "," + cz + " telling " + connection.getBungeeCordName() + " that " + subscriber + " subscribes");
                 connection.send(new AddChunkSubscriberMessage(world, cx, cz, subscriber));
             }
         }

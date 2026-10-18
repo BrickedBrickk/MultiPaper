@@ -1,24 +1,26 @@
 package puregero.multipaper.event.player;
 
+import java.util.UUID;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NullMarked;
-
-import java.util.UUID;
 
 /**
  * Called when a player joins an external MultiPaper instance.
  */
-@NullMarked
 public class PlayerJoinExternalServerEvent extends Event {
 
-    private static final HandlerList handlers = new HandlerList();
+    private static final HandlerList HANDLERS = new HandlerList();
     private final UUID playerUniqueId;
     private final String playerName;
     private final String localServerName;
 
-
+    /**
+     * Creates an event for a player joining this server from another MultiPaper server.
+     *
+     * @param playerUniqueId   the player's UUID
+     * @param playerName       the player's name
+     * @param localeServerName the local server name
+     */
     public PlayerJoinExternalServerEvent(UUID playerUniqueId, String playerName, String localeServerName) {
         super(false);
         this.playerUniqueId = playerUniqueId;
@@ -27,14 +29,18 @@ public class PlayerJoinExternalServerEvent extends Event {
     }
 
     /**
-     * Returns the name of this player
+     * Returns the name of this player.
+     *
+     * @return the player's name
      */
     public String getPlayerName() {
         return this.playerName;
     }
 
     /**
-     * Returns a unique and persistent id for this entity
+     * Returns a unique and persistent ID for this player.
+     *
+     * @return the player's UUID
      */
     public UUID getPlayerUniqueId() {
         return this.playerUniqueId;
@@ -50,12 +56,11 @@ public class PlayerJoinExternalServerEvent extends Event {
     }
 
     @Override
-    public @NotNull HandlerList getHandlers() {
-        return handlers;
+    public HandlerList getHandlers() {
+        return HANDLERS;
     }
 
-    @NotNull
     public static HandlerList getHandlerList() {
-        return handlers;
+        return HANDLERS;
     }
 }

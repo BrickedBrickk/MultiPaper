@@ -1,13 +1,10 @@
 --- a/net/minecraft/world/level/border/WorldBorder.java
 +++ b/net/minecraft/world/level/border/WorldBorder.java
-@@ -41,6 +41,7 @@ public class WorldBorder extends SavedData {
- 
-     public WorldBorder() {
-         this(WorldBorder.Settings.DEFAULT);
+@@ -46,3 +46,4 @@ public class WorldBorder extends SavedData {
+     public WorldBorder(final WorldBorder.Settings settings) {
+         this.settings = settings;
 +        listeners.add(new puregero.multipaper.MultiPaperWorldBorderHandler()); // MultiPaper - Add our own world border listener
      }
- 
-     public WorldBorder(final WorldBorder.Settings settings) {
 @@ -357,6 +358,7 @@ public class WorldBorder extends SavedData {
  
      // Paper start - add back applySettings

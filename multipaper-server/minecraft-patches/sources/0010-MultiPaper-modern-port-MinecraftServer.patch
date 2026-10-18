@@ -8,6 +8,15 @@
  
  public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> implements CommandSource, ServerInfo, ChunkIOErrorReporter, ca.spottedleaf.moonrise.patches.chunk_system.server.ChunkSystemMinecraftServer { // Paper - rewrite chunk system
      private static MinecraftServer SERVER; // Paper
+@@ -683,7 +684,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             levelStem.type().value(),
+             levelStem.generator(),
+             this.registryAccess(),
+-            loading.data().uuid()
++            MultiPaper.getWorldUid(loading.data().bukkitName(), loading.data().uuid()) // MultiPaper - share the world's uuid between all backends
+         );
+         if (biomeProvider == null && chunkGenerator != null) {
+             biomeProvider = chunkGenerator.getDefaultBiomeProvider(worldInfo);
 @@ -1025,6 +1026,22 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
          }
          // CraftBukkit end

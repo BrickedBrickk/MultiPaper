@@ -5,6 +5,8 @@ param(
     [int]$TestY = 102,
     [int]$TestZ = 71,
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
+    [string]$Server1RconPassword,
+    [string]$Server2RconPassword,
     [string]$PlayerName,
     [switch]$SkipContainerCheck,
     [switch]$SkipRedstoneAndPistonCheck,
@@ -19,8 +21,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if ([string]::IsNullOrWhiteSpace($RconPassword)) {
-    throw 'Pass -RconPassword or set MULTIPAPER_RCON_PASSWORD.'
+if ([string]::IsNullOrWhiteSpace($Server1RconPassword)) { $Server1RconPassword = $RconPassword }
+if ([string]::IsNullOrWhiteSpace($Server2RconPassword)) { $Server2RconPassword = $RconPassword }
+if ([string]::IsNullOrWhiteSpace($Server1RconPassword) -or [string]::IsNullOrWhiteSpace($Server2RconPassword)) {
+    throw 'Pass -RconPassword (or both per-server passwords) or set MULTIPAPER_RCON_PASSWORD.'
 }
 
 if ([string]::IsNullOrWhiteSpace($Server1LogPath) -ne [string]::IsNullOrWhiteSpace($Server2LogPath)) {
@@ -80,6 +84,7 @@ function Read-RconPacket([System.IO.Stream]$Stream) {
 }
 
 function Send-Rcon([int]$Port, [string]$Command) {
+    $password = if ($Port -eq $Server1RconPort) { $Server1RconPassword } else { $Server2RconPassword }
     $client = [System.Net.Sockets.TcpClient]::new()
     $client.ReceiveTimeout = $TimeoutSeconds * 1000
     $client.SendTimeout = $TimeoutSeconds * 1000
@@ -89,7 +94,7 @@ function Send-Rcon([int]$Port, [string]$Command) {
         $authId = Get-Random -Minimum 10000 -Maximum 2000000000
         $commandId = $authId + 1
         foreach ($packet in @(
-            @{ Id = $authId; Type = 3; Text = $RconPassword },
+            @{ Id = $authId; Type = 3; Text = $password },
             @{ Id = $commandId; Type = 2; Text = $Command }
         )) {
             $payload = [Text.Encoding]::UTF8.GetBytes([string]$packet.Text)

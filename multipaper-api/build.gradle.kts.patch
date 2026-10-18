@@ -1,11 +1,23 @@
 --- a/purpur-api/build.gradle.kts
 +++ b/purpur-api/build.gradle.kts
+@@ -20,9 +_,11 @@
+ paperCheckstyle {
+     customJavadocTags = projectCustomJavadocTags
+     directoriesToSkipFile = layout.projectDirectory.file("../paper-api/.checkstyle/ignored_directories.txt")
++    typeUseAnnotationsFile = layout.projectDirectory.file("../.checkstyle/type_use_annotations.txt")
+ }
+ 
+ tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
++    baseConfigFile.set(layout.projectDirectory.file("../.checkstyle/checkstyle_base.xml"))
+     overrideConfigFile.set(layout.projectDirectory.file("../paper-api/.checkstyle/checkstyle.xml"))
+ }
+ 
 @@ -107,7 +_,7 @@
      testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
  
      // checkstyle
 -    checkstyle(project(":purpur-checkstyle"))
-+    // checkstyle(project(":purpur-checkstyle")) // MultiPaper - unused
++    checkstyle(project(":paper-checkstyle"))
  }
  
  val generatedDir: java.nio.file.Path = rootProject.layout.projectDirectory.dir("paper-api/src/generated/java").asFile.toPath() // Purpur
@@ -31,3 +43,15 @@
          }
      }
  }
+@@ -204,6 +_,11 @@
+             "Automatic-Module-Name" to "org.bukkit"
+         )
+     }
++}
++
++// MultiPaper - both source roots provide org/bukkit/package-info.java; the copies are identical
++tasks.named<Jar>("sourcesJar") {
++    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+ }
+ 
+ abstract class Services {

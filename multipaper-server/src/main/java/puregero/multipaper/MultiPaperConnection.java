@@ -37,6 +37,7 @@ import puregero.multipaper.mastermessagingprotocol.MessageBootstrap;
 import puregero.multipaper.mastermessagingprotocol.datastream.InboundDataStream;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.*;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.*;
+import puregero.multipaper.mastermessagingprotocol.SharedDataPath;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -257,6 +258,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         ExternalServer server = message.owner.isEmpty() ? null : getOrCreateServer(message.owner);
 
         NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
+        MultiPaper.debug("setOwner " + message.world + "," + message.cx + "," + message.cz + " owner='" + message.owner + "' holder=" + (newChunkHolder != null)); // MultiPaper
         if (newChunkHolder != null) {
             if (newChunkHolder.externalOwner != null && newChunkHolder.externalOwner.isMe() && server != null && !server.isMe()) {
                 if (newChunkHolder.getCurrentChunk() instanceof LevelChunk levelChunk) {
@@ -296,6 +298,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
         MultiPaper.runSync(() -> {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
+            MultiPaper.debug("addSubscriber " + message.world + "," + message.cx + "," + message.cz + " += " + message.server + " holder=" + (newChunkHolder != null)); // MultiPaper
             if (newChunkHolder != null) {
                 newChunkHolder.externalSubscribers.add(server);
             } else {
@@ -328,6 +331,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
         MultiPaper.runSync(() -> {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
+            MultiPaper.debug("syncSubs " + message.world + "," + message.cx + "," + message.cz + " owner='" + message.owner + "' subs=[" + String.join(",", message.subscribers) + "] holder=" + (newChunkHolder != null)); // MultiPaper
             if (newChunkHolder != null) {
                 newChunkHolder.externalOwner = ownerServer;
                 newChunkHolder.externalSubscribers.clear();
@@ -355,24 +359,29 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
     @Override
     public void handle(DataUpdateMessage message) {
-        String pathStr = message.path;
-        File path = new File(pathStr);
-        String file = path.getName().substring(0, path.getName().length() - 4); // Remove .dat suffix
-        while (!path.getParentFile().equals(new File(".")) && !path.getParentFile().equals(path)) {
-            path = path.getParentFile();
+        final String pathStr;
+        final String file;
+        final String worldName;
+        try {
+            pathStr = SharedDataPath.normalizeSharedPath(message.path);
+            final java.nio.file.Path path = SharedDataPath.resolveSharedPath(pathStr);
+            file = path.getFileName().toString().substring(0, path.getFileName().toString().length() - 4); // Remove .dat suffix
+            worldName = path.getName(0).toString();
+        } catch (IOException e) {
+            LOGGER.warn("Received invalid shared saved-data path '{}'", message.path, e);
+            return;
         }
 
         // Clear the data from the world's data cache
-        final File finalPath = path;
         MultiPaper.runSync(() -> {
-            World world = Bukkit.getWorld(finalPath.getName());
+            World world = Bukkit.getWorld(worldName);
             if (world == null) {
-                LOGGER.warn("Unknown world '" + finalPath.getName() + "' in path " + pathStr + " for clearData");
+                LOGGER.warn("Unknown world '" + worldName + "' in path " + pathStr + " for clearData");
                 return;
             }
 
-            if (((CraftWorld) world).getHandle().getDataStorage().cache.remove(file) != null || dataCache.containsKey(file)) {
-                dataCache.put(file, message.data);
+            if (((CraftWorld) world).getHandle().getDataStorage().cache.remove(file) != null || dataCache.containsKey(pathStr)) {
+                dataCache.put(pathStr, message.data);
             }
         });
     }

@@ -1,0 +1,29 @@
+--- a/src/main/java/io/papermc/paper/world/migration/WorldFolderMigration.java
++++ b/src/main/java/io/papermc/paper/world/migration/WorldFolderMigration.java
+@@ -3,6 +3,7 @@
+ import com.mojang.logging.LogUtils;
+ import io.papermc.paper.world.saveddata.PaperLevelOverrides;
+ import io.papermc.paper.world.saveddata.PaperWorldMetadata;
++import puregero.multipaper.MultiPaper;
+ import java.io.IOException;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+@@ -117,7 +118,15 @@
+     static boolean hasCurrentPaperData(final LevelStorageSource.LevelStorageAccess rootAccess, final ResourceKey<Level> dimensionKey) {
+         final Path targetDataRoot = rootAccess.getDimensionPath(dimensionKey).resolve(LevelResource.DATA.id());
+-        return Files.isRegularFile(WorldMigrationSupport.savedDataPath(targetDataRoot, PaperWorldMetadata.TYPE))
+-            && Files.isRegularFile(WorldMigrationSupport.savedDataPath(targetDataRoot, PaperLevelOverrides.TYPE))
+-            && Files.isRegularFile(WorldMigrationSupport.savedDataPath(targetDataRoot, WorldGenSettings.TYPE));
++        return hasPaperData(WorldMigrationSupport.savedDataPath(targetDataRoot, PaperWorldMetadata.TYPE))
++            && hasPaperData(WorldMigrationSupport.savedDataPath(targetDataRoot, PaperLevelOverrides.TYPE))
++            && hasPaperData(WorldMigrationSupport.savedDataPath(targetDataRoot, WorldGenSettings.TYPE));
++    }
++
++    private static boolean hasPaperData(final Path file) {
++        if (Files.isRegularFile(file)) {
++            return true;
++        }
++        // Backends keep a local level.dat, but saved world data is owned by the Master.
++        return MultiPaper.readData(file.toString()).length > 0;
+     }
+ }

@@ -37,9 +37,11 @@ public class ReadChunkHandler {
             ServerConnection alreadyLoadedChunk = ChunkSubscriptionManager.getOwnerOrSubscriber(world, cx, cz);
             ChunkSubscriptionManager.subscribe(connection, world, cx, cz);
             if (alreadyLoadedChunk != null && alreadyLoadedChunk != connection) {
+                ChunkSubscriptionManager.debug("read " + world + "," + path + "," + cx + "," + cz + " by " + connection.getBungeeCordName() + " -> peer " + alreadyLoadedChunk.getBungeeCordName()); // MultiPaper
                 connection.sendReply(new ChunkLoadedOnAnotherServerMessage(alreadyLoadedChunk.getBungeeCordName()), message);
                 return true;
             }
+            ChunkSubscriptionManager.debug("read " + world + "," + path + "," + cx + "," + cz + " by " + connection.getBungeeCordName() + " -> disk"); // MultiPaper
         }
 
         if (path.equals("entities")) {
