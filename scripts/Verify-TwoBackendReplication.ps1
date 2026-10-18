@@ -125,6 +125,12 @@ function Assert-Contains([string]$Actual, [string]$Expected, [string]$Message) {
     }
 }
 
+function Assert-NotContains([string]$Actual, [string]$Unexpected, [string]$Message) {
+    if ($Actual.IndexOf($Unexpected, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        throw "$Message Did not expect '$Unexpected', got '$Actual'."
+    }
+}
+
 $tag = 'multipaper_regression_' + [Guid]::NewGuid().ToString('N')
 $x = $TestX
 $y = $TestY
@@ -185,6 +191,11 @@ try {
     $circuitX = $x + 2
     $circuitY = $y + 1
     $circuitZ = $z + 1
+    $stickyPistonX = $x + 1
+    $stickyPowerX = $x
+    $stickyPayloadX = $x + 2
+    $stickyDestinationX = $x + 3
+    $stickyCircuitZ = $z + 4
     $pistonX = $circuitX + 1
     $movedBlockX = $circuitX + 2
     $destinationX = $circuitX + 3
@@ -233,6 +244,52 @@ try {
         Assert-Contains $retractedBlock1 'Index (' 'Server 1 did not keep the moved stone at its destination after piston retraction.'
         Assert-Contains $retractedBlock2 'Index (' 'Server 2 did not observe the moved stone at its destination after piston retraction.'
         Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
+
+        foreach ($stickyClearX in $stickyPowerX..$stickyDestinationX) {
+            Send-Rcon $Server1RconPort "setblock $stickyClearX $circuitY $stickyCircuitZ minecraft:air" | Out-Null
+        }
+        $stickyExtendedCommand = "execute if block $stickyPistonX $circuitY $stickyCircuitZ minecraft:sticky_piston[facing=east,extended=true] run help"
+        $stickyRetractedCommand = "execute if block $stickyPistonX $circuitY $stickyCircuitZ minecraft:sticky_piston[facing=east,extended=false] run help"
+        $stickyDestinationCommand = "execute if block $stickyDestinationX $circuitY $stickyCircuitZ minecraft:redstone_block run help"
+        $stickyPayloadCommand = "execute if block $stickyPayloadX $circuitY $stickyCircuitZ minecraft:redstone_block run help"
+        $stickyItemCommand = "execute positioned $stickyPayloadX $circuitY $stickyCircuitZ if entity @e[type=minecraft:item,distance=..6] run help"
+        Send-Rcon $Server1RconPort "setblock $stickyPayloadX $circuitY $stickyCircuitZ minecraft:redstone_block" | Out-Null
+        Send-Rcon $Server1RconPort "setblock $stickyPistonX $circuitY $stickyCircuitZ minecraft:sticky_piston[facing=east]" | Out-Null
+        Send-Rcon $Server1RconPort "setblock $stickyPowerX $circuitY $stickyCircuitZ minecraft:redstone_block" | Out-Null
+
+        $stickyExtendDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $stickyExtended1 = Send-Rcon $Server1RconPort $stickyExtendedCommand
+            $stickyExtended2 = Send-Rcon $Server2RconPort $stickyExtendedCommand
+            $stickyDestination1 = Send-Rcon $Server1RconPort $stickyDestinationCommand
+            $stickyDestination2 = Send-Rcon $Server2RconPort $stickyDestinationCommand
+            if ($stickyExtended1 -match 'Index \(\d+/\d+\)' -and $stickyExtended2 -match 'Index \(\d+/\d+\)' -and
+                $stickyDestination1 -match 'Index \(\d+/\d+\)' -and $stickyDestination2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $stickyExtendDeadline)
+        Assert-Contains $stickyExtended1 'Index (' 'Server 1 sticky piston did not extend after receiving redstone power.'
+        Assert-Contains $stickyExtended2 'Index (' 'Server 2 did not observe the sticky piston extension.'
+        Assert-Contains $stickyDestination1 'Index (' 'Server 1 sticky piston did not push the redstone block.'
+        Assert-Contains $stickyDestination2 'Index (' 'Server 2 did not observe the pushed redstone block.'
+
+        Send-Rcon $Server1RconPort "setblock $stickyPowerX $circuitY $stickyCircuitZ minecraft:air" | Out-Null
+        $stickyRetractDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $stickyRetracted1 = Send-Rcon $Server1RconPort $stickyRetractedCommand
+            $stickyRetracted2 = Send-Rcon $Server2RconPort $stickyRetractedCommand
+            $stickyPayload1 = Send-Rcon $Server1RconPort $stickyPayloadCommand
+            $stickyPayload2 = Send-Rcon $Server2RconPort $stickyPayloadCommand
+            if ($stickyRetracted1 -match 'Index \(\d+/\d+\)' -and $stickyRetracted2 -match 'Index \(\d+/\d+\)' -and
+                $stickyPayload1 -match 'Index \(\d+/\d+\)' -and $stickyPayload2 -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $stickyRetractDeadline)
+        Assert-Contains $stickyRetracted1 'Index (' 'Server 1 sticky piston did not retract after power was removed.'
+        Assert-Contains $stickyRetracted2 'Index (' 'Server 2 did not observe the sticky piston retraction.'
+        Assert-Contains $stickyPayload1 'Index (' 'Server 1 sticky piston did not pull the redstone block back.'
+        Assert-Contains $stickyPayload2 'Index (' 'Server 2 did not observe the pulled redstone block.'
+        Assert-NotContains (Send-Rcon $Server1RconPort $stickyItemCommand) 'Index (' 'Server 1 dropped the pulled redstone block as an item.'
+        Assert-NotContains (Send-Rcon $Server2RconPort $stickyItemCommand) 'Index (' 'Server 2 dropped the pulled redstone block as an item.'
+        Write-Output 'PASS: sticky piston pulls a redstone block back and both backends retain it without dropping an item.'
     }
 
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
@@ -409,6 +466,8 @@ try {
     }
     try { Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
+    try { Send-Rcon $Server2RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "forceload remove $x $z" | Out-Null } catch { }
