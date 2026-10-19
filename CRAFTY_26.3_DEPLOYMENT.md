@@ -965,3 +965,7 @@ The sticky-piston duplicate retract fallback now delegates its removal decision 
 ### Full server and Master test rerun — 2026-10-19 17:42 EDT
 
 After adding the piston guard test, `:multipaper-server:test :multipaper-master:test --rerun-tasks --no-daemon --console=plain` completed successfully on Java 25 in 22m04s. The XML reports contain 125 suites and 10,162 tests: 0 failures, 0 errors, 89 skipped. The output included existing simulated peer timeout/entity callback warnings from tests, but the test task and every suite completed successfully. The Paperclip artifact hash remained `5B723C7FC44AEA9A45CC04DBC0FC0CCDE51F271E74BA6A04784B1320FDA57A70`; no production server was restarted or changed.
+
+### Physical-PC access check after test build — 2026-10-19 17:45 EDT
+
+Strict-host-key SSH connection attempts to `crafty1@100.78.108.117` and `crafty2@100.107.178.51` each timed out on TCP port 22 after eight seconds. No remote host key was bypassed, and neither PC was accessed or changed. The current `5B723C7...` Paperclip remains local and is not installed on either physical PC. Production health figures above are the last successful read-only verification at 17:10 EDT, not a fresh live check. The Crafty-managed entries remain separate stopped entries pending an accessible host and Java 25 available to Crafty.
