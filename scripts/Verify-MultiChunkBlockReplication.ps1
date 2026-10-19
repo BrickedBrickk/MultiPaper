@@ -25,7 +25,7 @@ $random = [Random]::new()
 $cases = @(
     [pscustomobject]@{ Name='Overworld, Backend 1 owner'; Dimension='minecraft:overworld'; SourcePort=$Server1RconPort; ChunkX=$random.Next(80, 900); ChunkZ=-$random.Next(80, 900); Y=300; Block='minecraft:emerald_block' },
     [pscustomobject]@{ Name='Overworld, Backend 2 owner'; Dimension='minecraft:overworld'; SourcePort=$Server2RconPort; ChunkX=-$random.Next(80, 900); ChunkZ=$random.Next(80, 900); Y=300; Block='minecraft:diamond_block' },
-    [pscustomobject]@{ Name='Nether, Backend 2 owner'; Dimension='minecraft:the_nether'; SourcePort=$Server2RconPort; ChunkX=$random.Next(80, 900); ChunkZ=-$random.Next(80, 900); Y=200; Block='minecraft:emerald_block' }
+    [pscustomobject]@{ Name='Nether, Backend 2 owner'; Dimension='minecraft:the_nether'; SourcePort=$Server2RconPort; ChunkX=$random.Next(80, 900); ChunkZ=-$random.Next(80, 900); Y=100; Block='minecraft:emerald_block' }
 )
 
 try {
@@ -89,7 +89,40 @@ try {
         Assert-Present $observerBlock "$($case.Name) replicated marker on peer backend"
         Write-Output "PASS: $($case.Name) block update replicated from its owner to the peer backend."
 
+        # Exercise the reverse path and then a fresh owner edit. Applying a peer
+        # update on the owner must enqueue its dirty ChunkHolder; otherwise
+        # hasChangedSections stays set and this following owner edit is dropped.
+        $peerX = $x + 1
+        $ownerFollowupX = $x + 2
+        $ownerPeerBlockCommand = "execute in $($case.Dimension) if block $peerX $($case.Y) $z minecraft:redstone_block run help"
+        $ownerFollowupCommand = "execute in $($case.Dimension) if block $ownerFollowupX $($case.Y) $z minecraft:gold_block run help"
+        $observerFollowupCommand = "execute in $($case.Dimension) if block $ownerFollowupX $($case.Y) $z minecraft:gold_block run help"
+
+        Send-Rcon $observerPort "execute in $($case.Dimension) run setblock $peerX $($case.Y) $z minecraft:redstone_block" | Out-Null
+        $peerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $sourcePeerBlock = Send-Rcon $case.SourcePort $ownerPeerBlockCommand
+            if ($sourcePeerBlock -match 'Index \(') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $peerDeadline)
+        Assert-Present $sourcePeerBlock "$($case.Name) peer-originated update on owner"
+        Write-Output "PASS: $($case.Name) peer-originated block update reached the owner."
+
+        Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $ownerFollowupX $($case.Y) $z minecraft:gold_block" | Out-Null
+        $followupDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $ownerFollowup = Send-Rcon $case.SourcePort $ownerFollowupCommand
+            $observerFollowup = Send-Rcon $observerPort $observerFollowupCommand
+            if ($ownerFollowup -match 'Index \(' -and $observerFollowup -match 'Index \(') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $followupDeadline)
+        Assert-Present $ownerFollowup "$($case.Name) owner follow-up marker"
+        Assert-Present $observerFollowup "$($case.Name) owner follow-up after peer-originated update"
+        Write-Output "PASS: $($case.Name) owner changes still replicated after applying a peer update."
+
         Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $x $($case.Y) $z minecraft:air" | Out-Null
+        Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $peerX $($case.Y) $z minecraft:air" | Out-Null
+        Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $ownerFollowupX $($case.Y) $z minecraft:air" | Out-Null
         Send-Rcon $case.SourcePort $forceloadRemove | Out-Null
         Send-Rcon $observerPort $forceloadRemove | Out-Null
     }
@@ -97,9 +130,13 @@ try {
     foreach ($case in $cases) {
         $x = $case.ChunkX * 16 + 5
         $z = $case.ChunkZ * 16 + 8
+        $peerX = $x + 1
+        $ownerFollowupX = $x + 2
         $observerPort = if ($case.SourcePort -eq $Server1RconPort) { $Server2RconPort } else { $Server1RconPort }
         $forceloadRemove = "execute in $($case.Dimension) run forceload remove $x $z"
         try { Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $x $($case.Y) $z minecraft:air" | Out-Null } catch { }
+        try { Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $peerX $($case.Y) $z minecraft:air" | Out-Null } catch { }
+        try { Send-Rcon $case.SourcePort "execute in $($case.Dimension) run setblock $ownerFollowupX $($case.Y) $z minecraft:air" | Out-Null } catch { }
         try { Send-Rcon $case.SourcePort $forceloadRemove | Out-Null } catch { }
         try { Send-Rcon $observerPort $forceloadRemove | Out-Null } catch { }
     }

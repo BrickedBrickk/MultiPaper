@@ -193,14 +193,14 @@ public class MultiPaperChunkHandler {
                 BlockEntity existingBlockEntity = blockUpdateChunk.getBlockEntity(update.getPos());
                 if (existingBlockEntity != null && existingBlockEntity.minecraftKey.toString().equals(update.getTag().getString("id"))) {
                     existingBlockEntity.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess(), update.getTag()));
-                    holder.vanillaChunkHolder.blockChanged(update.getPos());
+                    markBlockChanged(holder, level, update.getPos());
                 } else if (!blockUpdateChunk.getBlockState(update.getPos()).hasBlockEntity() && depth < 1) {
                     CompletableFuture.delayedExecutor(50, java.util.concurrent.TimeUnit.MILLISECONDS).execute(() -> handleBlockUpdate(world, packet, depth + 1));
                 } else {
                     blockUpdateChunk.removeBlockEntity(update.getPos());
                     blockUpdateChunk.setBlockEntityNbt(update.getTag());
                     blockUpdateChunk.getBlockEntity(update.getPos());
-                    holder.vanillaChunkHolder.blockChanged(update.getPos());
+                    markBlockChanged(holder, level, update.getPos());
                 }
             }
         } else if (blockUpdateChunk != null) {
@@ -241,10 +241,18 @@ public class MultiPaperChunkHandler {
 
     private static void setBlock(LevelChunk chunk, BlockPos pos, BlockState blockState) {
         BlockState oldState = chunk.setBlockState(pos, blockState, net.minecraft.world.level.block.Block.UPDATE_NONE);
-        holder.vanillaChunkHolder.blockChanged(pos);
+        markBlockChanged(holder, (ServerLevel) chunk.getLevel(), pos);
 
         if (oldState != null && blockState != oldState) {
             ((ServerLevel) chunk.getLevel()).getChunkSource().getLightEngine().checkBlock(pos);
+        }
+    }
+
+    private static void markBlockChanged(NewChunkHolder chunkHolder, ServerLevel level, BlockPos pos) {
+        if (chunkHolder.vanillaChunkHolder.blockChanged(pos)) {
+            // Changes applied from another backend bypass ServerChunkCache.blockChanged,
+            // so explicitly queue the holder for vanilla's changed-chunk broadcast.
+            level.getChunkSource().onChunkReadyToSend(chunkHolder.vanillaChunkHolder);
         }
     }
 
