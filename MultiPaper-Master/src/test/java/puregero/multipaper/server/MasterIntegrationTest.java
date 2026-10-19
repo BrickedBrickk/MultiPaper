@@ -450,4 +450,20 @@ class MasterIntegrationTest {
             }
         }
     }
+
+    @Test
+    @Order(19)
+    void abruptBackendSocketResetDoesNotBreakPeerConnections() throws Exception {
+        TestServerClient resetPeer = TestServerClient.connect(port, "reset-peer");
+        ServerConnection disconnected = ServerConnection.getConnection(resetPeer.name);
+        resetPeer.abort();
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && ServerConnection.getConnections().contains(disconnected)) {
+            Thread.sleep(10);
+        }
+
+        assertFalse(ServerConnection.getConnections().contains(disconnected), "Reset connection must be removed from the live server list");
+        assertTrue(((BooleanMessageReply) serverB.request(new PingMessage())).result, "The remaining backend must still receive Master replies");
+    }
 }

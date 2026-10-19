@@ -9,6 +9,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.Shutdown
 import puregero.multipaper.server.handlers.*;
 
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -144,6 +145,16 @@ public class ServerConnection extends MasterBoundMessageHandler {
         }
 
         System.out.println(ctx.channel().remoteAddress() + " (" + name + ") closed");
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        if (cause instanceof SocketException) {
+            ctx.close();
+            return;
+        }
+
+        ctx.fireExceptionCaught(cause);
     }
 
     public String getBungeeCordName() {

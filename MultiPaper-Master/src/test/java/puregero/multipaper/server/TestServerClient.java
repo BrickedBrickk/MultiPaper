@@ -2,6 +2,7 @@ package puregero.multipaper.server;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelOption;
 import puregero.multipaper.mastermessagingprotocol.MessageBootstrap;
 import puregero.multipaper.mastermessagingprotocol.messages.Message;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundMessage;
@@ -102,6 +103,11 @@ public class TestServerClient extends ServerBoundMessageHandler {
     }
 
     public void close() throws InterruptedException {
+        channel.close().sync();
+    }
+
+    public void abort() throws InterruptedException {
+        channel.config().setOption(ChannelOption.SO_LINGER, 0);
         channel.close().sync();
     }
 
