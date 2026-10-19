@@ -35,7 +35,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(PistonMoveBlockEndPacket.class.getSimpleName());
 
-    public static void finishBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean retract, BlockState blockState, boolean isExternal) {
+    public static void finishBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending, BlockState blockState, boolean isExternal) {
         LevelChunk chunk = level.getChunkIfLoaded(to);
 
         if (!MultiPaper.isChunkExternal(chunk)) {
@@ -46,7 +46,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
                 MultiPaperChunkHandler.blockUpdateChunk = chunk; // Don't call onRemove on the piston head
                 level.setBlock(to, movingPiston, 68);
                 MultiPaperChunkHandler.blockUpdateChunk = null;
-                level.setBlockEntity(MovingPistonBlock.newMovingBlockEntity(to, movingPiston, blockState, pistonDir, retract, false));
+                level.setBlockEntity(MovingPistonBlock.newMovingBlockEntity(to, movingPiston, blockState, pistonDir, extending, false));
             } else {
                 LootParams.Builder lootparams_a = (new LootParams.Builder(level)).withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(to)).withParameter(LootContextParams.TOOL, new ItemStack(Items.NETHERITE_PICKAXE)).withOptionalParameter(LootContextParams.BLOCK_ENTITY, null);
                 blockState.getDrops(lootparams_a).forEach(item -> {
@@ -65,22 +65,22 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         // Ensure any changes have already been sent over before the server executes the piston move
         broadcastBlockUpdate(level, to);
 
-        MultiPaper.getChunkHolder(chunk).externalOwner.getConnection().send(new PistonMoveBlockEndPacket(level, from, to, pistonDir, retract, blockState));
+        MultiPaper.getChunkHolder(chunk).externalOwner.getConnection().send(new PistonMoveBlockEndPacket(level, from, to, pistonDir, extending, blockState));
     }
 
     private final UUID worldUUID;
     private final BlockPos from;
     private final BlockPos to;
     private final Direction pistonDir;
-    private final boolean retract;
+    private final boolean extending;
     private final BlockState blockState;
 
-    public PistonMoveBlockEndPacket(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean retract, BlockState blockState) {
+    public PistonMoveBlockEndPacket(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending, BlockState blockState) {
         this.worldUUID = level.getWorld().getUID();
         this.from = from;
         this.to = to;
         this.pistonDir = pistonDir;
-        this.retract = retract;
+        this.extending = extending;
         this.blockState = blockState;
     }
 
@@ -89,7 +89,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         this.from = in.readBlockPos();
         this.to = in.readBlockPos();
         this.pistonDir = in.readEnum(Direction.class);
-        this.retract = in.readBoolean();
+        this.extending = in.readBoolean();
         this.blockState = Block.stateById(in.readVarInt());
     }
 
@@ -99,7 +99,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
         out.writeBlockPos(this.from);
         out.writeBlockPos(this.to);
         out.writeEnum(this.pistonDir);
-        out.writeBoolean(this.retract);
+        out.writeBoolean(this.extending);
         out.writeVarInt(Block.getId(this.blockState));
     }
 
@@ -113,7 +113,7 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
                 return;
             }
 
-            finishBlockMove(craftWorld.getHandle(), from, to, pistonDir, retract, blockState, true);
+            finishBlockMove(craftWorld.getHandle(), from, to, pistonDir, extending, blockState, true);
         });
     }
 

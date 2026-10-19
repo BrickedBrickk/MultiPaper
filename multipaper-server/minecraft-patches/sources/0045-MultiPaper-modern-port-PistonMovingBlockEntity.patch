@@ -13,6 +13,7 @@
  import net.minecraft.world.phys.shapes.Shapes;
  import net.minecraft.world.phys.shapes.VoxelShape;
 +import puregero.multipaper.MultiPaper;
++import puregero.multipaper.MultiPaperChunkHandler;
  
  public class PistonMovingBlockEntity extends BlockEntity {
      private static final int TICKS_TO_EXTEND = 2;
@@ -36,3 +37,11 @@
              this.progress = 1.0F;
              this.progressO = this.progress;
              this.level.removeBlockEntity(this.worldPosition);
+@@ -313,4 +319,6 @@
+                         level.setBlock(pos, newState, Block.UPDATE_ALL | Block.UPDATE_MOVE_BY_PISTON);
+                         level.neighborChanged(pos, newState.getBlock(), ExperimentalRedstoneUtils.initialOrientation(level, entity.getPushDirection(), null));
+                     }
++                    if (level instanceof ServerLevel serverLevel && MultiPaper.isChunkLocal(serverLevel, pos)) {
++                        MultiPaperChunkHandler.broadcastChangesToOtherServers(serverLevel, pos);
++                    }
+                 }

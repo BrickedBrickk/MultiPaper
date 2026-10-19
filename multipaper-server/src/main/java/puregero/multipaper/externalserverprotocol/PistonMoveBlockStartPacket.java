@@ -23,11 +23,11 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(PistonMoveBlockStartPacket.class.getSimpleName());
 
-    public static void startBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean retract) {
-        startBlockMove(level, from, to, pistonDir, retract, false);
+    public static void startBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending) {
+        startBlockMove(level, from, to, pistonDir, extending, false);
     }
 
-    public static void startBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean retract, boolean isExternal) {
+    public static void startBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending, boolean isExternal) {
         LevelChunk fromChunk = level.getChunkIfLoaded(from);
         LevelChunk toChunk = level.getChunkIfLoaded(to);
 
@@ -35,14 +35,14 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
             // Place a moving piston head in our chunk so that it can start ticking and maintain proper timing
             BlockState movingPiston = Blocks.MOVING_PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, pistonDir);
             level.setBlock(to, movingPiston, 68);
-            level.setBlockEntity(MovingPistonBlock.newMovingBlockEntity(to, movingPiston, Blocks.AIR.defaultBlockState(), pistonDir, retract, false));
+            level.setBlockEntity(MovingPistonBlock.newMovingBlockEntity(to, movingPiston, Blocks.AIR.defaultBlockState(), pistonDir, extending, false));
             level.getChunkSource().blockChanged(to);
         }
 
         if (!MultiPaper.isChunkExternal(fromChunk)) {
             BlockState blockState = level.getBlockState(from);
-            if (PistonBaseBlock.isPushable(blockState, level, from, retract ? pistonDir : pistonDir.getOpposite(), true, pistonDir)) {
-                PistonMoveBlockEndPacket.finishBlockMove(level, from, to, pistonDir, retract, blockState, isExternal);
+            if (PistonBaseBlock.isPushable(blockState, level, from, extending ? pistonDir : pistonDir.getOpposite(), true, pistonDir)) {
+                PistonMoveBlockEndPacket.finishBlockMove(level, from, to, pistonDir, extending, blockState, isExternal);
                 level.setBlock(from, Blocks.AIR.defaultBlockState(), 2 | 4 | 16 | 1024);
                 level.getChunkSource().blockChanged(from);
             }
@@ -56,21 +56,21 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
         broadcastBlockUpdate(level, from);
         broadcastBlockUpdate(level, to);
 
-        MultiPaper.getChunkHolder(fromChunk).externalOwner.getConnection().send(new PistonMoveBlockStartPacket(level, from, to, pistonDir, retract));
+        MultiPaper.getChunkHolder(fromChunk).externalOwner.getConnection().send(new PistonMoveBlockStartPacket(level, from, to, pistonDir, extending));
     }
 
     private final UUID worldUUID;
     private final BlockPos from;
     private final BlockPos to;
     private final Direction pistonDir;
-    private final boolean retract;
+    private final boolean extending;
 
-    public PistonMoveBlockStartPacket(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean retract) {
+    public PistonMoveBlockStartPacket(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending) {
         this.worldUUID = level.getWorld().getUID();
         this.from = from;
         this.to = to;
         this.pistonDir = pistonDir;
-        this.retract = retract;
+        this.extending = extending;
     }
 
     public PistonMoveBlockStartPacket(FriendlyByteBuf in) {
@@ -78,7 +78,7 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
         this.from = in.readBlockPos();
         this.to = in.readBlockPos();
         this.pistonDir = in.readEnum(Direction.class);
-        this.retract = in.readBoolean();
+        this.extending = in.readBoolean();
     }
 
     @Override
@@ -87,7 +87,7 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
         out.writeBlockPos(this.from);
         out.writeBlockPos(this.to);
         out.writeEnum(this.pistonDir);
-        out.writeBoolean(this.retract);
+        out.writeBoolean(this.extending);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class PistonMoveBlockStartPacket extends ExternalServerPacket {
                 return;
             }
 
-            startBlockMove(craftWorld.getHandle(), from, to, pistonDir, retract, true);
+            startBlockMove(craftWorld.getHandle(), from, to, pistonDir, extending, true);
         });
     }
 
