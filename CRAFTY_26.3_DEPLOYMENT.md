@@ -498,6 +498,10 @@ Over ten ICMP probes from PC1 to PC2, all 10 replied with 0% loss; average RTT w
 
 Three one-second `jstat -gc` samples were stable for both live Java 25 processes. Backend 1 used about 461 MiB of a 1 GiB currently committed heap (`-Xms1G -Xmx4G`); the Master used about 136 MiB of 514 MiB committed (`-Xms512M -Xmx1G`). Backend 1 had 19 young collections totaling 0.384 seconds, no full GCs, and 12 concurrent cycles totaling 0.042 seconds; the Master had one young collection totaling 0.005 seconds and no full GCs. This is idle-state occupancy and does not establish the peak heap required during gameplay or terrain generation. No JVM settings or server processes were changed for this read-only attach.
 
+### Live backend heartbeat after heap sampling — 2026-10-19 03:29 EDT
+
+After the read-only heap attach, Backend 1 RCON `/slist` and `/servers` still listed both `crafty1-backend1` and `crafty2-backend2`; `/servers` reported 20.0 TPS and zero players for each. Backend 1 returned 20.0 TPS in its 5-second through 15-minute windows; one-minute MSPT averaged 0.8 ms with a 7.2 ms maximum. This confirms the Master still has a registered Backend 2 reporting healthy tick status, but does not independently verify PC2's process, filesystem, resource use, or synchronized blocks/entities. No production changes were made.
+
 ### Paced single-backend chunk-generation sample — 2026-10-19 03:22–03:24 EDT
 
 A fresh, isolated world ran on PC1 under `/home/crafty1/multipaper-test/paced-chunk-20261019-0322` using the `405B8A...` Paperclip. One backend force-loaded 20 new Overworld chunks at three-second intervals, spaced two chunks apart, with no players. Five-second TPS stayed at 20.0; the one-minute sample dipped to 19.7 during generation and returned to 20.0 after it. At the first four-chunk sample, five-second MSPT averaged 1.5 ms (14.8 ms maximum), while 10-second MSPT reached a 1,149.1 ms maximum. Later samples during the sequence had 5-second maxima of 4.2–6.2 ms. The one-minute rolling maximum fell to 150.9 ms after generation and then to 6.4 ms after the earlier spike aged out.
