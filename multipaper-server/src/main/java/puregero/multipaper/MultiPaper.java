@@ -163,7 +163,8 @@ public class MultiPaper {
     }
 
     public static void sendTickTime(long time, double tps) {
-        getConnection().send(new WriteTickTimeMessage(time, (float) tps));
+        // Tick-time samples are transient; never stall the server tick while the Master reconnects.
+        getConnection().trySendIfActive(new WriteTickTimeMessage(time, (float) tps));
     }
 
     public static CompletableFuture<Boolean> sendPlayerConnect(ServerPlayer player) {

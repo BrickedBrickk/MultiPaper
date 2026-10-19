@@ -61,8 +61,8 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
     private final String myName;
     private final MessageBootstrap<ServerBoundMessage, MasterBoundMessage> bootstrap;
-    private SocketChannel channel;
-    private boolean channelActive = false;
+    private volatile SocketChannel channel;
+    private volatile boolean channelActive = false;
     private long lastPingReceived;
     private final Set<MasterBoundMessage> unhandledRequests = ConcurrentHashMap.newKeySet();
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
@@ -165,6 +165,19 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
                 e.printStackTrace();
             }
         }
+    }
+
+    public boolean trySendIfActive(MasterBoundMessage message) {
+        return trySendIfActive(channel, channelActive, message);
+    }
+
+    static boolean trySendIfActive(Channel channel, boolean channelActive, MasterBoundMessage message) {
+        if (channel == null || !channelActive || !channel.isActive()) {
+            return false;
+        }
+
+        channel.writeAndFlush(message);
+        return true;
     }
 
     public void ping() {
