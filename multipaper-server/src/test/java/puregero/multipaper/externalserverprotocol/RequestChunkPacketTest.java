@@ -12,7 +12,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -59,5 +68,25 @@ class RequestChunkPacketTest {
 
             serialization.verify(() -> SerializableChunkData.copyOf(level, chunk));
         }
+    }
+
+    @Test
+    void incompleteLightingTimesOutWithoutMutatingSharedFuture() throws InterruptedException {
+        CompletableFuture<Void> lightFuture = new CompletableFuture<>();
+        CountDownLatch failed = new CountDownLatch(1);
+        AtomicInteger readyCount = new AtomicInteger();
+        AtomicInteger failureCount = new AtomicInteger();
+
+        RequestChunkPacket.awaitLighting(lightFuture, 25, readyCount::incrementAndGet, throwable -> {
+            if (throwable instanceof TimeoutException || throwable.getCause() instanceof TimeoutException) {
+                failureCount.incrementAndGet();
+            }
+            failed.countDown();
+        });
+
+        assertTrue(failed.await(2, TimeUnit.SECONDS));
+        assertFalse(lightFuture.isDone(), "Waiting for one peer request must not time out the shared lighting future");
+        assertEquals(0, readyCount.get());
+        assertEquals(1, failureCount.get());
     }
 }

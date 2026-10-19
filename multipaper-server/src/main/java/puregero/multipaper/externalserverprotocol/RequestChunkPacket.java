@@ -21,6 +21,7 @@ import java.util.ConcurrentModificationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 public class RequestChunkPacket extends ExternalServerPacket {
 
@@ -97,7 +98,15 @@ public class RequestChunkPacket extends ExternalServerPacket {
             CompletableFuture<Void> lightFuture = ((ca.spottedleaf.moonrise.patches.starlight.light.StarLightLightingProvider) level.getLightEngine()).starlight$getLightEngine().getChunkFuture(newChunkHolder.vanillaChunkHolder.getPos());
 
             if (!lightFuture.isDone()) {
-                lightFuture.thenRunAsync(() -> handle(connection));
+                awaitLighting(lightFuture, 15_000, () -> CompletableFuture.runAsync(() -> handle(connection)), throwable -> {
+                    Throwable cause = throwable.getCause() == null ? throwable : throwable.getCause();
+                    if (cause instanceof TimeoutException) {
+                        LOGGER.warn("Timed out waiting for lighting while sending chunk " + world + "," + cx + "," + cz);
+                    } else {
+                        LOGGER.warn("Error while waiting for lighting while sending chunk " + world + "," + cx + "," + cz, cause);
+                    }
+                    connection.send(new SendChunkPacket(world, cx, cz, null));
+                });
                 return;
             }
 
@@ -143,6 +152,16 @@ public class RequestChunkPacket extends ExternalServerPacket {
 
     static ChunkAccess chunkForSerialization(ChunkAccess chunk) {
         return chunk instanceof ImposterProtoChunk imposterProtoChunk ? imposterProtoChunk.getWrapped() : chunk;
+    }
+
+    static void awaitLighting(CompletableFuture<Void> lightFuture, long timeoutMillis, Runnable onReady, Consumer<Throwable> onFailure) {
+        lightFuture.copy().orTimeout(timeoutMillis, TimeUnit.MILLISECONDS).whenComplete((ignored, throwable) -> {
+            if (throwable == null) {
+                onReady.run();
+            } else {
+                onFailure.accept(throwable);
+            }
+        });
     }
 
     static CompoundTag serializeChunk(ServerLevel level, ChunkAccess chunk) {
