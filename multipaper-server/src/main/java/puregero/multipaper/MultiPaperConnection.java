@@ -66,6 +66,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     private long lastPingReceived;
     private final Set<MasterBoundMessage> unhandledRequests = ConcurrentHashMap.newKeySet();
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
+    private final ServerStartMessageTracker serverStartMessageTracker = new ServerStartMessageTracker();
     public String secret;
     public Map<String, byte[]> dataCache = Maps.newHashMap();
     public int port = -1;
@@ -134,14 +135,25 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         }
 
         channelActive = true;
+        serverStartMessageTracker.onConnect(channel::write);
         channel.flush();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         channelActive = false;
+        serverStartMessageTracker.onDisconnect();
         LOGGER.info("Lost connection to " + ((SocketChannel) ctx.channel()).remoteAddress());
         connect();
+    }
+
+    public void setStartMessage(StartMessage message) {
+        serverStartMessageTracker.set(message, startMessage -> {
+            SocketChannel currentChannel = channel;
+            if (currentChannel != null && currentChannel.isActive() && channelActive) {
+                currentChannel.writeAndFlush(startMessage);
+            }
+        });
     }
 
     private void waitForActiveChannel() {

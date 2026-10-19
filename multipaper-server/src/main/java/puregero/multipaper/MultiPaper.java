@@ -179,7 +179,7 @@ public class MultiPaper {
     }
 
     public static void onStart(SocketAddress bindAddress) {
-        getConnection().send(new StartMessage(
+        getConnection().setStartMessage(new StartMessage(
                 System.getProperty("server.address", ((InetSocketAddress) bindAddress).getAddress().getHostAddress()),
                 ((InetSocketAddress) bindAddress).getPort()
         ));
