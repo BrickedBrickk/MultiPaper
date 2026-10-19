@@ -1,0 +1,6 @@
+=== Backend 2 jstat -gc ===
+    S0C         S1C         S0U         S1U          EC           EU           OC           OU          MC         MU       CCSC      CCSU     YGC     YGCT     FGC    FGCT     CGC    CGCT       GCT   
+        0.0     61440.0         0.0     60416.0     567296.0     548864.0     419840.0     224835.2   153664.0   152361.0   29056.0   28535.1     12     0.267     0     0.000     8     0.014     0.281
+=== Backend 2 jstat -gcutil ===
+  S0     S1     E      O      M     CCS    YGC     YGCT     FGC    FGCT     CGC    CGCT       GCT   
+     -  98.33  96.75  53.55  99.15  98.21     12     0.267     0     0.000     8     0.014     0.281

@@ -40,3 +40,21 @@ The exact deployed backend JAR was run on both physical PCs in the disposable `c
 At the post-generation sample, both reported 20 TPS over 5 seconds and 1 minute. One-minute MSPT averages were 2.1 ms on PC1 and 2.2 ms on PC2, with 451.2 and 458.4 ms sampled maxima during this world-generation/unload window. Host `vmstat` sampled 150 seconds beginning just before the generation commands: average idle was 87.95% / 87.07%, average I/O wait 0.33% / 0.28%, and maximum I/O wait 7% / 4% for PC1 / PC2. Diskstats deltas over the benchmark and cleanup window were about 25.8 MiB written on PC1 and 10.8 MiB on PC2. Fresh region files were persisted at 4 MiB and 3.8 MiB. See [`target-pc-fresh-chunk-generation.csv`](target-pc-fresh-chunk-generation.csv) and the [raw PC1](target-pc-chunkgen-pc1-vmstat.txt) / [raw PC2](target-pc-chunkgen-pc2-vmstat.txt) `vmstat` captures.
 
 This is a 128-chunk, no-player synthetic generation and replication measurement, not normal exploration or a survival benchmark. During simultaneous force-load removal, logs reported late chunk/entity subscriber notifications for already-unloaded holders, plus a Master read timeout for an entity chunk that Backend 2 retried at 20-second intervals. Both servers saved their block/entity chunks and completed RegionFile I/O, but I did not verify that the timed-out read returned successfully before stopping Backend 2. These warnings remain a lifecycle issue to investigate; this was not a clean warning-free run. The benchmark removed its own 64-chunk tickets on both backends and confirmed that only nine pre-existing disposable-world tickets remained.
+
+## Exact production artifact, two-worker AI-mob repeat — 2026-10-19
+
+The exact deployed Paperclip (`1C8B6FB1E374A2C41FFA9308DF185799644EA0201F73D2245F28275C082EB853`) and Master were run as a disposable physical pair in `fresh-player-smoke-20261019`. The disposable copy of `paper-global.yml` on each backend was changed from `worker-threads: -1` to `2` for this run. Its original files were retained as backups and restored after shutdown. Sixteen persistent AI-enabled zombies were held in a stone-roofed enclosure on each backend; natural mob spawning was disabled. No players were connected.
+
+Nine validated RCON/process samples covered 111.9 seconds. Each sample saw 20 TPS and 16 zombies on each backend through both views, with zero players. CPU and RSS are per-process readings; CPU is expressed as a percentage of one logical core.
+
+| Process | 1-minute MSPT average across samples | Highest sampled 1-minute max | CPU, one core | Average RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Backend 1, PC1 | 1.20 ms | 24.8 ms | 10.82% | 1.472 GiB |
+| Backend 2, PC2 | 1.01 ms | 24.7 ms | 10.31% | 1.440 GiB |
+| Master, PC1 | — | — | 0.75% | 0.125 GiB |
+
+After excluding `vmstat`'s initial since-boot row, the 104 one-second intervals averaged 93.58% idle / 0.30% I/O wait on PC1 and 92.11% idle / 0.14% I/O wait on PC2; maximum I/O wait was 6% / 3%. Average `vmstat` read/write rates were 0.81/58.31 blocks per second on PC1 and 1.46/37.23 on PC2. `diskstats` deltas over the run and cleanup were 0.15 MiB read and 7.87 MiB written on PC1, and 0.15 MiB read and 5.70 MiB written on PC2. The devices report `ROTA=1`; these counters do not give device latency.
+
+One post-run `jstat` snapshot showed 0.408 GiB used of 1 GiB committed heap on Backend 1 and 0.795 GiB of 1 GiB on Backend 2. The snapshots are not peak heap measurements. The raw capture is [`target-pc-16-ai-zombies-worker2-1c8b.csv`](target-pc-16-ai-zombies-worker2-1c8b.csv); host counters and JVM snapshots are in the [`PC1 vmstat`](target-pc-16-ai-zombies-worker2-pc1-vmstat.txt), [`PC2 vmstat`](target-pc-16-ai-zombies-worker2-pc2-vmstat.txt), [`PC1 jstat`](target-pc-16-ai-zombies-worker2-pc1-jstat.txt), [`PC2 jstat`](target-pc-16-ai-zombies-worker2-pc2-jstat.txt), and before/after `diskstats` files in this directory.
+
+This is a short, no-player AI-mob CPU diagnostic. It does not measure sustained survival play, chunk generation, redstone, or player-driven disk/network load.
