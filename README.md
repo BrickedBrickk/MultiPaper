@@ -5,13 +5,18 @@
 **MultiPaper is in public beta.** Most features work for most players most of
 the time, however things can occasionally break.
 
-1.20.1 [Purpur](https://github.com/PurpurMC/Purpur) fork that enables a server admin
-to scale a single world across multiple servers. Multiple MultiPaper servers run
-the same world and use a MultiPaper-Master to coordinate with each other and
-store server data. While the MultiPaper-Master is usually run as a standalone
-server, it can also be run as a BungeeCord or Velocity plugin, which has some benefits
-including being able to send players to the least busy server when they
-join.
+This `feature/port-26.3` branch is an in-progress Paper-based port for Minecraft
+26.3. It enables an administrator to scale one world across multiple backend
+servers. The backends use a MultiPaper Master to coordinate ownership and shared
+world data. The built-in Master can also proxy players to the least-busy backend.
+
+Build this branch with Java 25 and the included Gradle wrapper. On Windows,
+run `.\gradlew.bat :multipaper-server:createPaperclipJar :multipaper-master:build`
+from the repository root. The Paperclip JAR for both backends is written to
+`multipaper-server\build\libs`; the Master JAR is written to
+`multipaper-master\build\libs`. Use the same Paperclip build on both backends.
+Run `.\gradlew.bat :multipaper-server:test :multipaper-master:test` to run the
+server and Master test suites.
 
 MultiPaper 2.0:
 
