@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.event.player.PlayerKickEvent;
+import puregero.multipaper.ExternalPlayer;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.config.MultiPaperConfiguration;
@@ -42,7 +43,13 @@ public class PlayerRemovePacket extends ExternalServerPacket {
             ServerPlayer player = MinecraftServer.getServer().getPlayerList().getPlayer(uuid);
 
             if (player == null) {
-                LOGGER.warn("Tried to remove a non-existent player with uuid " + uuid);
+                LOGGER.debug("Ignoring a late player removal for uuid {}", uuid);
+                return;
+            }
+
+            if (!shouldRemovePlayer(player, connection)) {
+                String sourceServer = connection.externalServer == null ? "an unknown server" : connection.externalServer.getName();
+                LOGGER.debug("Ignoring a stale player removal for uuid {} from {}", uuid, sourceServer);
                 return;
             }
 
@@ -50,5 +57,9 @@ public class PlayerRemovePacket extends ExternalServerPacket {
             PlayerLeaveExternalServerEvent playerLeaveExternalServerEvent = new PlayerLeaveExternalServerEvent(player.getGameProfile().id(), player.getGameProfile().name(), MultiPaperConfiguration.get().masterConnection.myName);
             Bukkit.getPluginManager().callEvent(playerLeaveExternalServerEvent);
         });
+    }
+
+    static boolean shouldRemovePlayer(ServerPlayer player, ExternalServerConnection source) {
+        return player instanceof ExternalPlayer externalPlayer && externalPlayer.externalServerConnection == source;
     }
 }

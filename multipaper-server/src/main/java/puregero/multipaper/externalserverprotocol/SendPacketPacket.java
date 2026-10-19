@@ -69,7 +69,7 @@ public class SendPacketPacket extends ExternalServerPacket {
             ServerPlayer player = MinecraftServer.getServer().getPlayerList().getPlayer(uuid);
 
             if (player == null) {
-                LOGGER.warn("Tried to send a packet to a non-existent player uuid " + uuid);
+                LOGGER.debug("Dropping stale packet {} for disconnected player uuid {}", packet.getClass().getSimpleName(), uuid);
                 continue;
             }
 
