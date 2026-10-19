@@ -1,0 +1,2 @@
+{"label": "before", "utc": "2026-10-19T21:05:08Z", "pid": 75664, "cpu_ticks": 8629, "rss_kib": 279548}
+{"label": "after", "utc": "2026-10-19T21:05:28Z", "pid": 75664, "cpu_ticks": 8640, "rss_kib": 279548}
