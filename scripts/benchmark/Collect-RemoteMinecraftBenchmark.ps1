@@ -16,6 +16,8 @@ param(
     [string] $Tag1 = 'bench_a',
     [string] $Tag2 = 'bench_b',
     [ValidateRange(1, 10000)] [int] $ExpectedZombieCount = 16,
+    [int] $ExpectedZombieCount1 = -1,
+    [int] $ExpectedZombieCount2 = -1,
     [ValidateRange(1, 1000)] [int] $SampleCount = 9,
     [ValidateRange(1, 3600)] [int] $IntervalSeconds = 10,
     [switch] $AllowPlayers,
@@ -31,6 +33,10 @@ if ([string]::IsNullOrWhiteSpace($RconPassword1) -or [string]::IsNullOrWhiteSpac
 foreach ($tag in @($Tag1, $Tag2)) {
     if ($tag -notmatch '^[A-Za-z0-9_]{1,32}$') { throw "Invalid zombie tag '$tag'." }
 }
+if ($ExpectedZombieCount1 -lt 0) { $ExpectedZombieCount1 = $ExpectedZombieCount }
+if ($ExpectedZombieCount2 -lt 0) { $ExpectedZombieCount2 = $ExpectedZombieCount }
+if ($ExpectedZombieCount1 -lt 1 -or $ExpectedZombieCount1 -gt 10000) { throw 'ExpectedZombieCount1 must be between 1 and 10000.' }
+if ($ExpectedZombieCount2 -lt 1 -or $ExpectedZombieCount2 -gt 10000) { throw 'ExpectedZombieCount2 must be between 1 and 10000.' }
 $RconScript = Join-Path $PSScriptRoot '..\Send-RconCommand.ps1'
 if (-not (Test-Path -LiteralPath $RconScript -PathType Leaf)) { throw "RCON helper not found: $RconScript" }
 
@@ -112,8 +118,9 @@ for ($sample = 1; $sample -le $SampleCount; $sample++) {
     $zombies1b = Get-ZombieCount $RconHost1 $RconPort1 $RconPassword1 $Tag2 'bench_b'
     $zombies2a = Get-ZombieCount $RconHost2 $RconPort2 $RconPassword2 $Tag1 'bench_a'
     $zombies2b = Get-ZombieCount $RconHost2 $RconPort2 $RconPassword2 $Tag2 'bench_b'
-    foreach ($count in @($zombies1a, $zombies1b, $zombies2a, $zombies2b)) {
-        if ($count -ne $ExpectedZombieCount) { throw "Expected $ExpectedZombieCount tagged zombies in every backend view; observed counts $zombies1a/$zombies1b and $zombies2a/$zombies2b." }
+    if ($zombies1a -ne $ExpectedZombieCount1 -or $zombies2a -ne $ExpectedZombieCount1 -or
+        $zombies1b -ne $ExpectedZombieCount2 -or $zombies2b -ne $ExpectedZombieCount2) {
+        throw "Expected tag counts $ExpectedZombieCount1/$ExpectedZombieCount2 in both backend views; observed counts $zombies1a/$zombies1b and $zombies2a/$zombies2b."
     }
 
     $now = [DateTime]::UtcNow
