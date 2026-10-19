@@ -35,6 +35,10 @@ public class PistonMoveBlockEndPacket extends ExternalServerPacket {
 
     private static final Logger LOGGER = LogManager.getLogger(PistonMoveBlockEndPacket.class.getSimpleName());
 
+    public static boolean shouldRemoveRetractionHead(BlockState headState) {
+        return headState.is(Blocks.PISTON_HEAD);
+    }
+
     public static void finishBlockMove(ServerLevel level, BlockPos from, BlockPos to, Direction pistonDir, boolean extending, BlockState blockState, boolean isExternal) {
         LevelChunk chunk = level.getChunkIfLoaded(to);
 

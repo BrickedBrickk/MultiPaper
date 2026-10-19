@@ -1,8 +1,9 @@
 --- a/net/minecraft/world/level/block/piston/PistonBaseBlock.java
 +++ b/net/minecraft/world/level/block/piston/PistonBaseBlock.java
-@@ -9,4 +9,5 @@ import net.minecraft.server.level.ServerLevel;
+@@ -9,4 +9,6 @@ import net.minecraft.server.level.ServerLevel;
  import net.minecraft.sounds.SoundEvents;
  import net.minecraft.sounds.SoundSource;
++import puregero.multipaper.externalserverprotocol.PistonMoveBlockEndPacket;
 +import puregero.multipaper.externalserverprotocol.PistonMoveBlockStartPacket;
  import net.minecraft.tags.BlockTags;
  import net.minecraft.util.RandomSource;
@@ -10,7 +11,7 @@
 -                        level.removeBlock(pos.relative(direction), false);
 +                        BlockPos headPos = pos.relative(direction);
 +                        BlockState headState = level.getBlockState(headPos);
-+                        if (headState.is(Blocks.PISTON_HEAD)) {
++                        if (PistonMoveBlockEndPacket.shouldRemoveRetractionHead(headState)) {
 +                            level.removeBlock(headPos, false);
 +                        }
 @@ -382,20 +387,13 @@ public class PistonBaseBlock extends DirectionalBlock {
