@@ -1,0 +1,3 @@
+Host,OwnerChunks,OwnerAnchorReadySeconds,PeerAnchorReadySeconds,FullGridLoadedOnBoth,ElapsedToFullGridCheckSeconds,Tps5s,Tps1m,Mspt5sAvgMs,Mspt5sMaxMs,Mspt1mAvgMs,Mspt1mMaxMs,VmstatSamples,AverageHostIdlePercent,AverageIoWaitPercent,MaximumIoWaitPercent,AverageBlocksReadPerSecond,AverageBlocksWrittenPerSecond,DiskReadBytesSinceBaseline,DiskWriteBytesSinceBaseline,NewRegionFileBytes
+PC1-i5-7600,64,12.0,16.4,64,41.5,20.0,20.0,1.5,2.7,2.1,451.2,150,87.95,0.33,7,1.63,118.4,253952,27041792,4194304
+PC2-i5-6600,64,13.5,18.1,64,41.5,20.0,20.0,1.4,2.6,2.2,458.4,150,87.07,0.28,4,1.09,43.01,241664,11288576,3981312
