@@ -84,6 +84,6 @@ public class RequestEntitiesPacket extends ExternalServerPacket {
     }
 
     static boolean shouldRetryForEntityChunk(NewChunkHolder chunkHolder) {
-        return chunkHolder.getEntityChunk() == null;
+        return chunkHolder != null && chunkHolder.getEntityChunk() == null;
     }
 }

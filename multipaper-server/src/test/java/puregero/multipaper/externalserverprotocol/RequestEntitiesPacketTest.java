@@ -12,6 +12,8 @@ class RequestEntitiesPacketTest {
 
     @Test
     void retriesOnlyWhenAChunkHolderExistsWithoutLoadedEntities() {
+        assertFalse(RequestEntitiesPacket.shouldRetryForEntityChunk(null));
+
         NewChunkHolder holder = mock(NewChunkHolder.class);
 
         when(holder.getEntityChunk()).thenReturn(null);

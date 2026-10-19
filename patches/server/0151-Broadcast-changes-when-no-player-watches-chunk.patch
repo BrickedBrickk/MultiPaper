@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenAI Codex <codex@openai.com>
+Date: Mon, 19 Oct 2026 00:00:00 -0400
+Subject: [PATCH] Broadcast changes when no player watches a chunk
+
+diff --git a/src/main/java/net/minecraft/server/level/ServerChunkCache.java b/src/main/java/net/minecraft/server/level/ServerChunkCache.java
+index 0000000000000000000000000000000000000000..1111111111111111111111111111111111111111 100644
+--- a/src/main/java/net/minecraft/server/level/ServerChunkCache.java
++++ b/src/main/java/net/minecraft/server/level/ServerChunkCache.java
+@@ -545,7 +545,7 @@ public class ServerChunkCache extends ChunkSource {
+         profiler.push("broadcast");
+ 
+         for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
+-            LevelChunk chunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
++            LevelChunk chunk = this.getChunkAtIfLoadedImmediately(chunkHolder.pos.x(), chunkHolder.pos.z()); // MultiPaper - broadcast changes when no player watches this chunk
+             if (chunk != null) {
+                 chunkHolder.broadcastChanges(chunk);
+             }
+-- 
+2.45.2
