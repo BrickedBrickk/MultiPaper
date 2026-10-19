@@ -16,7 +16,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftWorld;
-import puregero.multipaper.ChunkKey;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperEntitiesHandler;
@@ -27,7 +26,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.zip.InflaterInputStream;
 
 public class SendEntitiesPacket extends ExternalServerPacket {
 
@@ -114,13 +112,9 @@ public class SendEntitiesPacket extends ExternalServerPacket {
     @Override
     public void handle(ExternalServerConnection connection) {
         try {
-            Consumer<DataInputStream> callback = connection.entitiesCallbacks.remove(new ChunkKey(world, cx, cz));
-            if (callback != null) {
+            if (connection.completeEntityRequest(world, cx, cz, data.length == 0 ? null : new DataInputStream(new ByteArrayInputStream(data)))) {
                 if (data.length == 0) {
-                    LOGGER.warn(connection.externalServer.getName() + " sent us an empty entities for " + world + "," + cx + "," + cz + ", force loading it from disk");
-                    MultiPaper.forceReadChunk(world, "entities", cx, cz).thenAccept(data2 -> callback.accept(data2.length == 0 ? null : new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data2)))));
-                } else {
-                    callback.accept(new DataInputStream(new ByteArrayInputStream(data)));
+                    LOGGER.warn(connection.externalServer.getName() + " sent us an empty entities for " + world + "," + cx + "," + cz + ", falling back to Master storage");
                 }
             } else {
                 if (data.length == 0) {

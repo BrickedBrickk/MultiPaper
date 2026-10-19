@@ -35,6 +35,7 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
 
     private static final Logger LOGGER = LogManager.getLogger(ExternalServerConnection.class.getSimpleName());
     private static final long CHUNK_REQUEST_TIMEOUT_MILLIS = Long.getLong("multipaper.peer.chunkRequestTimeoutMillis", 15_000L);
+    private static final long ENTITY_REQUEST_TIMEOUT_MILLIS = Long.getLong("multipaper.peer.entityRequestTimeoutMillis", 15_000L);
 
     private Channel channel;
     public long nanoTime = 0;
@@ -182,6 +183,19 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
         return false;
     }
 
+    public boolean completeEntityRequest(String world, int cx, int cz, DataInputStream data) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        Consumer<DataInputStream> callback;
+        synchronized (this) {
+            callback = entitiesCallbacks.remove(key);
+        }
+        if (callback != null) {
+            callback.accept(data);
+            return true;
+        }
+        return false;
+    }
+
     private static void failPendingDataRequests(ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> callbacks) {
         callbacks.forEach((key, callback) -> {
             if (callbacks.remove(key, callback)) {
@@ -305,13 +319,35 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     }
 
     public void requestEntities(String world, int cx, int cz, Consumer<DataInputStream> callback) {
-        if (callback != null) {
-            if (entitiesCallbacks.put(new ChunkKey(world, cx, cz), callback) != null) {
-                LOGGER.warn("An entities callback already existed for " + world + ", " + cx + ", " + cz + " (new request is to " + externalServer.getName() + ")");
-                LOGGER.warn("Stats for " + externalServer.getName() + ": last packet sent=" + (System.currentTimeMillis() - lastPacketSent) + "ms ago; last packet received=" + (System.currentTimeMillis() - lastPacketReceived) + "ms ago");
-            }
+        if (callback != null && !registerEntityRequest(world, cx, cz, callback, ENTITY_REQUEST_TIMEOUT_MILLIS)) {
+            return;
         }
 
         send(new RequestEntitiesPacket(world, cx, cz));
+    }
+
+    boolean registerEntityRequest(String world, int cx, int cz, Consumer<DataInputStream> callback, long timeoutMillis) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        boolean duplicate;
+        synchronized (this) {
+            duplicate = entitiesCallbacks.putIfAbsent(key, callback) != null;
+        }
+        if (duplicate) {
+            LOGGER.warn("An entities callback already existed for " + world + ", " + cx + ", " + cz + " (new request is to " + externalServer.getName() + ")");
+            LOGGER.warn("Stats for " + externalServer.getName() + ": last packet sent=" + (System.currentTimeMillis() - lastPacketSent) + "ms ago; last packet received=" + (System.currentTimeMillis() - lastPacketReceived) + "ms ago");
+            callback.accept(null);
+            return false;
+        }
+        CompletableFuture.delayedExecutor(timeoutMillis, TimeUnit.MILLISECONDS).execute(() -> {
+            Consumer<DataInputStream> timedOutCallback;
+            synchronized (this) {
+                timedOutCallback = entitiesCallbacks.remove(key);
+            }
+            if (timedOutCallback != null) {
+                LOGGER.warn("Timed out waiting for entities " + world + "," + cx + "," + cz + " from " + externalServer.getName() + "; falling back to Master storage");
+                timedOutCallback.accept(null);
+            }
+        });
+        return true;
     }
 }

@@ -102,6 +102,61 @@ class MultiPaperPeerDataFallbackTest {
     }
 
     @Test
+    void missingPeerEntityResponseCompletesWithNullAndAllowsLateLiveUpdate() throws InterruptedException {
+        ExternalServerConnection connection = new ExternalServerConnection();
+        connection.externalServer = new ExternalServer("peer", false);
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicInteger callbackCount = new AtomicInteger();
+        AtomicReference<DataInputStream> result = new AtomicReference<>(new DataInputStream(new java.io.ByteArrayInputStream(new byte[0])));
+
+        assertTrue(connection.registerEntityRequest("world", -8, 3, data -> {
+            callbackCount.incrementAndGet();
+            result.set(data);
+            completed.countDown();
+        }, 25));
+
+        assertTrue(completed.await(2, TimeUnit.SECONDS));
+        assertNull(result.get());
+        assertTrue(connection.entitiesCallbacks.isEmpty());
+
+        assertFalse(connection.completeEntityRequest("world", -8, 3, new DataInputStream(new java.io.ByteArrayInputStream(new byte[]{1}))));
+        assertEquals(1, callbackCount.get());
+    }
+
+    @Test
+    void completedPeerEntityRequestDoesNotFireTimeoutCallback() throws InterruptedException {
+        ExternalServerConnection connection = new ExternalServerConnection();
+        connection.externalServer = new ExternalServer("peer", false);
+        AtomicInteger callbackCount = new AtomicInteger();
+        CountDownLatch completed = new CountDownLatch(1);
+
+        assertTrue(connection.registerEntityRequest("world", 8, -3, data -> {
+            callbackCount.incrementAndGet();
+            completed.countDown();
+        }, 50));
+        assertTrue(connection.completeEntityRequest("world", 8, -3, null));
+
+        assertTrue(completed.await(1, TimeUnit.SECONDS));
+        Thread.sleep(100);
+        assertEquals(1, callbackCount.get());
+        assertTrue(connection.entitiesCallbacks.isEmpty());
+    }
+
+    @Test
+    void duplicatePeerEntityRequestPreservesOriginalCallback() {
+        ExternalServerConnection connection = new ExternalServerConnection();
+        connection.externalServer = new ExternalServer("peer", false);
+        AtomicInteger originalCallbackCount = new AtomicInteger();
+        AtomicReference<DataInputStream> duplicateResult = new AtomicReference<>(new DataInputStream(new java.io.ByteArrayInputStream(new byte[0])));
+
+        assertTrue(connection.registerEntityRequest("world", 8, -3, data -> originalCallbackCount.incrementAndGet(), 10_000));
+        assertFalse(connection.registerEntityRequest("world", 8, -3, duplicateResult::set, 10_000));
+        assertNull(duplicateResult.get());
+        assertTrue(connection.completeEntityRequest("world", 8, -3, null));
+        assertEquals(1, originalCallbackCount.get());
+    }
+
+    @Test
     void completedPeerChunkRequestDoesNotFireTimeoutCallback() throws InterruptedException {
         ExternalServerConnection connection = new ExternalServerConnection();
         connection.externalServer = new ExternalServer("peer", false);
