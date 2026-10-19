@@ -977,3 +977,7 @@ Crafty's current Minecraft configuration guide documents separate `Server Execut
 ### Final artifact rebuild from rerun outputs — 2026-10-19 17:50 EDT
 
 After the full `--rerun-tasks` test run regenerated classes, `:multipaper-server:createPaperclipJar` completed successfully twice (the second build was up to date). The current local artifact is 66,666,861 bytes with SHA-256 `736A97C92CC690DE7F7E067C3D3856BD2CDF4CF1F27A98722FAB297C530F45D0`. This supersedes the earlier local artifact hash recorded at 17:18 and in the test-run note before repackaging. No remote host was reachable, so the current artifact remains local and has not been deployed.
+
+### Final Paperclip local launch smoke — 2026-10-19 17:51 EDT
+
+Ran the current Paperclip (SHA-256 `736A97C92CC690DE7F7E067C3D3856BD2CDF4CF1F27A98722FAB297C530F45D0`) from an isolated `build/tmp/paperclip-smoke-final` working directory with `java -jar ... --version`. It downloaded the 26.3 server runtime into that temporary directory, applied patches, printed `26.3-DEV-73c5983`, and exited 0. No world was opened and no game listener was started. This is a local launch smoke only; it does not replace the unavailable two-PC deployment/player test.
