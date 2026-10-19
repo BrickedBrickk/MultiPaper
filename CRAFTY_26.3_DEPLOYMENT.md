@@ -622,6 +622,8 @@ Fresh rollback archives were created and checked before restart: PC1 Master+Back
 
 The existing Master started first (PID `63727`), followed by Backend 1 (PID `63778`) and Backend 2 (PID `90772`). The production ports are listening: Master coordination `35353`, proxy `25565`, backends `25566`/`25567`, and RCON `25576`/`25577`. Both backend JARs match SHA-256 `D3BAE01A...`. The public status handshake to `100.78.108.117:25565` returned `MultiPaper 26.3`, protocol 777, and 0/20 players. RCON `/slist` on both backends lists both backends; `/list` reports zero players. Both Crafty services are active, but the processes remain launched outside Crafty and are not yet Crafty-managed.
 
+An idle post-start RCON sample at 09:25 showed 20.0 TPS on both backends. One-minute tick averages were 0.7 ms on both, with one-minute maxima of 3.1 ms on Backend 1 and 13.6 ms on Backend 2. No players were connected, so this is an idle health sample and not the required loaded-performance measurement.
+
 This rollout verifies coordinated clean shutdown/startup, fresh backups, artifact integrity, and proxy/backend availability. Real GUI-player gameplay, the previous void behavior, redstone/piston behavior on a real player session, player inventory/disconnect/reconnect on this new build, Crafty-managed lifecycle, and sustained loaded performance/HDD measurements remain unverified.
 
 ### Post-rollout physical block, piston, entity, and save checks — 2026-10-19 09:22–09:24 EDT
