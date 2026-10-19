@@ -961,3 +961,7 @@ A read-only executable scan of `/usr/lib/jvm`, `/usr/local`, `/opt`, and `/var/o
 ### Sticky piston retract regression guard — 2026-10-19 17:18 EDT
 
 The sticky-piston duplicate retract fallback now delegates its removal decision to `PistonMoveBlockEndPacket.shouldRemoveRetractionHead`, preserving the existing behavior of removing an actual piston head while leaving air, a redstone block, and a moving piston untouched. Added a focused JUnit test and suite wrapper because this project only discovers `*TestSuite` classes. The targeted suite passed (1 test, 0 failures/errors), and `:multipaper-server:createPaperclipJar` completed successfully on Java 25. The resulting local Paperclip is 66,667,822 bytes with SHA-256 `5B723C7FC44AEA9A45CC04DBC0FC0CCDE51F271E74BA6A04784B1320FDA57A70`. `git diff --check` passed. This artifact has not been deployed; the running production processes and worlds remain untouched.
+
+### Full server and Master test rerun — 2026-10-19 17:42 EDT
+
+After adding the piston guard test, `:multipaper-server:test :multipaper-master:test --rerun-tasks --no-daemon --console=plain` completed successfully on Java 25 in 22m04s. The XML reports contain 125 suites and 10,162 tests: 0 failures, 0 errors, 89 skipped. The output included existing simulated peer timeout/entity callback warnings from tests, but the test task and every suite completed successfully. The Paperclip artifact hash remained `5B723C7FC44AEA9A45CC04DBC0FC0CCDE51F271E74BA6A04784B1320FDA57A70`; no production server was restarted or changed.
