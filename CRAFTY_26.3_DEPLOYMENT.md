@@ -482,6 +482,10 @@ A separate 90-second profile ran with only one disposable backend active on PC1 
 
 In the sampled 25-chunk interval, JFR saw 16 execution samples on `Paper Common Worker #0` and 15 had chunk or world-generation frames, but it also sampled normal fluid/entity work on the server thread. This is not enough time-correlated evidence to assign the 3.19-second tick to one precise code path. Taken together, the profiles support keeping chunk-generation CPU as a performance concern but do not prove that two backend processes on one PC caused the spike. Leave worker/thread configuration unchanged pending a paced player-like measurement on both physical hosts. JFR recordings remain in the disposable PC1 test directories and were not uploaded. All disposable processes and tunnels were stopped afterward; production was not touched.
 
+### Latest production recheck — 2026-10-19 03:15 EDT
+
+Strict-host-key SSH confirmed Master PID `39344` and Backend 1 PID `41569` remain up. Backend 1 still runs the previous production Paperclip, SHA-256 `787EE300CC59D81FABD6399D607B1CBEB2B2AEC85B9099A23775694279B49750`. The proxy at `100.78.108.117:25565` returned MultiPaper 26.3 / protocol 777 / 0 of 20 players. Backend 1 RCON `/list` reported zero players; `/slist` listed both production backends; `/tps` was 20.0; `/mspt` was 0.8 ms average for the 1-minute window (1.4 ms maximum). All disposable test ports were closed. No production processes or files were changed.
+
 ### Crafty 1 lifecycle audit — 2026-10-19
 
 Read-only inspection confirmed `crafty.service` is active and enabled, running Crafty 4 under the dedicated `crafty` account. Its SQLite database at `/var/opt/minecraft/crafty/crafty-4/app/config/db/crafty.sqlite` has zero rows in both `servers` and `server_stats`. The live MultiPaper Master and Backend 1 processes still run as `crafty1` from `~/multipaper-test`; the existing `start.sh` launchers use `nohup`, so Crafty does not own or supervise these processes. No Crafty or Minecraft files, databases, or services were modified during this inspection.
