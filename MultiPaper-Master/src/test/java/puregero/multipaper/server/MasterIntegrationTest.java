@@ -13,6 +13,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PingMess
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerConnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerDisconnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ForceReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadDataMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
@@ -23,6 +24,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SetPortM
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnlockChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnsubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveEntitiesLaterMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteDataMessage;
@@ -268,6 +270,37 @@ class MasterIntegrationTest {
 
     @Test
     @Order(11)
+    void forcedEntityReadWaitsForPendingEntityWrite() throws Exception {
+        ServerBoundMessage initialWrite = serverA.request(new WriteChunkMessage(WORLD, "entities", 9, 0, ENTITIES_PAYLOAD));
+        assertTrue(((BooleanMessageReply) initialWrite).result);
+
+        serverA.send(new WillSaveEntitiesLaterMessage(WORLD, 9, 0));
+        serverA.request(new PingMessage());
+
+        java.util.concurrent.CompletableFuture<ServerBoundMessage> pendingRead = new java.util.concurrent.CompletableFuture<>();
+        Thread reader = new Thread(() -> {
+            try {
+                pendingRead.complete(serverB.request(new ForceReadChunkMessage(WORLD, "entities", 9, 0)));
+            } catch (Exception e) {
+                pendingRead.completeExceptionally(e);
+            }
+        });
+        reader.setDaemon(true);
+        reader.start();
+
+        Thread.sleep(500);
+        assertFalse(pendingRead.isDone(), "Forced entity read must wait for the pending entity write");
+
+        byte[] updatedEntities = "updated-entities-bytes".getBytes(StandardCharsets.UTF_8);
+        ServerBoundMessage updatedWrite = serverA.request(new WriteChunkMessage(WORLD, "entities", 9, 0, updatedEntities));
+        assertTrue(((BooleanMessageReply) updatedWrite).result);
+
+        ServerBoundMessage readReply = pendingRead.get(10, TimeUnit.SECONDS);
+        assertArrayEquals(updatedEntities, ((DataMessageReply) readReply).data);
+    }
+
+    @Test
+    @Order(12)
     void levelDatIsSharedThroughTheMaster() throws Exception {
         ServerBoundMessage writeReply = serverA.request(new WriteLevelMessage(WORLD, LEVEL_PAYLOAD));
         assertTrue(((BooleanMessageReply) writeReply).result);
@@ -277,7 +310,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(12)
+    @Order(13)
     void playerDataIsSharedThroughTheMaster() throws Exception {
         String uuid = UUID.randomUUID().toString();
         ServerBoundMessage writeReply = serverA.request(new WritePlayerMessage(WORLD, uuid, PLAYER_PAYLOAD));
@@ -288,7 +321,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(13)
+    @Order(14)
     void playerCanOnlyConnectToOneServerAtATime() throws Exception {
         UUID player = UUID.randomUUID();
 
@@ -314,7 +347,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(14)
+    @Order(15)
     void crashRecoveryFreesOwnershipAndSubscriptions() throws Exception {
         // server-a currently owns (0, 0)/(2, 0) and is subscribed to the chunk at (5, 0).
         serverA.close();
@@ -355,7 +388,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(15)
+    @Order(16)
     void chunkDataRemainsReadableAfterOwnerCrash() throws Exception {
         // server-a crashed in the previous test; its stored data must still be available.
         ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(WORLD, "region", 5, 0));
@@ -366,7 +399,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(16)
+    @Order(17)
     void entityIdBlocksSkipTheReservedZeroEvenWhenPersistedStateIsZero() throws Exception {
         Path idFile = Path.of("entity-ids", "lastblock.txt").toAbsolutePath();
         Files.createDirectories(idFile.getParent());
@@ -382,7 +415,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(17)
+    @Order(18)
     void failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk() throws Exception {
         String world = "write-failure-world";
         int chunkX = 17;
@@ -424,7 +457,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(18)
+    @Order(19)
     void savedDataUsesSharedWorldRelativePathsAcrossBackends() throws Exception {
         final Path temporaryWorld = Path.of("build", "tmp", "multipaper-shared-data-" + UUID.randomUUID());
         final String sharedPath = temporaryWorld.resolve("world/dimensions/minecraft/overworld/data/paper/metadata.dat")
@@ -452,7 +485,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(19)
+    @Order(20)
     void abruptBackendSocketResetDoesNotBreakPeerConnections() throws Exception {
         TestServerClient resetPeer = TestServerClient.connect(port, "reset-peer");
         ServerConnection disconnected = ServerConnection.getConnection(resetPeer.name);
