@@ -105,7 +105,7 @@ public class RequestChunkPacket extends ExternalServerPacket {
                 ListTag entitiesToLoad = null;
                 ListTag blockEntitiesToLoad = null;
 
-                ChunkAccess fullChunk = chunk instanceof ImposterProtoChunk imposterProtoChunk ? imposterProtoChunk.getWrapped() : chunk;
+                ChunkAccess fullChunk = chunkForSerialization(chunk);
 
                 if (fullChunk instanceof LevelChunk levelChunk) {
                     // Cache these tags in case they get deleted while we serialize the chunk (multi-threaded fun!)
@@ -113,7 +113,7 @@ public class RequestChunkPacket extends ExternalServerPacket {
                     blockEntitiesToLoad = levelChunk.blockEntitiesToLoad;
                 }
 
-                CompoundTag tag = SerializableChunkData.copyOf(level, chunk).write();
+                CompoundTag tag = serializeChunk(level, chunk);
 
                 if (entitiesToLoad != null) {
                     tag.put("entities", entitiesToLoad);
@@ -139,5 +139,13 @@ public class RequestChunkPacket extends ExternalServerPacket {
             connection.send(new SendChunkPacket(world, cx, cz, null));
             return null;
         });
+    }
+
+    static ChunkAccess chunkForSerialization(ChunkAccess chunk) {
+        return chunk instanceof ImposterProtoChunk imposterProtoChunk ? imposterProtoChunk.getWrapped() : chunk;
+    }
+
+    static CompoundTag serializeChunk(ServerLevel level, ChunkAccess chunk) {
+        return SerializableChunkData.copyOf(level, chunkForSerialization(chunk)).write();
     }
 }

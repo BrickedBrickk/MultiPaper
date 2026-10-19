@@ -1,7 +1,7 @@
 param(
     [int]$Server1RconPort = 26010,
     [int]$Server2RconPort = 26011,
-    [int]$TestX = -194,
+    [int]$TestX = -183,
     [int]$TestY = 102,
     [int]$TestZ = 71,
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
@@ -185,20 +185,42 @@ $y = $TestY
 $z = $TestZ
 $block1 = "execute if block $($x + 2) $y $z minecraft:emerald_block run help"
 $block2 = "execute if block $($x + 3) $y $z minecraft:diamond_block run help"
+$testChunkCoordinates = @{}
+for ($testBlockX = $x; $testBlockX -le $x + 5; $testBlockX++) {
+    for ($testBlockZ = $z; $testBlockZ -le $z + 8; $testBlockZ++) {
+        $chunkX = [Math]::Floor($testBlockX / 16)
+        $chunkZ = [Math]::Floor($testBlockZ / 16)
+        $chunkKey = "$chunkX,$chunkZ"
+        if (-not $testChunkCoordinates.ContainsKey($chunkKey)) {
+            $testChunkCoordinates[$chunkKey] = [pscustomobject]@{ X = $testBlockX; Z = $testBlockZ }
+        }
+    }
+}
+$baseChunkLoads = @($testChunkCoordinates.Values)
 
 try {
-    Send-Rcon $Server1RconPort "forceload add $x $z" | Out-Null
-    Send-Rcon $Server2RconPort "forceload add $x $z" | Out-Null
-    $loadedCommand = "execute if loaded $x $y $z run help"
+    foreach ($chunk in $baseChunkLoads) {
+        Send-Rcon $Server1RconPort "forceload add $($chunk.X) $($chunk.Z)" | Out-Null
+        Send-Rcon $Server2RconPort "forceload add $($chunk.X) $($chunk.Z)" | Out-Null
+    }
     $loadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        $loaded1 = Send-Rcon $Server1RconPort $loadedCommand
-        $loaded2 = Send-Rcon $Server2RconPort $loadedCommand
-        if ($loaded1 -match 'Index \(\d+/\d+\)' -and $loaded2 -match 'Index \(\d+/\d+\)') { break }
+        $allChunksLoaded = $true
+        foreach ($chunk in $baseChunkLoads) {
+            $loadedCommand = "execute if loaded $($chunk.X) $y $($chunk.Z) run help"
+            $loaded1 = Send-Rcon $Server1RconPort $loadedCommand
+            $loaded2 = Send-Rcon $Server2RconPort $loadedCommand
+            if ($loaded1 -notmatch 'Index \(\d+/\d+\)' -or $loaded2 -notmatch 'Index \(\d+/\d+\)') {
+                $allChunksLoaded = $false
+                break
+            }
+        }
+        if ($allChunksLoaded) { break }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $loadDeadline)
-    Assert-Contains $loaded1 'Index (' 'Server 1 did not load the test chunk after forceload.'
-    Assert-Contains $loaded2 'Index (' 'Server 2 did not load the test chunk after forceload.'
+    if (-not $allChunksLoaded) {
+        throw 'One or more test chunks did not load on both backends after forceload.'
+    }
     Send-Rcon $Server1RconPort "setblock $($x + 2) $y $z minecraft:emerald_block" | Out-Null
     Send-Rcon $Server2RconPort "setblock $($x + 3) $y $z minecraft:diamond_block" | Out-Null
     $blockDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -478,6 +500,8 @@ try {
     try { Send-Rcon $Server2RconPort "fill $stickyPowerX $circuitY $reverseStickyCircuitZ $stickyDestinationX $circuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
-    try { Send-Rcon $Server1RconPort "forceload remove $x $z" | Out-Null } catch { }
-    try { Send-Rcon $Server2RconPort "forceload remove $x $z" | Out-Null } catch { }
+    foreach ($chunk in $baseChunkLoads) {
+        try { Send-Rcon $Server1RconPort "forceload remove $($chunk.X) $($chunk.Z)" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "forceload remove $($chunk.X) $($chunk.Z)" | Out-Null } catch { }
+    }
 }
