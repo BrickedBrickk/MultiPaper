@@ -53,7 +53,14 @@ public class RequestEntitiesPacket extends ExternalServerPacket {
     private void sendChunkLater(ExternalServerConnection connection, String world, int cx, int cz, int depth) {
         ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
         NewChunkHolder chunkHolder = MultiPaper.getChunkHolder(level, cx, cz);
-        if (chunkHolder == null || chunkHolder.getEntityChunk() == null) {
+        if (chunkHolder == null) {
+            // A stale Master subscription can route a read to a server that has already unloaded this chunk.
+            // There is no holder that could become ready here, so let the requesting server fall back to Master storage.
+            connection.send(new SendEntitiesPacket(world, cx, cz, null));
+            return;
+        }
+
+        if (shouldRetryForEntityChunk(chunkHolder)) {
             if (depth >= 20 || Bukkit.isStopping()) {
                 LOGGER.warn(connection.externalServer.getName() + " is requesting entities " + world + "," + cx + "," + cz + " but we timed out waiting for them to load.");
                 connection.send(new SendEntitiesPacket(world, cx, cz, null));
@@ -74,5 +81,9 @@ public class RequestEntitiesPacket extends ExternalServerPacket {
                 MultiPaper.runSync(() -> sendChunkLater(connection, world, cx, cz, depth));
             }
         }
+    }
+
+    static boolean shouldRetryForEntityChunk(NewChunkHolder chunkHolder) {
+        return chunkHolder.getEntityChunk() == null;
     }
 }
