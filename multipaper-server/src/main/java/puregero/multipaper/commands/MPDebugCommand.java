@@ -20,6 +20,7 @@ import puregero.multipaper.MultiPaper;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.function.Consumer;
 
 public class MPDebugCommand extends Command {
     private static final Logger LOGGER = LogManager.getLogger(MPDebugCommand.class);
@@ -56,7 +57,12 @@ public class MPDebugCommand extends Command {
         debugEnabled.add(player);
 
         sender.sendMessage("MultiPaper debug enabled");
-        run(player);
+        if (!runSafely(() -> run(player), exception -> {
+            debugEnabled.remove(player);
+            reportFailure(player, exception);
+        })) {
+            return true;
+        }
 
         return true;
     }
@@ -76,13 +82,25 @@ public class MPDebugCommand extends Command {
                 continue;
             }
 
-            try {
-                run(player);
-            } catch (RuntimeException exception) {
+            runSafely(() -> run(player), exception -> {
                 iterator.remove();
-                player.sendMessage(ChatColor.RED + "MultiPaper debug stopped because it could not inspect the current chunks.");
-                LOGGER.warn("Could not update MultiPaper debug overlay for {}", player.getName(), exception);
-            }
+                reportFailure(player, exception);
+            });
+        }
+    }
+
+    private void reportFailure(Player player, RuntimeException exception) {
+        player.sendMessage(ChatColor.RED + "MultiPaper debug stopped because it could not inspect the current chunks.");
+        LOGGER.warn("Could not update MultiPaper debug overlay for {}", player.getName(), exception);
+    }
+
+    static boolean runSafely(Runnable action, Consumer<RuntimeException> failureHandler) {
+        try {
+            action.run();
+            return true;
+        } catch (RuntimeException exception) {
+            failureHandler.accept(exception);
+            return false;
         }
     }
 
