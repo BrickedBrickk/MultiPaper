@@ -973,3 +973,7 @@ Strict-host-key SSH connection attempts to `crafty1@100.78.108.117` and `crafty2
 ### Crafty Java command-path option reviewed — 2026-10-19 17:46 EDT
 
 Crafty's current Minecraft configuration guide documents separate `Server Executable` and `Server Execution Command` fields. The guide does not explicitly confirm whether this installed Crafty version accepts an absolute Java executable path, so the Java selector limitation should not be treated as conclusive. Once strict SSH and panel access return, test the absolute Java 25 executable path on a disposable Crafty entry with the Paperclip arguments in `Server Execution Command`; verify Crafty can traverse and execute that path and that stop/log tracking work. Do not change production entries for this probe. Source: [Crafty Minecraft server configuration](https://docs.craftycontrol.com/pages/user-guide/server-config/minecraft/).
+
+### Final artifact rebuild from rerun outputs — 2026-10-19 17:50 EDT
+
+After the full `--rerun-tasks` test run regenerated classes, `:multipaper-server:createPaperclipJar` completed successfully twice (the second build was up to date). The current local artifact is 66,666,861 bytes with SHA-256 `736A97C92CC690DE7F7E067C3D3856BD2CDF4CF1F27A98722FAB297C530F45D0`. This supersedes the earlier local artifact hash recorded at 17:18 and in the test-run note before repackaging. No remote host was reachable, so the current artifact remains local and has not been deployed.
