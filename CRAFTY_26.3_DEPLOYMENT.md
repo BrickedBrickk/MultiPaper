@@ -663,3 +663,11 @@ Each deliberate client disconnect while `/mpdebug` was active produced a `[SendP
 ### Production recheck after D3 reconnect profile — 2026-10-19 09:49 EDT
 
 After the disposable reconnect test, production Master PID `63727`, Backend 1 PID `63778`, and Backend 2 PID `90772` were still running with their expected listeners. Both backend JARs still matched SHA-256 `D3BAE01AB5E50CD21B719D920D96BBAAD857ED3187A934F01D130B30E0F8AF4B`. A fresh status handshake to `100.78.108.117:25565` returned MultiPaper 26.3, protocol 777, and 0/20 players. The test was isolated from the production world and process directories.
+
+### Production shared-world and target-hardware idle sample — 2026-10-19 09:50–09:51 EDT
+
+Read-only configuration checks show both live Paper backends use `level-name=world` and point to the same Master at `100.78.108.117:35353`; their registered MultiPaper names are `crafty1-backend1` and `crafty2-backend2`. The PC1 Master data directory contains `world/level.dat` and `world/region`. RCON `/slist` from both backends lists both names, while `/list` reports zero players. The proxy status handshake to `100.78.108.117:25565` returned MultiPaper 26.3, protocol 777, and 0/20 players; the MOTD identified the selected Backend 2. This verifies current configuration and routing, not active player visibility.
+
+The actual hosts report Intel i5-7600 (PC1) and i5-6600 (PC2), each with about 16.3 GB RAM. Their system disks report rotational HDDs: PC1 WDC WD10EZEX-08M2NA0, 931.5 GB; PC2 WDC WD5000AZLX-75K2TA0, 465.8 GB. At the sample both had about 13 GiB available, no swap use, and 96–98% CPU idle with 0% I/O wait in three-second `vmstat` samples. Ten ICMP probes across the PCs had no loss and averaged 1.451 ms PC1→PC2 and 1.512 ms PC2→PC1.
+
+Both backends reported 20 TPS across 5s/1m/5m/15m. Backend 1's one-minute MSPT average/max was 1.0/2.0 ms; Backend 2 reported 0.8/10.4 ms. These are idle health and hardware samples, not loaded-game performance. The production Master and both backend PIDs, ports, and D3 artifact hashes remained unchanged; Crafty is active and enabled on both hosts, but still has no registered MultiPaper server entries.
