@@ -969,3 +969,7 @@ After adding the piston guard test, `:multipaper-server:test :multipaper-master:
 ### Physical-PC access check after test build — 2026-10-19 17:45 EDT
 
 Strict-host-key SSH connection attempts to `crafty1@100.78.108.117` and `crafty2@100.107.178.51` each timed out on TCP port 22 after eight seconds. No remote host key was bypassed, and neither PC was accessed or changed. The current `5B723C7...` Paperclip remains local and is not installed on either physical PC. Production health figures above are the last successful read-only verification at 17:10 EDT, not a fresh live check. The Crafty-managed entries remain separate stopped entries pending an accessible host and Java 25 available to Crafty.
+
+### Crafty Java command-path option reviewed — 2026-10-19 17:46 EDT
+
+Crafty's current Minecraft configuration guide documents separate `Server Executable` and `Server Execution Command` fields. The guide does not explicitly confirm whether this installed Crafty version accepts an absolute Java executable path, so the Java selector limitation should not be treated as conclusive. Once strict SSH and panel access return, test the absolute Java 25 executable path on a disposable Crafty entry with the Paperclip arguments in `Server Execution Command`; verify Crafty can traverse and execute that path and that stop/log tracking work. Do not change production entries for this probe. Source: [Crafty Minecraft server configuration](https://docs.craftycontrol.com/pages/user-guide/server-config/minecraft/).
