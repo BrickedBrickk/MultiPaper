@@ -1,0 +1,10 @@
+Perfdata copied over StrictHostKeyChecking=yes SSH from 2026-10-19T21:08:41Z to 2026-10-19T21:08:42Z; read by local JDK 25 jstat using file: VMIDs.
+[pc1-master]
+    S0C         S1C         S0U         S1U          EC           EU           OC           OU          MC         MU       CCSC      CCSU     YGC     YGCT     FGC    FGCT     CGC    CGCT       GCT
+        0.0      4096.0         0.0      3840.0     214016.0     151552.0     308224.0       2113.1     8640.0     8368.4    1088.0     980.0      1     0.005     0     0.000     0     0.000     0.005
+[pc1-backend1]
+    S0C         S1C         S0U         S1U          EC           EU           OC           OU          MC         MU       CCSC      CCSU     YGC     YGCT     FGC    FGCT     CGC    CGCT       GCT
+        0.0     32768.0         0.0     31744.0     595968.0      69632.0     419840.0     240275.8   149376.0   147903.7   27904.0   27295.2     23     0.443     0     0.000    16     0.060     0.503
+[pc2-backend2]
+    S0C         S1C         S0U         S1U          EC           EU           OC           OU          MC         MU       CCSC      CCSU     YGC     YGCT     FGC    FGCT     CGC    CGCT       GCT
+        0.0     30720.0         0.0     30720.0     598016.0     569344.0     419840.0     243449.0   149248.0   147796.9   27776.0   27238.7     21     0.438     0     0.000    14     0.054     0.492

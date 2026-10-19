@@ -935,3 +935,17 @@ A read-only 20-second host/process sample was captured simultaneously on both pr
 Each backend host used 20 one-second `vmstat` intervals after excluding the since-boot first row; swap use and swap-in/out were zero. Both disks report `ROTA=1`. A simultaneous PC1-to-PC2 ping sample returned 12/12 replies, 0% loss, 1.451 ms average RTT (0.854–1.629 ms). The raw process/host captures and ping output are in [`benchmark-results/2026-10-19/production-idle`](benchmark-results/2026-10-19/production-idle).
 
 These are short idle measurements, not a gameplay load test. RSS is resident process memory, not Java heap occupancy; the installed Java 25 runtime does not include `jstat` or `jcmd`, so this sample could not inspect live heap usage. Prior disposable AI-mob and chunk-generation runs provide workload measurements, but real-player load and HDD device latency remain unmeasured. Strict SSH tunnels used for final read-only RCON checks were closed afterward; no production setting or process was changed.
+
+### No-restart production heap follow-up — 2026-10-19 17:08–17:09 EDT
+
+The Java 25 runtime installed beside the production servers omits the `jstat` executable, but the running JVMs expose `hsperfdata` files. I copied snapshots of those files from each host over strict-host-key SSH and read them with the local Java 25 `jstat -gc` using its file-based VMID. This is a read-only snapshot and required no server restart or extra runtime installation. The [`jstat` reference](https://docs.oracle.com/en/java/javase/25/docs/specs/man/jstat.html) defines the `-gc` output as garbage-collected heap statistics.
+
+Four snapshots taken about seven seconds apart while both backends reported zero players showed:
+
+| Process | Used heap range | Committed heap | Young GC count | Full GC count |
+| --- | ---: | ---: | ---: | ---: |
+| Master, PC1 | 153.8 MiB | 514 MiB | 1 | 0 |
+| Backend 1, PC1 | 369.6–377.6 MiB | 1,024 MiB | 23 | 0 |
+| Backend 2, PC2 | 279.4–287.4 MiB | 1,024 MiB | 22 | 0 |
+
+An earlier single Backend 2 snapshot showed 823.8 MiB used immediately before its next young collection; its young GC count advanced from 21 to 22 and the next captured series showed 279.4 MiB used. This illustrates why heap usage should be sampled over time. The backend JVMs are configured with a 4 GiB maximum heap; committed heap remained 1 GiB in these idle snapshots. RCON checks immediately before and after the series reported zero players and both backend names on both `/slist` views. The raw `jstat -gc` counters are in [`jstat-heap-snapshots.txt`](benchmark-results/2026-10-19/production-idle/jstat-heap-snapshots.txt), and the four-point range is in [`heap-series.csv`](benchmark-results/2026-10-19/production-idle/heap-series.csv). This remains an idle sample and does not estimate peak heap under gameplay or chunk generation.
