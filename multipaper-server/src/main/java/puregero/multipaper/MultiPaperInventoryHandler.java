@@ -16,16 +16,11 @@ import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Relative;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.EnderEyeItem;
 import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import puregero.multipaper.externalserverprotocol.PlayerActionPacket;
@@ -167,9 +162,9 @@ public class MultiPaperInventoryHandler {
                             item.setCount(countDiff);
                             addItem(item, player);
                         } else {
-                            LOGGER.warn(player.getScoreboardName() + ": An external server tried to remove " + countDiff + " items from " + replacingItem + ", but that item is now a " + currentItem + ". Searching for duped items to remove...");
+                            LOGGER.warn(player.getScoreboardName() + ": An external server tried to remove " + -countDiff + " items from " + replacingItem + ", but that item is now a " + currentItem + ". Reconciling against the player's inventory...");
                             item.setCount(-countDiff);
-                            removeNearbyItems(player, item);
+                            removeFromPlayerOwnedItems(player, item);
                         }
                     } else if (replacingItem.getDamageValue() != item.getDamageValue()) {
                         int damageDiff = item.getDamageValue() - replacingItem.getDamageValue();
@@ -183,8 +178,8 @@ public class MultiPaperInventoryHandler {
                     addItem(item, player);
                     if (!replacingItem.isEmpty()) {
                         // The item has probably duplicated, try to find one of the copies and remove it
-                        LOGGER.info(player.getScoreboardName() + ": An external server tried to replace " + replacingItem + " with a " + item + ", but that item is now a " + currentItem + ". Searching for duped items to remove...");
-                        removeNearbyItems(player, replacingItem);
+                        LOGGER.info(player.getScoreboardName() + ": An external server tried to replace " + replacingItem + " with a " + item + ", but that item is now a " + currentItem + ". Reconciling against the player's inventory...");
+                        removeFromPlayerOwnedItems(player, replacingItem);
                     }
                 }
             } else {
@@ -201,60 +196,37 @@ public class MultiPaperInventoryHandler {
         }
     }
 
-    private static void removeNearbyItems(ServerPlayer player, ItemStack itemToRemove) {
-        for (Runnable runnable : new Runnable[]{
-                () -> removeFromContainerMenu(player, itemToRemove, player.containerMenu),
-                () -> removeFromContainerMenu(player, itemToRemove, player.inventoryMenu),
-                () -> removeFromInventory(player, itemToRemove, player.getInventory().compartments),
-                () -> removeFromItemEntities(player, itemToRemove),
-        }) {
-            runnable.run();
-
-            if (itemToRemove.isEmpty()) {
-                return;
-            }
-        }
-    }
-
-    private static void removeFromContainerMenu(ServerPlayer player, ItemStack itemToRemove, AbstractContainerMenu containerMenu) {
-        removeItems(player, itemToRemove, containerMenu::getCarried, (item, count) -> {
-            LOGGER.info("{}: Removing {}x of {} from cursor in open menu {}", player.getScoreboardName(), count, itemToRemove, containerMenu.getClass().getSimpleName());
-            containerMenu.setCarried(item);
+    private static void removeFromPlayerOwnedItems(ServerPlayer player, ItemStack itemToRemove) {
+        // Only compensate in state owned by this player. Scanning every slot in
+        // containerMenu can delete legitimate items from a shared chest, and
+        // scanning nearby item entities can delete another player's drops.
+        removeItems(itemToRemove, player.containerMenu::getCarried, (item, count) -> {
+            LOGGER.info("{}: Removing {}x of {} from cursor", player.getScoreboardName(), count, itemToRemove);
+            player.containerMenu.setCarried(item);
         });
 
-        for (Slot slot : containerMenu.slots) {
-            removeItems(player, itemToRemove, slot::getItem, (item, count) -> {
-                LOGGER.info("{}: Removing {}x of {} from open menu {}", player.getScoreboardName(), count, itemToRemove, containerMenu.getClass().getSimpleName());
-                slot.set(item);
-            });
+        if (!itemToRemove.isEmpty()) {
+            removeFromInventory(player.getScoreboardName(), itemToRemove, player.getInventory().compartments);
+        }
+
+        if (!itemToRemove.isEmpty()) {
+            LOGGER.warn("{}: Could not reconcile {} in player-owned inventory; leaving container contents and world item entities untouched.", player.getScoreboardName(), itemToRemove);
         }
     }
 
-    private static void removeFromInventory(ServerPlayer player, ItemStack itemToRemove, List<NonNullListFilter<ItemStack>> compartments) {
+    static void removeFromInventory(String playerName, ItemStack itemToRemove, List<NonNullListFilter<ItemStack>> compartments) {
         for (List<ItemStack> compartment : compartments) {
             for (int slot = 0; slot < compartment.size(); slot++) {
                 final int finalSlot = slot;
-                removeItems(player, itemToRemove, () -> compartment.get(finalSlot), (item, count) -> {
-                    LOGGER.info("{}: Removing {}x of {} from inventory", player.getScoreboardName(), count, itemToRemove);
+                removeItems(itemToRemove, () -> compartment.get(finalSlot), (item, count) -> {
+                    LOGGER.info("{}: Removing {}x of {} from inventory", playerName, count, itemToRemove);
                     compartment.set(finalSlot, item);
                 });
             }
         }
     }
 
-    private static void removeFromItemEntities(ServerPlayer player, ItemStack itemToRemove) {
-        for (ItemEntity entity : player.level().getEntitiesOfClass(ItemEntity.class, AABB.ofSize(player.position(), 16, 16, 16))) {
-            removeItems(player, itemToRemove, entity::getItem, (item, count) -> {
-                LOGGER.info("{}: Removing {}x of {} from item entity at {}", player.getScoreboardName(), count, itemToRemove, entity.position());
-                entity.remove(Entity.RemovalReason.DISCARDED); // Remove the item entity to update the item inside
-                if (!item.isEmpty()) {
-            entity.spawnAtLocation((ServerLevel) entity.level(), item); // Respawn it if it has items left
-                }
-            });
-        }
-    }
-
-    private static void removeItems(ServerPlayer player, ItemStack itemToRemove, Supplier<ItemStack> getter, BiConsumer<ItemStack, Integer> setter) {
+    private static void removeItems(ItemStack itemToRemove, Supplier<ItemStack> getter, BiConsumer<ItemStack, Integer> setter) {
         if (itemToRemove.isEmpty()) return;
 
         ItemStack item = getter.get();

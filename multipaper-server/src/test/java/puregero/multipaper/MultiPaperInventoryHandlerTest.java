@@ -7,6 +7,7 @@ import net.minecraft.world.item.Items;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,18 @@ class MultiPaperInventoryHandlerTest {
 
         assertFalse(inventory.items.isDirty);
         assertFalse(inventory.items.markDirty());
+    }
+
+    @Test
+    void staleInventoryCompensationRemovesItemsFromPlayerInventory() {
+        Inventory inventory = new Inventory(null, new PlayerEquipment(null));
+        inventory.items.set(0, new ItemStack(Items.DIAMOND, 5));
+        ItemStack duplicateToRemove = new ItemStack(Items.DIAMOND, 3);
+
+        MultiPaperInventoryHandler.removeFromInventory("test", duplicateToRemove, inventory.compartments);
+
+        assertEquals(2, inventory.items.get(0).getCount());
+        assertTrue(duplicateToRemove.isEmpty());
     }
 
     @Test
