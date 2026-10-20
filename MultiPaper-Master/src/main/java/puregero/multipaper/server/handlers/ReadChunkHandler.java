@@ -19,6 +19,12 @@ public class ReadChunkHandler {
                 if (b == null) {
                     b = new byte[0];
                 }
+                // An entity subscriber is a valid peer read source only once its
+                // initial entity data is available. Register before replying so
+                // subsequent reads can safely be redirected to this connection.
+                if (message.path.equals("entities")) {
+                    EntitiesSubscriptionManager.subscribe(connection, message.world, message.cx, message.cz);
+                }
                 connection.sendReply(new DataMessageReply(b), message);
             });
         };
@@ -34,7 +40,10 @@ public class ReadChunkHandler {
 
     private static boolean checkIfLoadedOnAnotherServer(ServerConnection connection, String world, String path, int cx, int cz, ReadChunkMessage message) {
         if (path.equals("region")) {
-            ServerConnection alreadyLoadedChunk = ChunkSubscriptionManager.getOwnerOrSubscriber(world, cx, cz);
+            // A subscriber may still be waiting for its first chunk read. Redirect only to a
+            // server that owns the chunk; redirecting between unowned subscribers can form
+            // a read cycle during concurrent backend startup.
+            ServerConnection alreadyLoadedChunk = ChunkSubscriptionManager.getOwner(world, cx, cz);
             ChunkSubscriptionManager.subscribe(connection, world, cx, cz);
             if (alreadyLoadedChunk != null && alreadyLoadedChunk != connection) {
                 ChunkSubscriptionManager.debug("read " + world + "," + path + "," + cx + "," + cz + " by " + connection.getBungeeCordName() + " -> peer " + alreadyLoadedChunk.getBungeeCordName()); // MultiPaper
@@ -46,7 +55,6 @@ public class ReadChunkHandler {
 
         if (path.equals("entities")) {
             ServerConnection alreadyLoadedEntities = EntitiesSubscriptionManager.getSubscriber(world, cx, cz);
-            EntitiesSubscriptionManager.subscribe(connection, world, cx, cz);
             if (alreadyLoadedEntities != null && alreadyLoadedEntities != connection) {
                 connection.sendReply(new ChunkLoadedOnAnotherServerMessage(alreadyLoadedEntities.getBungeeCordName()), message);
                 return true;

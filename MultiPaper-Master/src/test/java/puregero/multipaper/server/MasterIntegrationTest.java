@@ -21,6 +21,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestE
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.StartMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SetPortMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnlockChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnsubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
@@ -215,10 +216,11 @@ class MasterIntegrationTest {
         ServerBoundMessage readReply = serverA.request(new ReadChunkMessage(WORLD, "region", 5, 0));
         assertArrayEquals(CHUNK_PAYLOAD, ((DataMessageReply) readReply).data);
 
-        // server-a is now subscribed to the chunk, so server-b gets redirected to it.
+        // A read subscription alone does not make server-a a safe peer source.
+        // Without chunk ownership, server-b must read the master's stored bytes.
         ServerBoundMessage replyB = serverB.request(new ReadChunkMessage(WORLD, "region", 5, 0));
-        assertTrue(replyB instanceof ChunkLoadedOnAnotherServerMessage, "Expected redirect, got " + replyB.getClass());
-        assertEquals("server-a", ((ChunkLoadedOnAnotherServerMessage) replyB).server);
+        assertTrue(replyB instanceof DataMessageReply, "Expected master storage read, got " + replyB.getClass());
+        assertArrayEquals(CHUNK_PAYLOAD, ((DataMessageReply) replyB).data);
     }
 
     @Test
@@ -657,6 +659,80 @@ class MasterIntegrationTest {
         } finally {
             readerClient.close();
             writer.close();
+        }
+    }
+
+    @Test
+    @Order(25)
+    void unownedChunkSubscribersDoNotRedirectReadsToEachOther() throws Exception {
+        String world = "concurrent-startup-world";
+        int chunkX = 41;
+        int chunkZ = -29;
+
+        TestServerClient subscriber = TestServerClient.connect(port, "unowned-subscriber");
+        TestServerClient reader = TestServerClient.connect(port, "unowned-reader");
+        try {
+            subscriber.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            subscriber.request(new PingMessage()); // Ensure the subscription is registered before the read.
+
+            ServerBoundMessage reply = reader.request(new ReadChunkMessage(world, "region", chunkX, chunkZ));
+            assertTrue(reply instanceof DataMessageReply, "An unowned subscriber must not be treated as a read owner");
+            assertArrayEquals(new byte[0], ((DataMessageReply) reply).data, "A fresh chunk read must fall through to Master storage");
+        } finally {
+            subscriber.close();
+            reader.close();
+        }
+    }
+
+    @Test
+    @Order(26)
+    void entityReadersDoNotRedirectToBackendWaitingForFirstRead() throws Exception {
+        String world = "concurrent-entity-startup-world";
+        int chunkX = 43;
+        int chunkZ = -31;
+        byte[] entityPayload = "initial-entity-data".getBytes(StandardCharsets.UTF_8);
+
+        TestServerClient firstServer = TestServerClient.connect(port, "entity-startup-first");
+        TestServerClient secondServer = TestServerClient.connect(port, "entity-startup-second");
+        try {
+            firstServer.send(new WillSaveEntitiesLaterMessage(world, chunkX, chunkZ));
+            firstServer.request(new PingMessage()); // Ensure the entity write lock is active.
+
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> firstRead = new java.util.concurrent.CompletableFuture<>();
+            Thread firstReader = new Thread(() -> {
+                try {
+                    firstRead.complete(firstServer.request(new ReadChunkMessage(world, "entities", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    firstRead.completeExceptionally(e);
+                }
+            });
+            firstReader.setDaemon(true);
+            firstReader.start();
+
+            Thread.sleep(300);
+            assertFalse(firstRead.isDone(), "The first entity read should wait for the pending write");
+
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> secondRead = new java.util.concurrent.CompletableFuture<>();
+            Thread secondReader = new Thread(() -> {
+                try {
+                    secondRead.complete(secondServer.request(new ReadChunkMessage(world, "entities", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    secondRead.completeExceptionally(e);
+                }
+            });
+            secondReader.setDaemon(true);
+            secondReader.start();
+
+            Thread.sleep(300);
+            assertFalse(secondRead.isDone(), "A reader must not redirect to a backend waiting for its first entity read");
+
+            ServerBoundMessage writeReply = firstServer.request(new WriteChunkMessage(world, "entities", chunkX, chunkZ, entityPayload));
+            assertTrue(((BooleanMessageReply) writeReply).result);
+            assertArrayEquals(entityPayload, ((DataMessageReply) firstRead.get(10, TimeUnit.SECONDS)).data);
+            assertArrayEquals(entityPayload, ((DataMessageReply) secondRead.get(10, TimeUnit.SECONDS)).data);
+        } finally {
+            firstServer.close();
+            secondServer.close();
         }
     }
 }
