@@ -82,10 +82,7 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
                 pulledItemStack.setCount(count);
                 origItemStack.setCount(origItemStack.getCount() - count);
 
-                boolean previousUpdating = puregero.multipaper.MultiPaperInventoryHandler.updatingInventory;
-                puregero.multipaper.MultiPaperInventoryHandler.updatingInventory = true;
-                container.setItem(this.slot, origItemStack);
-                puregero.multipaper.MultiPaperInventoryHandler.updatingInventory = previousUpdating;
+                puregero.multipaper.MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> container.setItem(this.slot, origItemStack));
                 container.setChanged();
 
                 connection.send(new AddItemToContainerPacket(level, this.destination, 0, pulledItemStack));

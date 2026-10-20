@@ -8,6 +8,8 @@ import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Normal
 class MultiPaperInventoryHandlerTest {
@@ -20,5 +22,33 @@ class MultiPaperInventoryHandlerTest {
 
         assertFalse(inventory.items.isDirty);
         assertFalse(inventory.items.markDirty());
+    }
+
+    @Test
+    void inventoryUpdateSuppressionIsRestoredWhenMutationThrows() {
+        assertFalse(MultiPaperInventoryHandler.updatingInventory);
+
+        assertThrows(IllegalStateException.class, () -> MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> {
+            assertTrue(MultiPaperInventoryHandler.updatingInventory);
+            throw new IllegalStateException("simulated failed inventory load");
+        }));
+
+        assertFalse(MultiPaperInventoryHandler.updatingInventory);
+    }
+
+    @Test
+    void nestedInventoryUpdateSuppressionRestoresTheOuterState() {
+        MultiPaperInventoryHandler.updatingInventory = true;
+        try {
+            MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> {
+                assertTrue(MultiPaperInventoryHandler.updatingInventory);
+                MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> assertTrue(MultiPaperInventoryHandler.updatingInventory));
+                assertTrue(MultiPaperInventoryHandler.updatingInventory);
+            });
+
+            assertTrue(MultiPaperInventoryHandler.updatingInventory);
+        } finally {
+            MultiPaperInventoryHandler.updatingInventory = false;
+        }
     }
 }

@@ -48,6 +48,16 @@ public class MultiPaperInventoryHandler {
     private static final HashMap<UUID, ArrayList<AwaitingTeleport>> awaitingTeleports = new HashMap<>();
     private static final Set<NonNullListFilter<? extends ItemStack>> modifiedInventories = new LinkedHashSet<>();
 
+    public static void runWithInventoryUpdatesSuppressed(Runnable action) {
+        boolean previousUpdatingInventory = updatingInventory;
+        updatingInventory = true;
+        try {
+            action.run();
+        } finally {
+            updatingInventory = previousUpdatingInventory;
+        }
+    }
+
     public static boolean handlePacketFromExternalServer(ExternalServer server, ServerPlayer player, Packet<?> packet) {
         if (packet instanceof ClientboundOpenScreenPacket) {
             // An external server has requested to open a window on a player
@@ -123,7 +133,10 @@ public class MultiPaperInventoryHandler {
     }
 
     public static void updateInventory(ServerPlayer player, String name, int slot, ItemStack replacingItem, ItemStack item) {
-        updatingInventory = true; // Don't let these changes mark the inventories as dirty
+        runWithInventoryUpdatesSuppressed(() -> updateInventoryWithoutMarkingDirty(player, name, slot, replacingItem, item));
+    }
+
+    private static void updateInventoryWithoutMarkingDirty(ServerPlayer player, String name, int slot, ItemStack replacingItem, ItemStack item) {
         NonNullListFilter<ItemStack> component = null;
         switch (name) {
             case "items" -> component = player.getInventory().items;
@@ -180,7 +193,6 @@ public class MultiPaperInventoryHandler {
             }
         }
 
-        updatingInventory = false;
     }
 
     private static void addItem(ItemStack itemStack, ServerPlayer player) {

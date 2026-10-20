@@ -62,9 +62,9 @@ public class ExternalPlayer extends ServerPlayer {
 
     public ExternalPlayer(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, int entityId) {
         super(((CraftServer) Bukkit.getServer()).getServer(), ((CraftWorld) Bukkit.getWorld(world)).getHandle(), gameProfile, net.minecraft.server.level.ClientInformation.createDefault());
-        MultiPaperInventoryHandler.updatingInventory = true;
-        this.load(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, this.level().registryAccess(), saveData));
-        MultiPaperInventoryHandler.updatingInventory = false;
+        MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> this.load(
+            net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, this.level().registryAccess(), saveData)
+        ));
 
         if (MultiPaperConfiguration.get().syncSettings.syncEntityIds) {
             setId(entityId);

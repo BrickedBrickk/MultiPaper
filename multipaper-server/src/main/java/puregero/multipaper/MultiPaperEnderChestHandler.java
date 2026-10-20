@@ -85,8 +85,12 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
     }
 
     public static void updateInventory(ServerPlayer player, int slot, ItemStack item) {
+        boolean previousBroadcastChanges = broadcastChanges;
         broadcastChanges = false;
-        player.getEnderChestInventory().setItem(slot, item);
-        broadcastChanges = true;
+        try {
+            player.getEnderChestInventory().setItem(slot, item);
+        } finally {
+            broadcastChanges = previousBroadcastChanges;
+        }
     }
 }
