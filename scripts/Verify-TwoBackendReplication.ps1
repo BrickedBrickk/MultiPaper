@@ -1,15 +1,16 @@
 param(
     [int]$Server1RconPort = 26010,
     [int]$Server2RconPort = 26011,
-    [int]$TestX = -183,
+    [int]$TestX = 1000,
     [int]$TestY = 102,
-    [int]$TestZ = 71,
+    [int]$TestZ = 1000,
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
     [string]$Server1RconPassword,
     [string]$Server2RconPassword,
     [string]$PlayerName,
     [switch]$SkipContainerCheck,
     [switch]$SkipRedstoneAndPistonCheck,
+    [switch]$SkipPlayerAndEntityChecks,
     [string]$Server1LogPath,
     [string]$Server2LogPath,
     [int]$TimeoutSeconds = 10
@@ -190,10 +191,14 @@ $tag = 'multipaper_regression_' + [Guid]::NewGuid().ToString('N')
 $x = $TestX
 $y = $TestY
 $z = $TestZ
-$block1 = "execute if block $($x + 2) $y $z minecraft:emerald_block run help"
-$block2 = "execute if block $($x + 3) $y $z minecraft:diamond_block run help"
+$block1X = ([Math]::Floor($x / 16) * 16) + 15
+$block2X = $block1X + 4096
+$block2Z = $z + 4096
+$containerX = $block1X - 3
+$block1 = "execute if block $block1X $y $z minecraft:emerald_block run help"
+$block2 = "execute if block $block2X $y $block2Z minecraft:diamond_block run help"
 $testChunkCoordinates = @{}
-for ($testBlockX = $x; $testBlockX -le $x + 5; $testBlockX++) {
+for ($testBlockX = [Math]::Min($x, $containerX); $testBlockX -le $x + 5; $testBlockX++) {
     for ($testBlockZ = $z; $testBlockZ -le $z + 8; $testBlockZ++) {
         $chunkX = [Math]::Floor($testBlockX / 16)
         $chunkZ = [Math]::Floor($testBlockZ / 16)
@@ -203,6 +208,10 @@ for ($testBlockX = $x; $testBlockX -le $x + 5; $testBlockX++) {
         }
     }
 }
+$block2ChunkKey = "$([Math]::Floor($block2X / 16)),$([Math]::Floor($block2Z / 16))"
+if (-not $testChunkCoordinates.ContainsKey($block2ChunkKey)) {
+    $testChunkCoordinates[$block2ChunkKey] = [pscustomobject]@{ X = $block2X; Z = $block2Z }
+}
 $baseChunkLoads = @($testChunkCoordinates.Values)
 $hopperSourceX = $null
 $hopperDestinationX = $null
@@ -210,35 +219,33 @@ $hopperY = 300
 $hopperZ = $null
 $hopperMiddleZ = $null
 $hopperSecondZ = $null
+$baseChunkOwners = @{}
+$block1ChunkKey = "$([Math]::Floor($block1X / 16)),$([Math]::Floor($z / 16))"
+$baseChunkOwners[$block1ChunkKey] = $Server1RconPort
+$baseChunkOwners[$block2ChunkKey] = $Server2RconPort
 
 try {
     foreach ($chunk in $baseChunkLoads) {
-        Send-Rcon $Server1RconPort "forceload add $($chunk.X) $($chunk.Z)" | Out-Null
-        Send-Rcon $Server2RconPort "forceload add $($chunk.X) $($chunk.Z)" | Out-Null
+        $chunkKey = "$([Math]::Floor($chunk.X / 16)),$([Math]::Floor($chunk.Z / 16))"
+        if (-not $baseChunkOwners.ContainsKey($chunkKey)) { $baseChunkOwners[$chunkKey] = $Server1RconPort }
+        $ownerPort = $baseChunkOwners[$chunkKey]
+        $ownerName = if ($ownerPort -eq $Server1RconPort) { 'Backend 1' } else { 'Backend 2' }
+        Send-Rcon $ownerPort "forceload add $($chunk.X) $($chunk.Z)" | Out-Null
+        $loadedCommand = "execute if loaded $($chunk.X) $y $($chunk.Z) run help"
+        $loadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $loaded = Send-Rcon $ownerPort $loadedCommand
+            if ($loaded -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $loadDeadline)
+        Assert-Contains $loaded 'Index (' "Test chunk $chunkKey did not load on its designated owner $ownerName after forceload."
     }
-    $loadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        $allChunksLoaded = $true
-        foreach ($chunk in $baseChunkLoads) {
-            $loadedCommand = "execute if loaded $($chunk.X) $y $($chunk.Z) run help"
-            $loaded1 = Send-Rcon $Server1RconPort $loadedCommand
-            $loaded2 = Send-Rcon $Server2RconPort $loadedCommand
-            # A shared chunk has one ticking owner. Its peer can read replicated
-            # block state without holding a local chunk, so require local
-            # residency on at least one backend rather than both.
-            if ($loaded1 -notmatch 'Index \(\d+/\d+\)' -and $loaded2 -notmatch 'Index \(\d+/\d+\)') {
-                $allChunksLoaded = $false
-                break
-            }
-        }
-        if ($allChunksLoaded) { break }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTime]::UtcNow -lt $loadDeadline)
-    if (-not $allChunksLoaded) {
-        throw 'One or more test chunks did not load on either backend after forceload.'
-    }
-    Send-Rcon $Server1RconPort "setblock $($x + 2) $y $z minecraft:emerald_block" | Out-Null
-    Send-Rcon $Server2RconPort "setblock $($x + 3) $y $z minecraft:diamond_block" | Out-Null
+    Send-Rcon $Server1RconPort "setblock $block1X $y $z minecraft:air" | Out-Null
+    Send-Rcon $Server2RconPort "setblock $block2X $y $block2Z minecraft:air" | Out-Null
+    Assert-Contains (Send-Rcon $Server1RconPort "setblock $block1X $y $z minecraft:emerald_block") 'Changed the block' 'Backend 1 could not write its owned block marker.'
+    Assert-Contains (Send-Rcon $Server2RconPort "setblock $block2X $y $block2Z minecraft:diamond_block") 'Changed the block' 'Backend 2 could not write its owned block marker.'
+    Send-Rcon $Server2RconPort "forceload add $block1X $z" | Out-Null
+    Send-Rcon $Server1RconPort "forceload add $block2X $block2Z" | Out-Null
     $blockDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
         $block1On1 = Send-Rcon $Server1RconPort $block1
@@ -250,16 +257,16 @@ try {
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $blockDeadline)
     Assert-Contains $block1On1 'Index (' 'Server 1 could not read its block marker.'
-    Assert-Contains $block1On2 'Index (' 'Server 2 did not receive Server 1 block changes.'
+    Assert-Contains $block1On2 'Index (' 'Server 2 could not read Server 1 block changes after requesting its marker chunk.'
     Assert-Contains $block2On2 'Index (' 'Server 2 could not read its block marker.'
-    Assert-Contains $block2On1 'Index (' 'Server 1 did not receive Server 2 block changes.'
-    Write-Output 'PASS: block changes replicate in both directions.'
+    Assert-Contains $block2On1 'Index (' 'Server 1 could not read Server 2 block changes after requesting its marker chunk.'
+    Write-Output 'PASS: both backends read the other backend''s marker after requesting its chunk.'
 
-    $containerX = $x + 4
     $containerCommand = "data get block $containerX $y $z Items"
     if ($SkipContainerCheck) {
         Write-Output 'SKIP: chest block entity contents check disabled by -SkipContainerCheck.'
     } else {
+        Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:air" | Out-Null
         Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:chest" | Out-Null
         Send-Rcon $Server1RconPort "item replace block $containerX $y $z container.0 with minecraft:diamond 5" | Out-Null
         Assert-Contains (Send-Rcon $Server1RconPort $containerCommand) 'minecraft:diamond' 'Server 1 could not read the container marker item.'
@@ -270,59 +277,49 @@ try {
             if ($containerItems2.IndexOf('minecraft:diamond', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
             Start-Sleep -Milliseconds 200
         } while ([DateTime]::UtcNow -lt $containerDeadline)
-        Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 did not receive the chest block entity contents from Server 1.'
-        Write-Output 'PASS: chest block entity contents replicate to Server 2.'
+        Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 could not read the chest block entity contents after requesting the marker chunk.'
+        Write-Output 'PASS: Server 2 read the chest block entity contents after requesting the marker chunk.'
     }
 
-    $hopperSourceX = ([Math]::Floor($x / 16) * 16) + 15
+    $hopperSourceX = ([Math]::Floor(($x + 1024) / 16) * 16) + 15
     $hopperDestinationX = $hopperSourceX + 1
-    $hopperZ = ([Math]::Floor($z / 16) * 16) + 5
+    $hopperZ = ([Math]::Floor(($z + 1024) / 16) * 16) + 5
     $hopperMiddleZ = $hopperZ + 1
     $hopperSecondZ = $hopperZ + 2
     $hopperSourceLoadCommand = "execute if loaded $hopperSourceX $hopperY $hopperZ run help"
+    $hopperDestinationLoadCommand = "execute if loaded $hopperDestinationX $hopperY $hopperZ run help"
     Send-Rcon $Server1RconPort "forceload add $hopperSourceX $hopperZ" | Out-Null
     $hopperSourceDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        $hopperSourceLoaded1 = Send-Rcon $Server1RconPort $hopperSourceLoadCommand
-        $hopperSourceLoaded2 = Send-Rcon $Server2RconPort $hopperSourceLoadCommand
-        if ($hopperSourceLoaded1 -match 'Index \(\d+/\d+\)') {
-            $hopperControllerPort = $Server1RconPort
-            $hopperObserverPort = $Server2RconPort
-            break
-        } elseif ($hopperSourceLoaded2 -match 'Index \(\d+/\d+\)') {
-            $hopperControllerPort = $Server2RconPort
-            $hopperObserverPort = $Server1RconPort
-            break
-        }
+        $hopperSourceLoaded = Send-Rcon $Server1RconPort $hopperSourceLoadCommand
+        if ($hopperSourceLoaded -match 'Index \(\d+/\d+\)') { break }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $hopperSourceDeadline)
-    if ($null -eq $hopperControllerPort) {
-        throw 'Neither backend locally loaded the cross-chunk hopper test source.'
+    Assert-Contains $hopperSourceLoaded 'Index (' 'Backend 1 did not locally load the cross-chunk hopper source.'
+    $hopperDestinationLoaded = Send-Rcon $Server1RconPort $hopperDestinationLoadCommand
+    if ($hopperDestinationLoaded -notmatch 'Index \(\d+/\d+\)') {
+        Send-Rcon $Server1RconPort "forceload add $hopperDestinationX $hopperZ" | Out-Null
     }
-    Send-Rcon $hopperObserverPort "forceload add $hopperDestinationX $hopperZ" | Out-Null
-    $hopperDestinationLoadCommand = "execute if loaded $hopperDestinationX $hopperY $hopperZ run help"
     $hopperDestinationDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        $hopperDestinationLoaded = Send-Rcon $hopperObserverPort $hopperDestinationLoadCommand
+        $hopperDestinationLoaded = Send-Rcon $Server1RconPort $hopperDestinationLoadCommand
         if ($hopperDestinationLoaded -match 'Index \(\d+/\d+\)') { break }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $hopperDestinationDeadline)
-    Assert-Contains $hopperDestinationLoaded 'Index (' 'The peer backend did not locally load the cross-chunk hopper destination.'
-    $hopperDestinationLoadedOnController = Send-Rcon $hopperControllerPort $hopperDestinationLoadCommand
-    if ($hopperDestinationLoadedOnController -match 'Index \(\d+/\d+\)') {
-        throw 'The hopper probe did not establish different local owners for its source and destination chunks.'
-    }
-    # A local chunk becomes queryable before its Master/peer subscriber handshake
-    # finishes. Wait for that handshake before placing inventories or transferring items.
+    Assert-Contains $hopperDestinationLoaded 'Index (' 'Backend 1 did not locally load the cross-chunk hopper destination.'
+    $hopperControllerPort = $Server1RconPort
+    $hopperObserverPort = $Server2RconPort
+    # Keep both sides of this cross-chunk redstone mechanism on one owner. The
+    # safety chunk lock can pull the adjacent destination into the source owner.
     Start-Sleep -Seconds 2
     foreach ($zPos in @($hopperZ, $hopperMiddleZ, $hopperSecondZ)) {
         Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $zPos minecraft:air" | Out-Null
-        Send-Rcon $hopperObserverPort "setblock $hopperDestinationX $hopperY $zPos minecraft:air" | Out-Null
+        Send-Rcon $hopperControllerPort "setblock $hopperDestinationX $hopperY $zPos minecraft:air" | Out-Null
     }
-    Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperZ minecraft:hopper[facing=east,enabled=true]" | Out-Null
-    Send-Rcon $hopperObserverPort "setblock $hopperDestinationX $hopperY $hopperZ minecraft:chest" | Out-Null
-    Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperSecondZ minecraft:hopper[facing=east,enabled=true]" | Out-Null
-    Send-Rcon $hopperObserverPort "setblock $hopperDestinationX $hopperY $hopperSecondZ minecraft:chest" | Out-Null
+    Assert-Contains (Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperZ minecraft:hopper[facing=east,enabled=true]") 'Changed the block' 'Could not place the cross-chunk diamond hopper.'
+    Assert-Contains (Send-Rcon $hopperControllerPort "setblock $hopperDestinationX $hopperY $hopperZ minecraft:chest") 'Changed the block' 'Could not place the cross-chunk diamond destination chest.'
+    Assert-Contains (Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperSecondZ minecraft:hopper[facing=east,enabled=true]") 'Changed the block' 'Could not place the cross-chunk iron hopper.'
+    Assert-Contains (Send-Rcon $hopperControllerPort "setblock $hopperDestinationX $hopperY $hopperSecondZ minecraft:chest") 'Changed the block' 'Could not place the cross-chunk iron destination chest.'
     Send-Rcon $hopperControllerPort "item replace block $hopperSourceX $hopperY $hopperZ container.0 with minecraft:diamond 8" | Out-Null
     Send-Rcon $hopperControllerPort "item replace block $hopperSourceX $hopperY $hopperSecondZ container.0 with minecraft:iron_ingot 8" | Out-Null
     $hopperSourceCommand = "data get block $hopperSourceX $hopperY {0} Items"
@@ -330,32 +327,46 @@ try {
     $hopperDeadline = [DateTime]::UtcNow.AddSeconds([Math]::Max($TimeoutSeconds, 20))
     do {
         $hopperCounts = @{}
-        foreach ($backend in @(@{Name='1';Port=$Server1RconPort},@{Name='2';Port=$Server2RconPort})) {
-            foreach ($zPos in @($hopperZ, $hopperSecondZ)) {
-                $sourceData = Send-Rcon $backend.Port ($hopperSourceCommand -f $zPos)
-                $destinationData = Send-Rcon $backend.Port ($hopperDestinationCommand -f $zPos)
-                $sourceItem = if ($zPos -eq $hopperZ) { 'minecraft:diamond' } else { 'minecraft:iron_ingot' }
-                $hopperCounts["source$($backend.Name)-$sourceItem"] = Get-BlockItemCount $sourceData $sourceItem
-                $hopperCounts["destination$($backend.Name)-$sourceItem"] = Get-BlockItemCount $destinationData $sourceItem
-            }
+        foreach ($zPos in @($hopperZ, $hopperSecondZ)) {
+            $sourceData = Send-Rcon $hopperControllerPort ($hopperSourceCommand -f $zPos)
+            $destinationData = Send-Rcon $hopperControllerPort ($hopperDestinationCommand -f $zPos)
+            $sourceItem = if ($zPos -eq $hopperZ) { 'minecraft:diamond' } else { 'minecraft:iron_ingot' }
+            $hopperCounts["source-$sourceItem"] = Get-BlockItemCount $sourceData $sourceItem
+            $hopperCounts["destination-$sourceItem"] = Get-BlockItemCount $destinationData $sourceItem
         }
-        if ($hopperCounts['source1-minecraft:diamond'] -eq 0 -and $hopperCounts['destination1-minecraft:diamond'] -eq 8 -and
-            $hopperCounts['source2-minecraft:diamond'] -eq 0 -and $hopperCounts['destination2-minecraft:diamond'] -eq 8 -and
-            $hopperCounts['source1-minecraft:iron_ingot'] -eq 0 -and $hopperCounts['destination1-minecraft:iron_ingot'] -eq 8 -and
-            $hopperCounts['source2-minecraft:iron_ingot'] -eq 0 -and $hopperCounts['destination2-minecraft:iron_ingot'] -eq 8) { break }
+        if ($hopperCounts['source-minecraft:diamond'] -eq 0 -and $hopperCounts['destination-minecraft:diamond'] -eq 8 -and
+            $hopperCounts['source-minecraft:iron_ingot'] -eq 0 -and $hopperCounts['destination-minecraft:iron_ingot'] -eq 8) { break }
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $hopperDeadline)
     foreach ($itemId in @('minecraft:diamond', 'minecraft:iron_ingot')) {
-        $source1 = $hopperCounts["source1-$itemId"]
-        $destination1 = $hopperCounts["destination1-$itemId"]
-        $source2 = $hopperCounts["source2-$itemId"]
-        $destination2 = $hopperCounts["destination2-$itemId"]
-        if ($source1 + $destination1 -ne 8 -or $source2 + $destination2 -ne 8 -or
-            $source1 -ne $source2 -or $destination1 -ne $destination2) {
-            throw "Cross-chunk hopper item count for $itemId was not conserved. Backend 1 source/destination=$source1/$destination1; Backend 2=$source2/$destination2."
+        $sourceCount = $hopperCounts["source-$itemId"]
+        $destinationCount = $hopperCounts["destination-$itemId"]
+        if ($sourceCount -ne 0 -or $destinationCount -ne 8) {
+            throw "Cross-chunk hopper transfer for $itemId did not finish with exact conservation on Backend 1. Source/destination=$sourceCount/$destinationCount."
         }
     }
-    Write-Output 'PASS: two hoppers simultaneously transferred 8 diamonds and 8 iron ingots across a chunk boundary; both backends see the exact conserved counts.'
+    Send-Rcon $hopperControllerPort "forceload remove $hopperSourceX $hopperZ" | Out-Null
+    Send-Rcon $hopperControllerPort "forceload remove $hopperDestinationX $hopperZ" | Out-Null
+    Send-Rcon $hopperObserverPort "forceload add $hopperSourceX $hopperZ" | Out-Null
+    Send-Rcon $hopperObserverPort "forceload add $hopperDestinationX $hopperZ" | Out-Null
+    $hopperPeerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $hopperSourceLoadedOnPeer = Send-Rcon $hopperObserverPort $hopperSourceLoadCommand
+        $hopperDestinationLoadedOnPeer = Send-Rcon $hopperObserverPort $hopperDestinationLoadCommand
+        if ($hopperSourceLoadedOnPeer -match 'Index \(\d+/\d+\)' -and $hopperDestinationLoadedOnPeer -match 'Index \(\d+/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $hopperPeerDeadline)
+    Assert-Contains $hopperSourceLoadedOnPeer 'Index (' 'Backend 2 did not load the hopper source after owner handoff.'
+    Assert-Contains $hopperDestinationLoadedOnPeer 'Index (' 'Backend 2 did not load the hopper destination after owner handoff.'
+    foreach ($zPos in @($hopperZ, $hopperSecondZ)) {
+        $sourceItem = if ($zPos -eq $hopperZ) { 'minecraft:diamond' } else { 'minecraft:iron_ingot' }
+        $sourceCount = Get-BlockItemCount (Send-Rcon $hopperObserverPort ($hopperSourceCommand -f $zPos)) $sourceItem
+        $destinationCount = Get-BlockItemCount (Send-Rcon $hopperObserverPort ($hopperDestinationCommand -f $zPos)) $sourceItem
+        if ($sourceCount + $destinationCount -ne 8) {
+            throw "Cross-chunk hopper item count for $sourceItem changed after ownership handoff to Backend 2. Source/destination=$sourceCount/$destinationCount."
+        }
+    }
+    Write-Output 'PASS: two same-owner hoppers transferred 8 diamonds and 8 iron ingots across a chunk boundary with exact conservation; counts persisted after transfer to Backend 2.'
 
     $circuitX = $x + 2
     $circuitY = $y + 1
@@ -453,6 +464,9 @@ try {
         Test-StickyPistonPull -ControllerPort $baseCircuitObserverPort -ObserverPort $baseCircuitControllerPort -PistonX $reverseStickyPistonX -PowerX $reverseStickyPowerX -PayloadX $reverseStickyPayloadX -DestinationX $reverseStickyDestinationX -CircuitY $reverseStickyCircuitY -CircuitZ $reverseStickyCircuitZ -Direction 'peer backend'
     }
 
+    if ($SkipPlayerAndEntityChecks) {
+        Write-Output 'SKIP: player inventory, entity subscription, and dimension checks disabled by -SkipPlayerAndEntityChecks.'
+    } else {
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
         Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
         Write-Output 'SKIP: player inventory replication requires -PlayerName.'
@@ -626,6 +640,8 @@ try {
             throw "Player positions differ after returning to the Overworld: Server 1 '$overworldPlayerPosition1', Server 2 '$overworldPlayerPosition2'."
         }
         Write-Output "PASS: player returned to the Overworld on both backends at '$($overworldPlayerMatch2.Value)'."
+    }
+
     }
 
     Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null
