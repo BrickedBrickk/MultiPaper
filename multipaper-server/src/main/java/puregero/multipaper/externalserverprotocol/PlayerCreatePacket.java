@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PlayerCreatePacket extends ExternalServerPacket {
@@ -52,6 +53,8 @@ public class PlayerCreatePacket extends ExternalServerPacket {
     private final ConcurrentHashMap<String, String> data;
     private final ConcurrentHashMap<String, String> persistentData;
     private final int entityId;
+    private final UUID playerSyncSessionId;
+    private final String playerOwnerName;
 
     private PlayerCreatePacket(ServerPlayer player, CompoundTag saveData) {
         this.gameProfile = player.gameProfile;
@@ -70,6 +73,8 @@ public class PlayerCreatePacket extends ExternalServerPacket {
         this.data = player.getBukkitEntity().data;
         this.persistentData = player.getBukkitEntity().persistentData;
         this.entityId = player.getId();
+        this.playerSyncSessionId = PlayerSyncSession.getSessionId(player);
+        this.playerOwnerName = PlayerSyncSession.getOwnerName(player);
     }
 
     public PlayerCreatePacket(FriendlyByteBuf in) {
@@ -102,6 +107,8 @@ public class PlayerCreatePacket extends ExternalServerPacket {
         }
 
         entityId = in.readVarInt();
+        playerSyncSessionId = in.readUUID();
+        playerOwnerName = in.readUtf();
     }
 
     @Override
@@ -136,6 +143,8 @@ public class PlayerCreatePacket extends ExternalServerPacket {
         }
 
         out.writeVarInt(entityId);
+        out.writeUUID(playerSyncSessionId);
+        out.writeUtf(playerOwnerName);
     }
 
     @Override
@@ -155,7 +164,7 @@ public class PlayerCreatePacket extends ExternalServerPacket {
                 e.printStackTrace();
             }
 
-            ExternalPlayer player = ExternalPlayer.create(connection, gameProfile, world, x, y, z, yaw, pitch, gamemode, address, saveData, advancements, stats, entityId);
+            ExternalPlayer player = ExternalPlayer.create(connection, gameProfile, world, x, y, z, yaw, pitch, gamemode, address, saveData, advancements, stats, entityId, playerSyncSessionId, playerOwnerName);
             player.getBukkitEntity().data.putAll(data);
             player.getBukkitEntity().persistentData.putAll(persistentData);
             PlayerJoinExternalServerEvent playerJoinExternalServerEvent = new PlayerJoinExternalServerEvent(gameProfile.id(), gameProfile.name(), MultiPaperConfiguration.get().masterConnection.myName);

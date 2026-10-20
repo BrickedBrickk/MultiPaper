@@ -37,6 +37,8 @@ public class ExternalPlayer extends ServerPlayer {
     private static final Logger LOGGER = LogManager.getLogger(ExternalPlayer.class.getSimpleName());
     public static HashMap<UUID, String> loadedAdvancements = new HashMap<>();
     public static HashMap<UUID, String> loadedStats = new HashMap<>();
+    public final UUID playerSyncSessionId;
+    public final String playerOwnerName;
     public ExternalServerConnection externalServerConnection;
     private final InetSocketAddress address;
     private boolean sendPackets = true;
@@ -54,13 +56,13 @@ public class ExternalPlayer extends ServerPlayer {
                 && !(packet instanceof ClientboundSetChunkCacheRadiusPacket);
     }
 
-    public static ExternalPlayer create(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, String advancements, String stats, int entityId) {
+    public static ExternalPlayer create(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, String advancements, String stats, int entityId, UUID playerSyncSessionId, String playerOwnerName) {
         loadedAdvancements.put(gameProfile.id(), advancements);
         loadedStats.put(gameProfile.id(), stats);
-        return new ExternalPlayer(externalServerConnection, gameProfile, world, x, y, z, yaw, pitch, gamemode, address, saveData, entityId);
+        return new ExternalPlayer(externalServerConnection, gameProfile, world, x, y, z, yaw, pitch, gamemode, address, saveData, entityId, playerSyncSessionId, playerOwnerName);
     }
 
-    public ExternalPlayer(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, int entityId) {
+    public ExternalPlayer(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, int entityId, UUID playerSyncSessionId, String playerOwnerName) {
         super(((CraftServer) Bukkit.getServer()).getServer(), ((CraftWorld) Bukkit.getWorld(world)).getHandle(), gameProfile, net.minecraft.server.level.ClientInformation.createDefault());
         MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> this.load(
             net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, this.level().registryAccess(), saveData)
@@ -74,6 +76,8 @@ public class ExternalPlayer extends ServerPlayer {
         }
 
         this.externalServerConnection = externalServerConnection;
+        this.playerSyncSessionId = playerSyncSessionId;
+        this.playerOwnerName = playerOwnerName;
         this.address = address;
         this.isRealPlayer = true;
         this.valid = true;

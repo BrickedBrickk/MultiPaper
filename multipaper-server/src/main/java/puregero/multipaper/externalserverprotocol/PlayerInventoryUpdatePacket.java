@@ -9,10 +9,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import puregero.multipaper.ExternalPlayer;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperInventoryHandler;
+import puregero.multipaper.PlayerSyncSession;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -22,17 +22,27 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
     private static final Logger LOGGER = LogManager.getLogger(PlayerInventoryUpdatePacket.class.getSimpleName());
 
     private final UUID uuid;
+    private final UUID playerSyncSessionId;
+    private final String playerOwnerName;
     private final String component;
     private final CompoundTag tag;
 
     public PlayerInventoryUpdatePacket(ServerPlayer player, String component, CompoundTag tag) {
-        this.uuid = player.getUUID();
+        this(player.getUUID(), PlayerSyncSession.getSessionId(player), PlayerSyncSession.getOwnerName(player), component, tag);
+    }
+
+    PlayerInventoryUpdatePacket(UUID uuid, UUID playerSyncSessionId, String playerOwnerName, String component, CompoundTag tag) {
+        this.uuid = uuid;
+        this.playerSyncSessionId = playerSyncSessionId;
+        this.playerOwnerName = playerOwnerName;
         this.component = component;
         this.tag = tag;
     }
 
     public PlayerInventoryUpdatePacket(FriendlyByteBuf in) {
         uuid = in.readUUID();
+        playerSyncSessionId = in.readUUID();
+        playerOwnerName = in.readUtf();
         component = in.readUtf();
 
         try {
@@ -45,6 +55,8 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
     @Override
     public void write(FriendlyByteBuf out) {
         out.writeUUID(uuid);
+        out.writeUUID(playerSyncSessionId);
+        out.writeUtf(playerOwnerName);
         out.writeUtf(component);
 
         try {
@@ -64,8 +76,9 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
-            if (!isCurrentOwner(player, connection)) {
-                LOGGER.debug("Ignoring stale inventory update for player {} from a backend that no longer owns them", uuid);
+            if (!PlayerSyncSession.matches(PlayerSyncSession.getSessionId(player), playerSyncSessionId,
+                    PlayerSyncSession.getOwnerName(player), playerOwnerName)) {
+                LOGGER.debug("Ignoring stale inventory update for player {} from another player session or owner", uuid);
                 return;
             }
 
@@ -83,7 +96,11 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
         });
     }
 
-    static boolean isCurrentOwner(ServerPlayer player, ExternalServerConnection source) {
-        return player instanceof ExternalPlayer externalPlayer && externalPlayer.externalServerConnection == source;
+    UUID getPlayerSyncSessionId() {
+        return playerSyncSessionId;
+    }
+
+    String getPlayerOwnerName() {
+        return playerOwnerName;
     }
 }
