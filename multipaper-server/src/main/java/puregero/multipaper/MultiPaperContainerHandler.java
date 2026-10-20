@@ -12,6 +12,46 @@ import puregero.multipaper.externalserverprotocol.AddItemToContainerPacket;
 import puregero.multipaper.externalserverprotocol.AddItemToEntityContainerPacket;
 
 public class MultiPaperContainerHandler {
+    public enum ExternalTransferResult {
+        LOCAL,
+        SENT,
+        FAILED
+    }
+
+    public static ItemStack rollbackFailedExternalTransfer(Container destination, int slot, ItemStack originalDestination, ItemStack originalSource) {
+        destination.setItem(slot, originalDestination.copy());
+        return originalSource.copy();
+    }
+
+    public static boolean addItemToSlot(Container destination, int slot, ItemStack addition) {
+        if (slot < 0 || slot >= destination.getContainerSize() || addition.isEmpty() || !destination.canPlaceItem(slot, addition)) {
+            return false;
+        }
+
+        ItemStack current = destination.getItem(slot);
+        if (current.isEmpty()) {
+            if (addition.getCount() > Math.min(addition.getMaxStackSize(), destination.getMaxStackSize())) {
+                return false;
+            }
+            destination.setItem(slot, addition.copy());
+            return true;
+        }
+
+        if (!ItemStack.isSameItemSameComponents(current, addition)) {
+            return false;
+        }
+
+        int maxStackSize = Math.min(current.getMaxStackSize(), destination.getMaxStackSize());
+        if (addition.getCount() > maxStackSize - current.getCount()) {
+            return false;
+        }
+
+        ItemStack updated = current.copy();
+        updated.grow(addition.getCount());
+        destination.setItem(slot, updated);
+        return true;
+    }
+
     public static BlockEntity getPrimaryChest(CompoundContainer compoundContainer) {
         BlockEntity chest1 = (BlockEntity) compoundContainer.container1;
         BlockEntity chest2 = (BlockEntity) compoundContainer.container2;
@@ -27,23 +67,23 @@ public class MultiPaperContainerHandler {
         }
     }
 
-    public static boolean increaseItemExternal(Container to, int slot, ItemStack stack, int count) {
+    public static ExternalTransferResult increaseItemExternal(Container to, int slot, ItemStack stack, int count) {
         if (to instanceof Entity entity) {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(entity);
             if (MultiPaper.isChunkExternal(newChunkHolder)) {
                 stack = stack.copy();
                 stack.setCount(count);
-                newChunkHolder.externalOwner.getConnection().send(new AddItemToEntityContainerPacket(entity, slot, stack));
-
-                return true;
+                ExternalServerConnection connection = newChunkHolder.externalOwner.getConnection();
+                return connection != null && connection.send(new AddItemToEntityContainerPacket(entity, slot, stack))
+                        ? ExternalTransferResult.SENT : ExternalTransferResult.FAILED;
             } else {
-                return false;
+                return ExternalTransferResult.LOCAL;
             }
         }
 
         if (to instanceof ComposterBlock.InputContainer || to instanceof ComposterBlock.OutputContainer || to instanceof ComposterBlock.EmptyContainer) {
             // It doesn't really matter if we modify composters across servers (which might even be impossible anyways)
-            return false;
+            return ExternalTransferResult.LOCAL;
         }
 
         BlockEntity block;
@@ -58,11 +98,11 @@ public class MultiPaperContainerHandler {
         if (MultiPaper.isChunkExternal(newChunkHolder)) {
             stack = stack.copy();
             stack.setCount(count);
-            newChunkHolder.externalOwner.getConnection().send(new AddItemToContainerPacket(block, slot, stack));
-
-            return true;
+            ExternalServerConnection connection = newChunkHolder.externalOwner.getConnection();
+            return connection != null && connection.send(new AddItemToContainerPacket(block, slot, stack))
+                    ? ExternalTransferResult.SENT : ExternalTransferResult.FAILED;
         } else {
-            return false;
+            return ExternalTransferResult.LOCAL;
         }
     }
 }

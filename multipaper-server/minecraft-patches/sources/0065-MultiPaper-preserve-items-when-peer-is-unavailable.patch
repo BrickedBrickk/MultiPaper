@@ -1,0 +1,26 @@
+--- a/net/minecraft/world/level/block/entity/HopperBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/HopperBlockEntity.java
+@@ -29,1 +29,2 @@
+ import org.jspecify.annotations.Nullable;
++import puregero.multipaper.MultiPaperContainerHandler;
+@@ -581,2 +582,5 @@
+         ItemStack current = container.getItem(slot);
++        int startingStackSize = current.getCount(); // MultiPaper
++        ItemStack originalDestinationStack = current.copy(); // MultiPaper - restore an external mirror if its owner is unreachable
++        ItemStack originalSourceStack = itemStack.copy(); // MultiPaper - return the untransferred source items
+         if (canPlaceItemInContainer(container, itemStack, slot, direction)) {
+@@ -606,2 +610,9 @@
+             if (success) {
++                MultiPaperContainerHandler.ExternalTransferResult externalTransfer = MultiPaperContainerHandler.increaseItemExternal(
++                    container, slot, container.getItem(slot), container.getItem(slot).getCount() - startingStackSize
++                ); // MultiPaper - synchronize successful hopper insertion with the remote owner
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.FAILED) {
++                    return MultiPaperContainerHandler.rollbackFailedExternalTransfer(container, slot, originalDestinationStack, originalSourceStack);
++                }
++
+                 if (wasEmpty && container instanceof HopperBlockEntity hopperBlockEntity && !hopperBlockEntity.isOnCustomCooldown()) {
+@@ -616,1 +627,3 @@
+-                container.setChanged();
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.LOCAL) { // MultiPaper - don't change external containers
++                    container.setChanged();
++                }

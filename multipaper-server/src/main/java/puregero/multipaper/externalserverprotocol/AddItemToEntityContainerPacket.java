@@ -1,20 +1,18 @@
 package puregero.multipaper.externalserverprotocol;
 
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftWorld;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
+import puregero.multipaper.MultiPaperContainerHandler;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -67,12 +65,10 @@ public class AddItemToEntityContainerPacket extends ExternalServerPacket {
             Entity entity = level.getEntity(uuid);
 
             if (entity instanceof Container container) {
-                // We can assume the item is being added from the side as it's cross servers, so any side direction such as north will do
-                ItemStack leftOver = HopperBlockEntity.addItem(null, container, itemStack, Direction.NORTH);
-                if (!leftOver.isEmpty()) {
-                    LOGGER.warn("There was a left over " + leftOver + " after adding an item to " + container);
-                    ItemEntity item = new ItemEntity(level, entity.getX(), entity.getY(), entity.getZ(), leftOver);
-                    level.addFreshEntity(item);
+                if (MultiPaperContainerHandler.addItemToSlot(container, slot, itemStack)) {
+                    container.setChanged();
+                } else {
+                    LOGGER.warn("Could not add " + itemStack + " to slot " + slot + " in entity container " + entity);
                 }
             } else {
                 LOGGER.warn("Tried to set a " + itemStack + " in slot " + slot + " in a non-existent entity in " + world + " with uuid " + uuid + ": " + entity);

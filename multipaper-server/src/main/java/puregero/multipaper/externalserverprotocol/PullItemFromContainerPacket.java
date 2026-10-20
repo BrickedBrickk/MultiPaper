@@ -85,7 +85,7 @@ public class PullItemFromContainerPacket extends ExternalServerPacket {
                 puregero.multipaper.MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> container.setItem(this.slot, origItemStack));
                 container.setChanged();
 
-                connection.send(new AddItemToContainerPacket(level, this.destination, 0, pulledItemStack));
+                connection.send(new AddItemToContainerPacket(level, this.destination, -1, pulledItemStack));
             }
         });
     }

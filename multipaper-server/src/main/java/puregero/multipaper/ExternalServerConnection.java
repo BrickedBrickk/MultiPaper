@@ -217,20 +217,24 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
         return channel.isOpen();
     }
 
-    public void send(ExternalServerPacket packet) {
-        if (!channel.isOpen()) {
-            new IOException("Channel is closed for " + externalServer.getName()).printStackTrace();
-        } else {
-            onConnect.thenRun(() -> {
-                if (channel.eventLoop().inEventLoop()) {
-                    lastPacketSent = System.currentTimeMillis();
-                    channel.writeAndFlush(packet);
-                } else {
-                    lastPacketSent = System.currentTimeMillis();
-                    channel.eventLoop().execute(() -> channel.writeAndFlush(packet));
-                }
-            });
+    public boolean send(ExternalServerPacket packet) {
+        if (channel == null || !channel.isOpen()) {
+            return false;
         }
+
+        onConnect.thenRun(() -> {
+            if (!channel.isOpen()) {
+                return;
+            }
+            if (channel.eventLoop().inEventLoop()) {
+                lastPacketSent = System.currentTimeMillis();
+                channel.writeAndFlush(packet);
+            } else {
+                lastPacketSent = System.currentTimeMillis();
+                channel.eventLoop().execute(() -> channel.writeAndFlush(packet));
+            }
+        });
+        return true;
     }
 
     public void tick() {

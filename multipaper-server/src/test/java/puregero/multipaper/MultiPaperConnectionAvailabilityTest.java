@@ -1,6 +1,8 @@
 package puregero.multipaper;
 
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.channel.Channel;
+import puregero.multipaper.externalserverprotocol.ExternalServerPacket;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteTickTimeMessage;
@@ -9,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @Normal
 class MultiPaperConnectionAvailabilityTest {
@@ -51,5 +55,17 @@ class MultiPaperConnectionAvailabilityTest {
         } finally {
             channel.finishAndReleaseAll();
         }
+    }
+
+    @Test
+    void externalPacketSendIsRejectedWhenPeerChannelIsClosed() throws Exception {
+        Channel channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(false);
+        ExternalServerConnection connection = new ExternalServerConnection();
+        java.lang.reflect.Field channelField = ExternalServerConnection.class.getDeclaredField("channel");
+        channelField.setAccessible(true);
+        channelField.set(connection, channel);
+
+        assertFalse(connection.send(mock(ExternalServerPacket.class)));
     }
 }

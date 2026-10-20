@@ -16,6 +16,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftWorld;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
+import puregero.multipaper.MultiPaperContainerHandler;
 
 import java.io.IOException;
 
@@ -72,13 +73,18 @@ public class AddItemToContainerPacket extends ExternalServerPacket {
 
             if (container == null) {
                 LOGGER.warn("Tried to set a " + itemStack + " in slot " + slot + " in a non-existant container at " + world + " " + pos);
-            } else {
-                // We can assume the item is being added from the side as it's cross servers, so any side direction such as north will do
+            } else if (slot == -1) {
                 ItemStack leftOver = HopperBlockEntity.addItem(null, container, itemStack, Direction.NORTH);
                 if (!leftOver.isEmpty()) {
                     LOGGER.warn("There was a left over " + leftOver + " after adding an item to " + container.getClass().getSimpleName() + "@" + world + pos);
                     ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, leftOver);
                     level.addFreshEntity(item);
+                }
+            } else {
+                if (MultiPaperContainerHandler.addItemToSlot(container, slot, itemStack)) {
+                    container.setChanged();
+                } else {
+                    LOGGER.warn("Could not add " + itemStack + " to slot " + slot + " in " + container.getClass().getSimpleName() + "@" + world + pos);
                 }
             }
         });

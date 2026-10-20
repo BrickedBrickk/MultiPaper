@@ -84,31 +84,37 @@ index f03608a133338b0f5522a07239e06fd2245db1e5..ea4c04dcfecba89f294a2ee72f14fe83
          final ItemStack remainingItem = addItem(container, hopper, movedItem, null);
          final int remainingItemCount = remainingItem.getCount();
          if (remainingItemCount != movedItemCount) {
-@@ -667,6 +688,7 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
+@@ -667,6 +688,9 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
  
      private static ItemStack tryMoveInItem(@Nullable Container from, Container to, ItemStack stack, int slot, @Nullable Direction side) {
          ItemStack itemstack1 = to.getItem(slot);
 +        int startingStackSize = itemstack1.getCount(); // MultiPaper
++        ItemStack originalDestinationStack = itemstack1.copy(); // MultiPaper - restore an external mirror if its owner is unreachable
++        ItemStack originalSourceStack = stack.copy(); // MultiPaper - return the untransferred source items
  
          if (HopperBlockEntity.canPlaceItemInContainer(to, stack, slot, side)) {
              boolean flag = false;
-@@ -713,6 +735,7 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
+@@ -713,6 +737,11 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
                      }
                  }
  
-+                if (!MultiPaperContainerHandler.increaseItemExternal(to, slot, to.getItem(slot), to.getItem(slot).getCount() - startingStackSize)) // MultiPaper - don't change external containers
++                MultiPaperContainerHandler.ExternalTransferResult externalTransfer = MultiPaperContainerHandler.increaseItemExternal(to, slot, to.getItem(slot), to.getItem(slot).getCount() - startingStackSize); // MultiPaper
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.FAILED) {
++                    return MultiPaperContainerHandler.rollbackFailedExternalTransfer(to, slot, originalDestinationStack, originalSourceStack);
++                }
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.LOCAL) // MultiPaper - don't change external containers
                  to.setChanged();
              }
          }
 diff --git a/src/main/java/puregero/multipaper/MultiPaperContainerHandler.java b/src/main/java/puregero/multipaper/MultiPaperContainerHandler.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..e344051cfbd7441360a6aab811179aaca1f8f3aa
+index 0000000000000000000000000000000000000000..9aec43c65a1954bf6752c726bbe86497dd09af54
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/MultiPaperContainerHandler.java
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,108 @@
 +package puregero.multipaper;
 +
-+import io.papermc.paper.chunk.system.scheduling.NewChunkHolder;
++import ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder;
 +import net.minecraft.server.level.ServerLevel;
 +import net.minecraft.world.CompoundContainer;
 +import net.minecraft.world.Container;
@@ -120,6 +126,46 @@ index 0000000000000000000000000000000000000000..e344051cfbd7441360a6aab811179aac
 +import puregero.multipaper.externalserverprotocol.AddItemToEntityContainerPacket;
 +
 +public class MultiPaperContainerHandler {
++    public enum ExternalTransferResult {
++        LOCAL,
++        SENT,
++        FAILED
++    }
++
++    public static ItemStack rollbackFailedExternalTransfer(Container destination, int slot, ItemStack originalDestination, ItemStack originalSource) {
++        destination.setItem(slot, originalDestination.copy());
++        return originalSource.copy();
++    }
++
++    public static boolean addItemToSlot(Container destination, int slot, ItemStack addition) {
++        if (slot < 0 || slot >= destination.getContainerSize() || addition.isEmpty() || !destination.canPlaceItem(slot, addition)) {
++            return false;
++        }
++
++        ItemStack current = destination.getItem(slot);
++        if (current.isEmpty()) {
++            if (addition.getCount() > Math.min(addition.getMaxStackSize(), destination.getMaxStackSize())) {
++                return false;
++            }
++            destination.setItem(slot, addition.copy());
++            return true;
++        }
++
++        if (!ItemStack.isSameItemSameComponents(current, addition)) {
++            return false;
++        }
++
++        int maxStackSize = Math.min(current.getMaxStackSize(), destination.getMaxStackSize());
++        if (addition.getCount() > maxStackSize - current.getCount()) {
++            return false;
++        }
++
++        ItemStack updated = current.copy();
++        updated.grow(addition.getCount());
++        destination.setItem(slot, updated);
++        return true;
++    }
++
 +    public static BlockEntity getPrimaryChest(CompoundContainer compoundContainer) {
 +        BlockEntity chest1 = (BlockEntity) compoundContainer.container1;
 +        BlockEntity chest2 = (BlockEntity) compoundContainer.container2;
@@ -135,23 +181,23 @@ index 0000000000000000000000000000000000000000..e344051cfbd7441360a6aab811179aac
 +        }
 +    }
 +
-+    public static boolean increaseItemExternal(Container to, int slot, ItemStack stack, int count) {
++    public static ExternalTransferResult increaseItemExternal(Container to, int slot, ItemStack stack, int count) {
 +        if (to instanceof Entity entity) {
 +            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(entity);
 +            if (MultiPaper.isChunkExternal(newChunkHolder)) {
 +                stack = stack.copy();
 +                stack.setCount(count);
-+                newChunkHolder.externalOwner.getConnection().send(new AddItemToEntityContainerPacket(entity, slot, stack));
-+
-+                return true;
++                ExternalServerConnection connection = newChunkHolder.externalOwner.getConnection();
++                return connection != null && connection.send(new AddItemToEntityContainerPacket(entity, slot, stack))
++                        ? ExternalTransferResult.SENT : ExternalTransferResult.FAILED;
 +            } else {
-+                return false;
++                return ExternalTransferResult.LOCAL;
 +            }
 +        }
 +
 +        if (to instanceof ComposterBlock.InputContainer || to instanceof ComposterBlock.OutputContainer || to instanceof ComposterBlock.EmptyContainer) {
 +            // It doesn't really matter if we modify composters across servers (which might even be impossible anyways)
-+            return false;
++            return ExternalTransferResult.LOCAL;
 +        }
 +
 +        BlockEntity block;
@@ -166,20 +212,20 @@ index 0000000000000000000000000000000000000000..e344051cfbd7441360a6aab811179aac
 +        if (MultiPaper.isChunkExternal(newChunkHolder)) {
 +            stack = stack.copy();
 +            stack.setCount(count);
-+            newChunkHolder.externalOwner.getConnection().send(new AddItemToContainerPacket(block, slot, stack));
-+
-+            return true;
++            ExternalServerConnection connection = newChunkHolder.externalOwner.getConnection();
++            return connection != null && connection.send(new AddItemToContainerPacket(block, slot, stack))
++                    ? ExternalTransferResult.SENT : ExternalTransferResult.FAILED;
 +        } else {
-+            return false;
++            return ExternalTransferResult.LOCAL;
 +        }
 +    }
 +}
 diff --git a/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToContainerPacket.java b/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToContainerPacket.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aad9f580a8
+index 0000000000000000000000000000000000000000..38f18782c80212a3b51fc771d9009468370ff2c4
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToContainerPacket.java
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,92 @@
 +package puregero.multipaper.externalserverprotocol;
 +
 +import net.minecraft.core.BlockPos;
@@ -198,6 +244,7 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +import org.bukkit.craftbukkit.CraftWorld;
 +import puregero.multipaper.ExternalServerConnection;
 +import puregero.multipaper.MultiPaper;
++import puregero.multipaper.MultiPaperContainerHandler;
 +
 +import java.io.IOException;
 +
@@ -215,7 +262,7 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +    }
 +
 +    public AddItemToContainerPacket(ServerLevel serverLevel, BlockPos blockPos, int slot, ItemStack itemStack) {
-+        this.world = serverLevel.convertable.getLevelId();
++        this.world = serverLevel.getWorld().getName();
 +        this.pos = blockPos;
 +        this.slot = slot;
 +        this.itemStack = itemStack;
@@ -227,7 +274,7 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +        slot = in.readByte();
 +
 +        try {
-+            itemStack = ItemStack.of(MultiPaper.nbtFromBytes(in.readByteArray()));
++            itemStack = MultiPaper.itemStackFromNBT(MultiPaper.nbtFromBytes(in.readByteArray()));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -240,7 +287,7 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +        out.writeByte(slot);
 +
 +        try {
-+            out.writeByteArray(MultiPaper.nbtToBytes(itemStack.save(new CompoundTag())));
++            out.writeByteArray(MultiPaper.nbtToBytes(MultiPaper.itemStackToNBT(itemStack)));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -254,13 +301,18 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +
 +            if (container == null) {
 +                LOGGER.warn("Tried to set a " + itemStack + " in slot " + slot + " in a non-existant container at " + world + " " + pos);
-+            } else {
-+                // We can assume the item is being added from the side as it's cross servers, so any side direction such as north will do
++            } else if (slot == -1) {
 +                ItemStack leftOver = HopperBlockEntity.addItem(null, container, itemStack, Direction.NORTH);
 +                if (!leftOver.isEmpty()) {
 +                    LOGGER.warn("There was a left over " + leftOver + " after adding an item to " + container.getClass().getSimpleName() + "@" + world + pos);
 +                    ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, leftOver);
 +                    level.addFreshEntity(item);
++                }
++            } else {
++                if (MultiPaperContainerHandler.addItemToSlot(container, slot, itemStack)) {
++                    container.setChanged();
++                } else {
++                    LOGGER.warn("Could not add " + itemStack + " to slot " + slot + " in " + container.getClass().getSimpleName() + "@" + world + pos);
 +                }
 +            }
 +        });
@@ -268,27 +320,25 @@ index 0000000000000000000000000000000000000000..77e8fd3417e25ed9f12e865413c635aa
 +}
 diff --git a/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToEntityContainerPacket.java b/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToEntityContainerPacket.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b21bf599543d1a2fb2f44d22a8b9ebc17d05c96b
+index 0000000000000000000000000000000000000000..5e0e847ccf92c9420445d6e9bbd83b587b5e3a52
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/externalserverprotocol/AddItemToEntityContainerPacket.java
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,78 @@
 +package puregero.multipaper.externalserverprotocol;
 +
-+import net.minecraft.core.Direction;
 +import net.minecraft.nbt.CompoundTag;
 +import net.minecraft.network.FriendlyByteBuf;
 +import net.minecraft.server.level.ServerLevel;
 +import net.minecraft.world.Container;
 +import net.minecraft.world.entity.Entity;
-+import net.minecraft.world.entity.item.ItemEntity;
 +import net.minecraft.world.item.ItemStack;
-+import net.minecraft.world.level.block.entity.HopperBlockEntity;
 +import org.apache.logging.log4j.LogManager;
 +import org.apache.logging.log4j.Logger;
 +import org.bukkit.Bukkit;
 +import org.bukkit.craftbukkit.CraftWorld;
 +import puregero.multipaper.ExternalServerConnection;
 +import puregero.multipaper.MultiPaper;
++import puregero.multipaper.MultiPaperContainerHandler;
 +
 +import java.io.IOException;
 +import java.util.UUID;
@@ -303,7 +353,7 @@ index 0000000000000000000000000000000000000000..b21bf599543d1a2fb2f44d22a8b9ebc1
 +    private final ItemStack itemStack;
 +
 +    public AddItemToEntityContainerPacket(Entity entity, int slot, ItemStack itemStack) {
-+        this.world = ((ServerLevel) entity.level()).convertable.getLevelId();
++        this.world = ((ServerLevel) entity.level()).getWorld().getName();
 +        this.uuid = entity.getUUID();
 +        this.slot = slot;
 +        this.itemStack = itemStack;
@@ -315,7 +365,7 @@ index 0000000000000000000000000000000000000000..b21bf599543d1a2fb2f44d22a8b9ebc1
 +        slot = in.readByte();
 +
 +        try {
-+            itemStack = ItemStack.of(MultiPaper.nbtFromBytes(in.readByteArray()));
++            itemStack = MultiPaper.itemStackFromNBT(MultiPaper.nbtFromBytes(in.readByteArray()));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -328,7 +378,7 @@ index 0000000000000000000000000000000000000000..b21bf599543d1a2fb2f44d22a8b9ebc1
 +        out.writeByte(slot);
 +
 +        try {
-+            out.writeByteArray(MultiPaper.nbtToBytes(itemStack.save(new CompoundTag())));
++            out.writeByteArray(MultiPaper.nbtToBytes(MultiPaper.itemStackToNBT(itemStack)));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -341,12 +391,10 @@ index 0000000000000000000000000000000000000000..b21bf599543d1a2fb2f44d22a8b9ebc1
 +            Entity entity = level.getEntity(uuid);
 +
 +            if (entity instanceof Container container) {
-+                // We can assume the item is being added from the side as it's cross servers, so any side direction such as north will do
-+                ItemStack leftOver = HopperBlockEntity.addItem(null, container, itemStack, Direction.NORTH);
-+                if (!leftOver.isEmpty()) {
-+                    LOGGER.warn("There was a left over " + leftOver + " after adding an item to " + container);
-+                    ItemEntity item = new ItemEntity(level, entity.getX(), entity.getY(), entity.getZ(), leftOver);
-+                    level.addFreshEntity(item);
++                if (MultiPaperContainerHandler.addItemToSlot(container, slot, itemStack)) {
++                    container.setChanged();
++                } else {
++                    LOGGER.warn("Could not add " + itemStack + " to slot " + slot + " in entity container " + entity);
 +                }
 +            } else {
 +                LOGGER.warn("Tried to set a " + itemStack + " in slot " + slot + " in a non-existent entity in " + world + " with uuid " + uuid + ": " + entity);
@@ -370,10 +418,10 @@ index 5e57b1977c93d3b94deaf382c32f4621408ddf3b..8b9eeb12b2aac89ea8654163f63125b3
      private static void addPacket(Class<? extends ExternalServerPacket> clazz, Function<FriendlyByteBuf, ExternalServerPacket> deserializer) {
 diff --git a/src/main/java/puregero/multipaper/externalserverprotocol/PullItemFromContainerPacket.java b/src/main/java/puregero/multipaper/externalserverprotocol/PullItemFromContainerPacket.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b699d1e1b70
+index 0000000000000000000000000000000000000000..5f063a7834a712d92c98f35d196f76ed800c60cb
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/externalserverprotocol/PullItemFromContainerPacket.java
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,92 @@
 +package puregero.multipaper.externalserverprotocol;
 +
 +import net.minecraft.core.BlockPos;
@@ -405,7 +453,7 @@ index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b69
 +    private final BlockPos destination;
 +
 +    public PullItemFromContainerPacket(BlockEntity blockEntity, int slot, ItemStack itemStack, Hopper destinationHopper) {
-+        this.world = ((ServerLevel) blockEntity.getLevel()).convertable.getLevelId();
++        this.world = ((ServerLevel) blockEntity.getLevel()).getWorld().getName();
 +        this.source = blockEntity.getBlockPos();
 +        this.slot = slot;
 +        this.itemStack = itemStack;
@@ -418,7 +466,7 @@ index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b69
 +        this.slot = in.readByte();
 +
 +        try {
-+            this.itemStack = ItemStack.of(MultiPaper.nbtFromBytes(in.readByteArray()));
++            this.itemStack = MultiPaper.itemStackFromNBT(MultiPaper.nbtFromBytes(in.readByteArray()));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -433,7 +481,7 @@ index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b69
 +        out.writeByte(this.slot);
 +
 +        try {
-+            out.writeByteArray(MultiPaper.nbtToBytes(this.itemStack.save(new CompoundTag())));
++            out.writeByteArray(MultiPaper.nbtToBytes(MultiPaper.itemStackToNBT(this.itemStack)));
 +        } catch (IOException e) {
 +            throw new RuntimeException(e);
 +        }
@@ -449,7 +497,7 @@ index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b69
 +
 +            if (container == null) {
 +                LOGGER.warn("Tried to take a " + this.itemStack + " in slot " + this.slot + " in a non-existent container at " + this.world + " " + this.source);
-+            } else if (!ItemStack.isSameItemSameTags(this.itemStack, container.getItem(this.slot))) {
++            } else if (!ItemStack.isSameItemSameComponents(this.itemStack, container.getItem(this.slot))) {
 +                LOGGER.warn("Tried to take a " + this.itemStack + " in slot " + this.slot + " from container at " + this.world + " " + this.source + ", but it is a " + container.getItem(this.slot));
 +            } else {
 +                ItemStack origItemStack = container.getItem(this.slot);
@@ -458,12 +506,10 @@ index 0000000000000000000000000000000000000000..c7916316eacf6d104d80373864ef2b69
 +                pulledItemStack.setCount(count);
 +                origItemStack.setCount(origItemStack.getCount() - count);
 +
-+                HopperBlockEntity.ignoreTileUpdates = true;
-+                container.setItem(this.slot, origItemStack);
-+                HopperBlockEntity.ignoreTileUpdates = false;
++                puregero.multipaper.MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> container.setItem(this.slot, origItemStack));
 +                container.setChanged();
 +
-+                connection.send(new AddItemToContainerPacket(level, this.destination, 0, pulledItemStack));
++                connection.send(new AddItemToContainerPacket(level, this.destination, -1, pulledItemStack));
 +            }
 +        });
 +    }
