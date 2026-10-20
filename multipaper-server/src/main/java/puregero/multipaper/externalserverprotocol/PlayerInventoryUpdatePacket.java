@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import puregero.multipaper.ExternalPlayer;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperInventoryHandler;
@@ -63,6 +64,11 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
+            if (!isCurrentOwner(player, connection)) {
+                LOGGER.debug("Ignoring stale inventory update for player {} from a backend that no longer owns them", uuid);
+                return;
+            }
+
             ListTag items = tag.getListOrEmpty("items");
             items.forEach(i -> {
                 CompoundTag item = (CompoundTag) i;
@@ -75,5 +81,9 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
 
             player.detectEquipmentUpdates();
         });
+    }
+
+    static boolean isCurrentOwner(ServerPlayer player, ExternalServerConnection source) {
+        return player instanceof ExternalPlayer externalPlayer && externalPlayer.externalServerConnection == source;
     }
 }
