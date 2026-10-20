@@ -210,7 +210,10 @@ try {
             $loadedCommand = "execute if loaded $($chunk.X) $y $($chunk.Z) run help"
             $loaded1 = Send-Rcon $Server1RconPort $loadedCommand
             $loaded2 = Send-Rcon $Server2RconPort $loadedCommand
-            if ($loaded1 -notmatch 'Index \(\d+/\d+\)' -or $loaded2 -notmatch 'Index \(\d+/\d+\)') {
+            # A shared chunk has one ticking owner. Its peer can read replicated
+            # block state without holding a local chunk, so require local
+            # residency on at least one backend rather than both.
+            if ($loaded1 -notmatch 'Index \(\d+/\d+\)' -and $loaded2 -notmatch 'Index \(\d+/\d+\)') {
                 $allChunksLoaded = $false
                 break
             }
@@ -219,7 +222,7 @@ try {
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $loadDeadline)
     if (-not $allChunksLoaded) {
-        throw 'One or more test chunks did not load on both backends after forceload.'
+        throw 'One or more test chunks did not load on either backend after forceload.'
     }
     Send-Rcon $Server1RconPort "setblock $($x + 2) $y $z minecraft:emerald_block" | Out-Null
     Send-Rcon $Server2RconPort "setblock $($x + 3) $y $z minecraft:diamond_block" | Out-Null
@@ -266,58 +269,92 @@ try {
     $stickyPayloadX = $x + 2
     $stickyDestinationX = $x + 3
     $stickyCircuitZ = $z + 4
+    $reverseStickyCircuitX = $x + 4096
+    $reverseStickyPowerX = $reverseStickyCircuitX
+    $reverseStickyPistonX = $reverseStickyCircuitX + 1
+    $reverseStickyPayloadX = $reverseStickyCircuitX + 2
+    $reverseStickyDestinationX = $reverseStickyCircuitX + 3
+    $reverseStickyCircuitY = 300
+    $reverseStickyCircuitZ = $z + 4096
     $pistonX = $circuitX + 1
     $movedBlockX = $circuitX + 2
     $destinationX = $circuitX + 3
     if ($SkipRedstoneAndPistonCheck) {
         Write-Output 'SKIP: redstone and piston checks disabled by -SkipRedstoneAndPistonCheck.'
     } else {
+        $baseCircuitLoadedCommand = "execute if loaded $pistonX $circuitY $circuitZ run help"
+        $baseCircuitLoaded1 = Send-Rcon $Server1RconPort $baseCircuitLoadedCommand
+        $baseCircuitLoaded2 = Send-Rcon $Server2RconPort $baseCircuitLoadedCommand
+        if ($baseCircuitLoaded1 -match 'Index \(\d+/\d+\)') {
+            $baseCircuitControllerPort = $Server1RconPort
+            $baseCircuitObserverPort = $Server2RconPort
+            $baseCircuitControllerName = 'Backend 1'
+            $baseCircuitObserverName = 'Backend 2'
+        } elseif ($baseCircuitLoaded2 -match 'Index \(\d+/\d+\)') {
+            $baseCircuitControllerPort = $Server2RconPort
+            $baseCircuitObserverPort = $Server1RconPort
+            $baseCircuitControllerName = 'Backend 2'
+            $baseCircuitObserverName = 'Backend 1'
+        } else {
+            throw 'Neither backend locally owns the base piston test chunk.'
+        }
+        Write-Output "PASS: $baseCircuitControllerName owns the base redstone test chunk."
         $pistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=true] run help"
         $retractedPistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=false] run help"
         $movedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
         $retractedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
         foreach ($clearX in $circuitX..$destinationX) {
-            Send-Rcon $Server1RconPort "setblock $clearX $circuitY $circuitZ minecraft:air" | Out-Null
+            Send-Rcon $baseCircuitControllerPort "setblock $clearX $circuitY $circuitZ minecraft:air" | Out-Null
         }
-        Send-Rcon $Server1RconPort "setblock $movedBlockX $circuitY $circuitZ minecraft:stone" | Out-Null
-        Send-Rcon $Server1RconPort "setblock $pistonX $circuitY $circuitZ minecraft:piston[facing=east]" | Out-Null
-        Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:redstone_block" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $movedBlockX $circuitY $circuitZ minecraft:stone" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $pistonX $circuitY $circuitZ minecraft:piston[facing=east]" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $circuitX $circuitY $circuitZ minecraft:redstone_block" | Out-Null
         $circuitDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         do {
-            $pistonState1 = Send-Rcon $Server1RconPort $pistonCommand
-            $pistonState2 = Send-Rcon $Server2RconPort $pistonCommand
-            $movedBlock1 = Send-Rcon $Server1RconPort $movedBlockCommand
-            $movedBlock2 = Send-Rcon $Server2RconPort $movedBlockCommand
+            $pistonState1 = Send-Rcon $baseCircuitControllerPort $pistonCommand
+            $pistonState2 = Send-Rcon $baseCircuitObserverPort $pistonCommand
+            $movedBlock1 = Send-Rcon $baseCircuitControllerPort $movedBlockCommand
+            $movedBlock2 = Send-Rcon $baseCircuitObserverPort $movedBlockCommand
             if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
                 $movedBlock1 -match 'Index \(\d+/\d+\)' -and $movedBlock2 -match 'Index \(\d+/\d+\)') { break }
             Start-Sleep -Milliseconds 200
         } while ([DateTime]::UtcNow -lt $circuitDeadline)
-        Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not extend after receiving redstone power.'
-        Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the powered piston state.'
-        Assert-Contains $movedBlock1 'Index (' 'Server 1 piston did not move the stone block.'
-        Assert-Contains $movedBlock2 'Index (' 'Server 2 did not observe the piston-moved stone block.'
-        Write-Output 'PASS: redstone-powered piston extension and block movement replicate to Server 2.'
+        Assert-Contains $pistonState1 'Index (' "$baseCircuitControllerName piston did not extend after receiving redstone power."
+        Assert-Contains $pistonState2 'Index (' 'The peer did not observe the powered piston state.'
+        Assert-Contains $movedBlock1 'Index (' "$baseCircuitControllerName piston did not move the stone block."
+        Assert-Contains $movedBlock2 'Index (' 'The peer did not observe the piston-moved stone block.'
+        Write-Output "PASS: redstone-powered piston extension and block movement replicate from $baseCircuitControllerName."
 
-        Send-Rcon $Server1RconPort "setblock $circuitX $circuitY $circuitZ minecraft:air" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $circuitX $circuitY $circuitZ minecraft:air" | Out-Null
         $retractDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         do {
-            $pistonState1 = Send-Rcon $Server1RconPort $retractedPistonCommand
-            $pistonState2 = Send-Rcon $Server2RconPort $retractedPistonCommand
-            $retractedBlock1 = Send-Rcon $Server1RconPort $retractedBlockCommand
-            $retractedBlock2 = Send-Rcon $Server2RconPort $retractedBlockCommand
+            $pistonState1 = Send-Rcon $baseCircuitControllerPort $retractedPistonCommand
+            $pistonState2 = Send-Rcon $baseCircuitObserverPort $retractedPistonCommand
+            $retractedBlock1 = Send-Rcon $baseCircuitControllerPort $retractedBlockCommand
+            $retractedBlock2 = Send-Rcon $baseCircuitObserverPort $retractedBlockCommand
             if ($pistonState1 -match 'Index \(\d+/\d+\)' -and $pistonState2 -match 'Index \(\d+/\d+\)' -and
                 $retractedBlock1 -match 'Index \(\d+/\d+\)' -and $retractedBlock2 -match 'Index \(\d+/\d+\)') { break }
             Start-Sleep -Milliseconds 200
         } while ([DateTime]::UtcNow -lt $retractDeadline)
-        Assert-Contains $pistonState1 'Index (' 'Server 1 piston did not retract after redstone power was removed.'
-        Assert-Contains $pistonState2 'Index (' 'Server 2 did not observe the retracted piston state.'
-        Assert-Contains $retractedBlock1 'Index (' 'Server 1 did not keep the moved stone at its destination after piston retraction.'
-        Assert-Contains $retractedBlock2 'Index (' 'Server 2 did not observe the moved stone at its destination after piston retraction.'
+        Assert-Contains $pistonState1 'Index (' "$baseCircuitControllerName piston did not retract after redstone power was removed."
+        Assert-Contains $pistonState2 'Index (' 'The peer did not observe the retracted piston state.'
+        Assert-Contains $retractedBlock1 'Index (' "$baseCircuitControllerName did not keep the moved stone at its destination after piston retraction."
+        Assert-Contains $retractedBlock2 'Index (' 'The peer did not observe the piston-moved stone after retraction.'
         Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
 
-        Test-StickyPistonPull -ControllerPort $Server1RconPort -ObserverPort $Server2RconPort -PistonX $stickyPistonX -PowerX $stickyPowerX -PayloadX $stickyPayloadX -DestinationX $stickyDestinationX -CircuitY $circuitY -CircuitZ $stickyCircuitZ -Direction 'Backend 1'
-        $reverseStickyCircuitZ = $z + 8
-        Test-StickyPistonPull -ControllerPort $Server2RconPort -ObserverPort $Server1RconPort -PistonX $stickyPistonX -PowerX $stickyPowerX -PayloadX $stickyPayloadX -DestinationX $stickyDestinationX -CircuitY $circuitY -CircuitZ $reverseStickyCircuitZ -Direction 'Backend 2'
+        Test-StickyPistonPull -ControllerPort $baseCircuitControllerPort -ObserverPort $baseCircuitObserverPort -PistonX $stickyPistonX -PowerX $stickyPowerX -PayloadX $stickyPayloadX -DestinationX $stickyDestinationX -CircuitY $circuitY -CircuitZ $stickyCircuitZ -Direction $baseCircuitControllerName
+        Send-Rcon $baseCircuitObserverPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
+        $reverseLoadCommand = "execute if loaded $reverseStickyCircuitX $reverseStickyCircuitY $reverseStickyCircuitZ run help"
+        $reverseLoadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $reverseChunkLoaded = Send-Rcon $baseCircuitObserverPort $reverseLoadCommand
+            if ($reverseChunkLoaded -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $reverseLoadDeadline)
+        Assert-Contains $reverseChunkLoaded 'Index (' "$baseCircuitObserverName sticky-piston test chunk did not become locally loaded."
+        Write-Output "PASS: $baseCircuitObserverName sticky-piston circuit runs in a locally owned chunk."
+        Send-Rcon $baseCircuitControllerPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
+        Test-StickyPistonPull -ControllerPort $baseCircuitObserverPort -ObserverPort $baseCircuitControllerPort -PistonX $reverseStickyPistonX -PowerX $reverseStickyPowerX -PayloadX $reverseStickyPayloadX -DestinationX $reverseStickyDestinationX -CircuitY $reverseStickyCircuitY -CircuitZ $reverseStickyCircuitZ -Direction 'peer backend'
     }
 
     if ([string]::IsNullOrWhiteSpace($PlayerName)) {
@@ -496,8 +533,10 @@ try {
     try { Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
-    try { Send-Rcon $Server1RconPort "fill $stickyPowerX $circuitY $reverseStickyCircuitZ $stickyDestinationX $circuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
-    try { Send-Rcon $Server2RconPort "fill $stickyPowerX $circuitY $reverseStickyCircuitZ $stickyDestinationX $circuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "fill $reverseStickyPowerX $reverseStickyCircuitY $reverseStickyCircuitZ $reverseStickyDestinationX $reverseStickyCircuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
+    try { Send-Rcon $Server2RconPort "fill $reverseStickyPowerX $reverseStickyCircuitY $reverseStickyCircuitZ $reverseStickyDestinationX $reverseStickyCircuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
+    if ($null -ne $baseCircuitObserverPort) { try { Send-Rcon $baseCircuitObserverPort "forceload remove $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null } catch { } }
+    if ($null -ne $baseCircuitControllerPort) { try { Send-Rcon $baseCircuitControllerPort "forceload remove $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null } catch { } }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     foreach ($chunk in $baseChunkLoads) {
