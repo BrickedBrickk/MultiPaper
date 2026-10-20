@@ -7,14 +7,14 @@
 +import puregero.multipaper.externalserverprotocol.PistonMoveBlockStartPacket;
  import net.minecraft.tags.BlockTags;
  import net.minecraft.util.RandomSource;
-@@ -220,1 +221,5 @@ public class PistonBaseBlock extends DirectionalBlock {
+@@ -220,1 +222,5 @@ public class PistonBaseBlock extends DirectionalBlock {
 -                        level.removeBlock(pos.relative(direction), false);
 +                        BlockPos headPos = pos.relative(direction);
 +                        BlockState headState = level.getBlockState(headPos);
 +                        if (PistonMoveBlockEndPacket.shouldRemoveRetractionHead(headState)) {
 +                            level.removeBlock(headPos, false);
 +                        }
-@@ -382,20 +387,13 @@ public class PistonBaseBlock extends DirectionalBlock {
+@@ -382,20 +388,13 @@ public class PistonBaseBlock extends DirectionalBlock {
              pos = pos.relative(pushDirection);
              deleteAfterMove.remove(pos);
 -            BlockState actualState = Blocks.MOVING_PISTON.defaultBlockState().setValue(FACING, direction);

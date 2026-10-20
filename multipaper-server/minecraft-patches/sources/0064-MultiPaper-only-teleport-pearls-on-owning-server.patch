@@ -1,0 +1,18 @@
+--- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
++++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+@@ -28,5 +28,6 @@ import net.minecraft.world.phys.EntityHitResult;
+ import net.minecraft.world.phys.HitResult;
+ import net.minecraft.world.phys.Vec3;
++import puregero.multipaper.MultiPaper;
+ import org.jspecify.annotations.Nullable;
+ 
+ public class ThrownEnderpearl extends ThrowableItemProjectile {
+@@ -98,7 +99,7 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+                 );
+         }
+ 
+-        if (this.level() instanceof ServerLevel level && !this.isRemoved()) {
++        if (this.level() instanceof ServerLevel level && !this.isRemoved() && MultiPaper.isChunkLocal(level, this.blockPosition())) {
+             Entity owner = this.getOwner();
+             if (owner != null && isAllowedToTeleportOwner(owner, level)) {
+                 Vec3 teleportPos = this.oldPosition();
