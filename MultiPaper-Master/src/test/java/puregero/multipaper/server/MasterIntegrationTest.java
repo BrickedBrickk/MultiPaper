@@ -499,4 +499,164 @@ class MasterIntegrationTest {
         assertFalse(ServerConnection.getConnections().contains(disconnected), "Reset connection must be removed from the live server list");
         assertTrue(((BooleanMessageReply) serverB.request(new PingMessage())).result, "The remaining backend must still receive Master replies");
     }
+
+    @Test
+    @Order(21)
+    void forcedChunkReadWaitsForEveryOverlappingWrite() throws Exception {
+        int chunkX = 20;
+        int chunkZ = -4;
+        byte[] firstWrite = "overlapping-chunk-write-1".getBytes(StandardCharsets.UTF_8);
+        byte[] finalWrite = "overlapping-chunk-write-2-final".getBytes(StandardCharsets.UTF_8);
+
+        serverB.send(new WillSaveChunkLaterMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        serverB.send(new WillSaveChunkLaterMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        TestServerClient readerClient = TestServerClient.connect(port, "overlapping-chunk-reader");
+        try {
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> pendingRead = new java.util.concurrent.CompletableFuture<>();
+            Thread reader = new Thread(() -> {
+                try {
+                    pendingRead.complete(readerClient.request(new ForceReadChunkMessage(WORLD, "region", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    pendingRead.completeExceptionally(e);
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+
+            Thread.sleep(500);
+            assertFalse(pendingRead.isDone(), "Forced chunk read must wait for both pending writes");
+
+            ServerBoundMessage firstReply = serverB.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, firstWrite));
+            assertTrue(((BooleanMessageReply) firstReply).result);
+            Thread.sleep(500);
+            assertFalse(pendingRead.isDone(), "The first write must not release a read while the second write is pending");
+
+            ServerBoundMessage finalReply = serverB.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, finalWrite));
+            assertTrue(((BooleanMessageReply) finalReply).result);
+
+            ServerBoundMessage readReply = pendingRead.get(10, TimeUnit.SECONDS);
+            assertArrayEquals(finalWrite, ((DataMessageReply) readReply).data);
+        } finally {
+            readerClient.close();
+        }
+    }
+
+    @Test
+    @Order(22)
+    void forcedEntityReadWaitsForEveryOverlappingWrite() throws Exception {
+        int chunkX = -20;
+        int chunkZ = 4;
+        byte[] firstWrite = "overlapping-entity-write-1".getBytes(StandardCharsets.UTF_8);
+        byte[] finalWrite = "overlapping-entity-write-2-final".getBytes(StandardCharsets.UTF_8);
+
+        serverB.send(new WillSaveEntitiesLaterMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        serverB.send(new WillSaveEntitiesLaterMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        TestServerClient readerClient = TestServerClient.connect(port, "overlapping-entity-reader");
+        try {
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> pendingRead = new java.util.concurrent.CompletableFuture<>();
+            Thread reader = new Thread(() -> {
+                try {
+                    pendingRead.complete(readerClient.request(new ForceReadChunkMessage(WORLD, "entities", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    pendingRead.completeExceptionally(e);
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+
+            Thread.sleep(500);
+            assertFalse(pendingRead.isDone(), "Forced entity read must wait for both pending writes");
+
+            ServerBoundMessage firstReply = serverB.request(new WriteChunkMessage(WORLD, "entities", chunkX, chunkZ, firstWrite));
+            assertTrue(((BooleanMessageReply) firstReply).result);
+            Thread.sleep(500);
+            assertFalse(pendingRead.isDone(), "The first write must not release a read while the second write is pending");
+
+            ServerBoundMessage finalReply = serverB.request(new WriteChunkMessage(WORLD, "entities", chunkX, chunkZ, finalWrite));
+            assertTrue(((BooleanMessageReply) finalReply).result);
+
+            ServerBoundMessage readReply = pendingRead.get(10, TimeUnit.SECONDS);
+            assertArrayEquals(finalWrite, ((DataMessageReply) readReply).data);
+        } finally {
+            readerClient.close();
+        }
+    }
+
+    @Test
+    @Order(23)
+    void disconnectingWriterReleasesPendingChunkRead() throws Exception {
+        String world = "disconnect-pending-chunk-world";
+        int chunkX = 27;
+        int chunkZ = -13;
+        TestServerClient writer = TestServerClient.connect(port, "disconnecting-chunk-writer");
+        TestServerClient readerClient = TestServerClient.connect(port, "disconnecting-chunk-reader");
+
+        try {
+            writer.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            writer.request(new PingMessage());
+
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> pendingRead = new java.util.concurrent.CompletableFuture<>();
+            Thread reader = new Thread(() -> {
+                try {
+                    pendingRead.complete(readerClient.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    pendingRead.completeExceptionally(e);
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+
+            Thread.sleep(300);
+            assertFalse(pendingRead.isDone(), "Chunk read should wait for the connected writer");
+            writer.close();
+
+            ServerBoundMessage reply = pendingRead.get(5, TimeUnit.SECONDS);
+            assertArrayEquals(new byte[0], ((DataMessageReply) reply).data,
+                    "A disconnected writer must not leave chunk reads blocked forever");
+        } finally {
+            readerClient.close();
+            writer.close();
+        }
+    }
+
+    @Test
+    @Order(24)
+    void disconnectingWriterReleasesPendingEntityRead() throws Exception {
+        String world = "disconnect-pending-entities-world";
+        int chunkX = -27;
+        int chunkZ = 13;
+        TestServerClient writer = TestServerClient.connect(port, "disconnecting-entity-writer");
+        TestServerClient readerClient = TestServerClient.connect(port, "disconnecting-entity-reader");
+
+        try {
+            writer.send(new WillSaveEntitiesLaterMessage(world, chunkX, chunkZ));
+            writer.request(new PingMessage());
+
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> pendingRead = new java.util.concurrent.CompletableFuture<>();
+            Thread reader = new Thread(() -> {
+                try {
+                    pendingRead.complete(readerClient.request(new ForceReadChunkMessage(world, "entities", chunkX, chunkZ)));
+                } catch (Exception e) {
+                    pendingRead.completeExceptionally(e);
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+
+            Thread.sleep(300);
+            assertFalse(pendingRead.isDone(), "Entity read should wait for the connected writer");
+            writer.close();
+
+            ServerBoundMessage reply = pendingRead.get(5, TimeUnit.SECONDS);
+            assertArrayEquals(new byte[0], ((DataMessageReply) reply).data,
+                    "A disconnected writer must not leave entity reads blocked forever");
+        } finally {
+            readerClient.close();
+            writer.close();
+        }
+    }
 }

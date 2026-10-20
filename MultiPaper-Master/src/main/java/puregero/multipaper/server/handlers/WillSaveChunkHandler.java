@@ -6,6 +6,6 @@ import puregero.multipaper.server.ServerConnection;
 
 public class WillSaveChunkHandler {
     public static void handle(ServerConnection connection, WillSaveChunkLaterMessage message) {
-        ChunkLockManager.lockUntilWrite(message.world, message.cx, message.cz);
+        ChunkLockManager.lockUntilWrite(connection, message.world, message.cx, message.cz);
     }
 }

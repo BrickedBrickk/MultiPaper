@@ -137,6 +137,8 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+        ChunkLockManager.releaseAll(this);
+        EntitiesLockManager.releaseAll(this);
         EntitiesSubscriptionManager.unsubscribeAll(this);
         ChunkSubscriptionManager.unsubscribeAndUnlockAll(this);
 

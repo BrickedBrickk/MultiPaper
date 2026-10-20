@@ -29,10 +29,10 @@ public class WriteChunkHandler {
     private static void writeData(ServerConnection connection, WriteChunkMessage message, byte[] data) {
         RegionFileCache.putChunkDeflatedDataAsync(ReadChunkHandler.getWorldDir(message.world, message.path), message.cx, message.cz, data).whenComplete((ignored, failure) -> {
             if (message.path.equals("region")) {
-                ChunkLockManager.writeCompleted(message.world, message.cx, message.cz);
+                ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
             }
             if (message.path.equals("entities")) {
-                EntitiesLockManager.writeCompleted(message.world, message.cx, message.cz);
+                EntitiesLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
             }
 
             if (failure != null) {
