@@ -66,3 +66,15 @@ coordinates. The observer's powered state was not sampled during the pulse,
 so this is an inconclusive trigger attempt, not evidence that reverse travel
 works or fails. The pair was flushed and stopped; all fixture listeners were
 confirmed closed again.
+
+Owner-assignment follow-up
+--------------------------
+A temporary reflection-only plugin queried `MultiPaper.getChunkHolder()` on
+the exact RC1 pair in a fresh disposable world. After the RCON `forceload add`
+requests, both backends had loaded holders for chunks 9 and 10, but both
+reported `externalOwner=null` through the observation window, including after
+ticks were unfrozen. No player was connected. This confirms that the earlier
+force-load ordering did not create a two-owner test; the flying-engine run
+proves movement and replica agreement across a chunk-coordinate boundary
+only. The server-side probe files and logs remain in the disposable fixture;
+the temporary plugin and its configuration changes were removed/restored.
