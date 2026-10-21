@@ -1,0 +1,24 @@
+Two-PC persistent-HDD authoritative movement run — 2026-10-21
+
+Purpose and isolation
+This run corrects the earlier harness attempts documented in `two-pc-persistent-hdd-harness-validation-20261021.txt`. It used fresh disposable fixture worlds and ports on the two physical PCs. SSH host verification remained strict. No Crafty configuration, production process, or live world was accessed or changed.
+
+Machines and build
+PC1 (Master + Backend A): Intel Core i5-7600, 16 GiB RAM, WDC WD10EZEX-08M2NA0 rotational HDD.
+PC2 (Backend B): Intel Core i5-6600, 16 GiB RAM, WDC WD5000AZLX-75K2TA0 rotational HDD.
+Runtime: Temurin JRE 25.0.4.1 on both PCs.
+Paperclip SHA-256: `BBFADB051088F6978C111C661AD3227586B626A6CCB0DC6C62085AE133998C78` on both backends.
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Fixture: fresh `multipaper_hdd_bench_20261021`; isolated Master, proxy, backend, and RCON ports. The world was flushed before the fixture processes stopped.
+
+Movement and server-side evidence
+Eight protocol-777 clients joined through the Master proxy. The harness waited until all eight were ready, set Creative mode, and placed them at y=180 on a collision-free route. They then sent movement with `onGround=false` for 121 seconds. This avoided the earlier parser error and floating kick. Each client completed 1,209 chunk packets and about 2,223 movement packets; 17,788 movement packets were sent in total. All eight remained connected until the planned end, with zero client errors, protocol disconnects, or unexpected socket ends.
+
+RCON sampled each player's entity position on both backend processes throughout the moving phase. Samples show players advancing between x≈100 and x≈220 and crossing x=160, the backend ownership boundary. Both `/list` responses reported all eight clients online during the measured interval, and `/slist` continued to report both backends. This is authoritative movement evidence, unlike the earlier packet-only attempt.
+
+During the post-warmup movement samples, both backends reported 20 TPS. Backend A's one-minute average MSPT was about 9.5–10.1 ms and Backend B's was about 2.7–3.5 ms. The first fresh-login/chunk-generation sample had one-minute maximum MSPT spikes of 633.7 ms and 850.4 ms; these are startup/chunk-load spikes and are not represented by the later movement averages. Per-sample system and disk metrics are in `two-pc-hdd-verified-movement-metrics-20261021.csv`; authoritative positions are in `two-pc-hdd-authoritative-position-samples-20261021.jsonl`; client events are in `two-pc-hdd-authoritative-client-20261021.jsonl`.
+
+Limits and release guidance
+This establishes one 8-client synthetic Creative movement baseline on the two HDD hosts. The clients followed a short, bounded, high-altitude route with overlapping view distance. It does not measure Survival exploration, farms, redstone, long-duration gameplay, or the safe maximum player count. Keep the eight-player soft cap as conservative guidance; do not treat eight as a measured safe maximum or extrapolate higher capacity.
+
+The files `two-pc-hdd-backend-a-20261021.log` and `two-pc-hdd-backend-b-20261021.log` identify build `f5abc1a` and cover earlier harness attempts. They are not server logs for the successful movement run above and their warnings must not be attributed to this run. The run's client, RCON position, and metrics captures are retained. I could not retrieve its matching remote logs because the saved SSH identities are currently denied on both hosts; no host-key verification was bypassed.

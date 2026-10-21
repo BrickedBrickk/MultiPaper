@@ -12,6 +12,7 @@ const port = Number(portText)
 const count = Number(countText)
 const durationSeconds = Number(durationText)
 const startupDelaySeconds = Number(startupDelayText)
+const onGround = process.env.MULTIPAPER_BOT_ON_GROUND !== 'false'
 const version = '26.3'
 const dataDir = process.env.MULTIPAPER_MC_DATA_26_3
 
@@ -57,6 +58,60 @@ Object.defineProperty(mapped, 'version', {
 dataPaths.pc[version] = mapped
 
 const mc = require('minecraft-protocol')
+
+function encodeVarInt(value) {
+  const bytes = []
+  do {
+    let byte = value & 0x7f
+    value >>>= 7
+    if (value !== 0) byte |= 0x80
+    bytes.push(byte)
+  } while (value !== 0)
+  return bytes
+}
+
+function encodeEntityMovePacket(packetId, steps) {
+  const packet = [...encodeVarInt(packetId), ...encodeVarInt(7)]
+  const properties = (steps.length === 1 && steps[0].ticks === 0 ? 0 : steps.length) << 1 | 1
+  packet.push(...encodeVarInt(properties))
+  for (const step of steps) {
+    if (properties >>> 1 !== 0) packet.push(...encodeVarInt(step.ticks))
+    const delta = Buffer.alloc(6)
+    delta.writeInt16BE(step.dX, 0)
+    delta.writeInt16BE(step.dY, 2)
+    delta.writeInt16BE(step.dZ, 4)
+    packet.push(...delta)
+  }
+  return Buffer.from(packet)
+}
+
+function validateEntityDeltaCodec() {
+  const packetMappings = mapped.protocol.play.toClient.types.packet[1][0].type[1].mappings
+  const packetEntry = Object.entries(packetMappings).find(([, name]) => name === 'rel_entity_move')
+  if (!packetEntry) throw new Error('26.3 clientbound rel_entity_move packet is missing from protocol data')
+
+  const packetId = Number.parseInt(packetEntry[0], 16)
+  const deserializer = mc.createDeserializer({ state: 'play', isServer: false, version })
+  const packets = [
+    { steps: [{ dX: 12, dY: -4, dZ: 9, ticks: 0 }] },
+    { steps: [{ dX: 2, dY: 1, dZ: -3, ticks: 1 }, { dX: 6, dY: -2, dZ: 4, ticks: 137 }] }
+  ]
+
+  for (const expected of packets) {
+    const decoded = deserializer.parsePacketBuffer(encodeEntityMovePacket(packetId, expected.steps)).data
+    if (decoded.name !== 'rel_entity_move' || decoded.params.entityId !== 7 ||
+        !decoded.params.move.onGround || JSON.stringify(decoded.params.move.steps) !== JSON.stringify(expected.steps)) {
+      throw new Error(`26.3 entity-delta codec mismatch: ${JSON.stringify(decoded)}`)
+    }
+  }
+}
+
+validateEntityDeltaCodec()
+if (process.env.MULTIPAPER_PROTOCOL_PREFLIGHT_ONLY === '1') {
+  process.stdout.write('PASS: 26.3 linear and stepped entity-move packets decode correctly.\n')
+  process.exit(0)
+}
+
 const elapsed = () => Math.round(performance.now())
 const startedAt = performance.now()
 const records = []
@@ -75,7 +130,7 @@ function event(record, name, fields = {}) {
 function startMovement() {
   if (movementStartedAt !== null || ending || records.some(record => !record.ready)) return
   movementStartedAt = performance.now()
-  process.stdout.write(`${JSON.stringify({ event: 'movement_started', elapsedMs: elapsed(), ready: records.filter(record => record.ready).length })}\n`)
+  process.stdout.write(`${JSON.stringify({ event: 'movement_started', elapsedMs: elapsed(), ready: records.filter(record => record.ready).length, onGround })}\n`)
   for (const record of records) {
     record.movementTimer = setInterval(() => {
       if (ending || !record.ready || !record.position || record.endedAt !== null) return
@@ -89,7 +144,7 @@ function startMovement() {
         x: record.position.x,
         y: record.position.y,
         z: record.position.z,
-        flags: { onGround: true, hasHorizontalCollision: false }
+        flags: { onGround, hasHorizontalCollision: false }
       })
       record.client.write('tick_end', {})
       record.movementPackets++
