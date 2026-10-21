@@ -76,7 +76,7 @@ public class EntityUpdateNBTPacket extends ExternalServerPacket {
     }
 
     public static Entity loadEntity(ServerLevel level, CompoundTag tag, UUID uuid) {
-        Entity.RemovalReason removalReason = EntityRemovePacket.removedEntities.get(uuid);
+        Entity.RemovalReason removalReason = EntityRemovePacket.getRemovalReason(uuid);
         if (removalReason != null && removalReason.shouldDestroy()) {
             // We've already removed this entity. This is likely a race condition, so don't recreate the entity.
             return null;

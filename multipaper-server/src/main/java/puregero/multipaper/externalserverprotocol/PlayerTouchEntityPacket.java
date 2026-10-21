@@ -49,7 +49,7 @@ public class PlayerTouchEntityPacket extends ExternalServerPacket {
             Entity entity = ((ServerLevel) player.level()).getEntity(entityUuid);
 
             if (entity == null) {
-                Entity.RemovalReason removalReason = EntityRemovePacket.removedEntities.get(entityUuid);
+                Entity.RemovalReason removalReason = EntityRemovePacket.getRemovalReason(entityUuid);
                 if (removalReason != null && removalReason.shouldDestroy()) {
                     connection.send(new EntityRemovePacket(player.level().getWorld().getName(), entityUuid, false));
                     return;

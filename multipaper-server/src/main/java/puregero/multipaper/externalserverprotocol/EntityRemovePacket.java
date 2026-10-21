@@ -12,11 +12,11 @@ import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 import puregero.multipaper.MultiPaperEntitiesHandler;
 
-import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class EntityRemovePacket extends ExternalServerPacket {
-    public static final HashMap<UUID, Entity.RemovalReason> removedEntities = new HashMap<>();
+    private static final ExpiringEntityRemovals removedEntities = new ExpiringEntityRemovals();
 
     private final String world;
     private final UUID uuid;
@@ -78,8 +78,16 @@ public class EntityRemovePacket extends ExternalServerPacket {
 
     public static void setEntityRemoved(UUID uuid, Entity.RemovalReason reason, int durationInTicks) {
         if (reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER) return;
-        removedEntities.put(uuid, reason);
-        java.util.concurrent.CompletableFuture.delayedExecutor(durationInTicks * 50L, java.util.concurrent.TimeUnit.MILLISECONDS)
-            .execute(() -> removedEntities.remove(uuid, reason));
+        ExpiringEntityRemovals.Marker marker = removedEntities.markRemoved(uuid, reason);
+        java.util.concurrent.CompletableFuture.delayedExecutor(durationInTicks * 50L, TimeUnit.MILLISECONDS)
+            .execute(() -> removedEntities.expire(uuid, marker));
+    }
+
+    public static Entity.RemovalReason getRemovalReason(UUID uuid) {
+        return removedEntities.getReason(uuid);
+    }
+
+    public static boolean hasRemovalMarker(UUID uuid) {
+        return removedEntities.contains(uuid);
     }
 }

@@ -84,7 +84,7 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
             ServerLevel level = craftWorld.getHandle();
             Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
             if (entity == null) {
-                if (EntityRemovePacket.removedEntities.containsKey(uuid)) {
+                if (EntityRemovePacket.hasRemovalMarker(uuid)) {
                     return;
                 }
 
@@ -113,7 +113,7 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
                 entities[i] = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuids[i]);
 
                 if (entities[i] == null) {
-                    if (EntityRemovePacket.removedEntities.containsKey(uuids[i])) {
+                    if (EntityRemovePacket.hasRemovalMarker(uuids[i])) {
                         return;
                     }
 
