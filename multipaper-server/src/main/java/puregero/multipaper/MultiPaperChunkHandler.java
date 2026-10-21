@@ -225,9 +225,10 @@ public class MultiPaperChunkHandler {
         blockUpdateChunk = null;
     }
 
-    private static void setBlockInUnloadedChunk(ChunkAccess chunk, BlockPos pos, BlockState blockState) {
+    static void setBlockInUnloadedChunk(ChunkAccess chunk, BlockPos pos, BlockState blockState) {
         if (chunk instanceof LevelChunk levelChunk) {
-            levelChunk.setBlockState(pos, blockState, net.minecraft.world.level.block.Block.UPDATE_NONE);
+            // Remote replicas only mirror the owner's block state; they must not run placement callbacks or schedule local ticks.
+            levelChunk.setBlockState(pos, blockState, net.minecraft.world.level.block.Block.UPDATE_NONE | net.minecraft.world.level.block.Block.UPDATE_SKIP_ON_PLACE);
         } else {
             chunk.setBlockState(pos, blockState, net.minecraft.world.level.block.Block.UPDATE_NONE);
         }

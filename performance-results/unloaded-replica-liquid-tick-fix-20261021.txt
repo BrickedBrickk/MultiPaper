@@ -1,0 +1,25 @@
+Unloaded replica placement callback caused missing-tick-container errors
+Date: 2026-10-21
+
+Diagnosis
+---------
+The prior moving-client probes logged `Trying to schedule tick in not loaded position` on a backend applying remote block updates to a `LevelChunk` that was not loaded into its world. A temporary, generated-source-only stack trace reproduced the issue 26 times in a disposable two-backend run. The trace was:
+
+`LevelTicks.schedule` -> `ScheduledTickAccess.scheduleTick` -> `LiquidBlock.onPlace` -> `LevelChunk.setBlockState` -> `MultiPaperChunkHandler.setBlockInUnloadedChunk` -> `MultiPaperChunkHandler.handleBlockUpdate` while applying a `ClientboundSectionBlocksUpdatePacket`.
+
+Fix
+---
+When mirroring remote block states into an unloaded `LevelChunk`, pass `Block.UPDATE_SKIP_ON_PLACE` along with `UPDATE_NONE`. The authoritative backend already ran the block placement callback; an unloaded replica must mirror the resulting state without attempting local placement callbacks or local tick scheduling. `ChunkAccess`/proto-chunk behavior remains unchanged.
+
+Verification
+------------
+The fix was built under Temurin Java 25.0.3 and tested in fresh, disposable local Master + two-backend worlds. The same eight-client, 120-second moving protocol probe completed with all 8 clients ready, 2,765 chunk packets, 16,091 movement packets, zero client disconnects/errors, and zero `Trying to schedule tick in not loaded position` log entries on either backend. The preceding diagnostic run had 26 such entries on Backend B. The protocol clients intentionally use synthetic movement and are not a substitute for ordinary GUI gameplay.
+
+`MultiPaperChunkHandlerTestSuite` passed both focused tests (0 failures/errors/skips): the LevelChunk mirror uses the skip-on-place flag, and the non-LevelChunk mirror retains its existing update flags.
+
+Artifacts used for the fixed runtime probe:
+
+- Paperclip SHA-256: `6F61A84BFB71113FC6170363132AFBBF80170107763642FA6AA973ACFFB014DB`
+- Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+All disposable test backends and Master were saved/stopped; the test ports were closed. The temporary stack-trace instrumentation is absent from tracked source and the fixed Paperclip artifact.
