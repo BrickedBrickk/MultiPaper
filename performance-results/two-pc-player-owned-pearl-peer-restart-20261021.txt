@@ -1,0 +1,24 @@
+Two-PC player-owned ender pearl survives a peer-backend restart
+Date: 2026-10-21
+Result: PASS for peer-backend restart; authoritative-owner restart remains unverified.
+
+Artifacts and fixture
+---------------------
+Paperclip SHA-256 on both PCs: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`.
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Runtime: Temurin JRE 25.0.4.1 on both PCs.
+PC1 ran the Master and Backend A (`pearl-restart-a`); PC2 ran Backend B (`pearl-restart-b`). The fixture used fresh directories and world `pearl_persist_20261021`, with isolated ports. SSH used saved host keys and strict verification. No production process, world, configuration, or Crafty panel was accessed.
+
+Player-owned throw and replication
+---------------------------------
+An offline protocol-777 client connected directly to Backend A as `PearlPersist05` (UUID `4668c633-3d9d-3192-a631-256e22e55fa1`). Backend B first force-loaded the test area and created a soul-sand bubble column from y=60 through y=89, capped by a waterlogged top-half oak trapdoor at `(16005,90,16005)`. The player was moved to `(16005.5,60,16005.5)` and threw a normal ender-pearl item straight up.
+
+The client received pearl UUID `459b9ccb-fcc1-45dd-84b5-34b36d7acf9c`. Both backends reported that UUID with `Owner` equal to the player's UUID int array `[I; 1181271603, 1033712018, -1506728594, 585457569]`. The pearl settled in the chamber at approximately `(16005.447, 90.00, 16005.400)` with near-zero motion. The player's `mpdebug` action bar showed `pearl-restart-a` in aqua, confirming Backend A owned the chunk during this test.
+
+Peer restart
+------------
+Both backends acknowledged `save-all flush`. Backend B was stopped and restarted while the player stayed connected on Backend A. After Backend B rejoined the Master, `/list` on both backends still showed the player. Both then reported the same pearl UUID and the same player Owner UUID. The final sampled positions were `(16005.4467, 89.9929, 16005.4004)` on A and `(16005.4467, 90.0016, 16005.4004)` on B, less than 0.01 blocks apart vertically. The exact Paperclip and Master hashes were verified on the test hosts.
+
+This confirms that a player-owned pearl replica is re-established on a restarted peer while its authoritative chunk owner and player remain online. It does not test restarting the authoritative owner, chunk unload/reload, a hold without a force-load ticket, redstone release, or Mojang-client behavior. Keep those items open in the release checklist.
+
+Both backends were flushed and stopped cleanly; the Master logged `Exiting safely`. All test listeners and local SSH forwards were confirmed closed.
