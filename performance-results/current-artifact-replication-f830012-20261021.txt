@@ -1,0 +1,33 @@
+Current artifact two-backend replication regression — f830012
+Date: 2026-10-21
+Environment: two local backends plus disposable Master on one workstation; fresh
+temporary directories and disposable world `clean-f830012`. No Crafty, remote
+host, production process, or production world was accessed.
+
+Artifacts: Paperclip SHA-256
+`AF509B7D23186BCDB6C7B2BBA4DFFB1C41057B85FF014E02240710F34C122A2E`; Master
+SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+Ran `scripts/Verify-TwoBackendReplication.ps1` against RCON ports 26811 and
+26812 at `(1000,102,1000)`, with 20-second timeouts and each backend's current
+stdout log supplied for duplicate-UUID warning comparison. It passed:
+
+- cross-backend marker blocks, chest contents, and shulker contents;
+- same-owner hopper transfers of exactly 8 diamonds and 8 iron ingots across a
+  chunk boundary, including persistence after the chunk transferred to Backend
+  2;
+- redstone piston extension/retraction, observer pulse/reset, and sticky-piston
+  redstone-block pullback from both backend owners, with no dropped item;
+- entity subscription and UUID agreement, movement replication, owner-side and
+  non-owner-side entity removal, and Nether transfer/removal;
+- no increase in duplicate entity UUID warnings.
+
+Observer pulse and reset were observed in 48 ms and 90 ms. The verifier skipped
+player inventory replication because no automated player was connected. This
+run also does not exercise concurrent players, crashes, farming/TNT/stasis, or
+physical two-PC latency. The backends completed `save-all flush` and stopped
+cleanly; all fixture listeners were confirmed closed. The disposable Master
+was stopped after both backends disconnected.
+
+Full verifier output and backend logs are retained under
+`%TEMP%\mp-26.3-f830012-clean-smoke-20261021`.
