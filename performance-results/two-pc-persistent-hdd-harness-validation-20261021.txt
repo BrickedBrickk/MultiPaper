@@ -1,0 +1,31 @@
+Two-PC persistent-HDD harness validation — 2026-10-21
+
+Purpose and isolation
+The exact current development artifacts were run on isolated, disposable directories on the two target PCs to validate whether the movement harness could support a real HDD gameplay-capacity measurement. No Crafty configuration, production process, or live world was accessed. SSH connections used the saved known_hosts file with StrictHostKeyChecking=yes. Both fixture processes were stopped, all fixture ports were confirmed closed, and only the two task-created fixture directories were removed after evidence collection.
+
+Machines and artifacts
+PC1 (Master + Backend A): Intel Core i5-7600, 16 GiB RAM, WDC WD10EZEX-08M2NA0 rotational HDD, ext4.
+PC2 (Backend B): Intel Core i5-6600, 16 GiB RAM, WDC WD5000AZLX-75K2TA0 rotational HDD, ext4.
+Runtime: Eclipse Temurin JRE 25.0.4.1 on both PCs.
+Paperclip SHA-256: 3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D.
+Master SHA-256: BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968.
+All runs used the fresh disposable world multipaper_hdd_bench_20261021 and isolated ports (Master 37910/27910; backends 27911/27912; RCON 27920/27921).
+
+Harness outcomes
+1. Eight-client packet-count run: all eight clients reached ready and stayed for 121 seconds; 17,696 movement packets were sent, with no client errors. Authoritative server-side positions remained at spawn. This is login/packet-load evidence only.
+2. Route attempt: eight clients were teleported across backend ownership to a y=64 route; the route intersected terrain and generated suffocation messages. Although clients sent 16,708 movement packets over 121 seconds, RCON reads on both backends showed the sampled players remained at their initial x positions. This run is invalid as movement evidence.
+3. Stationary-client attempt: the protocol parser failed on all eight clients with `Read error for undefined : ctx.entityDelta is not a function` within 2.2–8.1 seconds. Keepalive timeouts followed. An RCON teleport was confirmed on both backends, but clients did not sustain a session. This is not capacity evidence.
+
+The first two metric captures briefly showed eight clients online and 20 TPS, with sampled 1-minute average MSPT in the single-digit range after startup. Because the clients did not move authoritatively and the third attempt hit a protocol parser incompatibility, these samples do not demonstrate active-play or HDD capacity. No safe maximum is established; retain the existing eight-player soft cap pending a valid gameplay run.
+
+Entity and protocol observations
+The fresh-world login attempts logged two rejected duplicate-UUID insertions on Backend B:
+- Pig 4d49264c-2978-4fef-a2eb-48b21b89dd94: existing mapping at x=84.73,z=28.76; rejected candidate at x=91.20,z=37.20.
+- Sheep 2a150f5c-3dee-4065-a484-8ce72c984790: existing mapping at x=131.20,z=28.73; rejected candidate at x=126.04,z=32.06.
+After graceful shutdown, the four copied Master entity-region files were scanned; each UUID appeared once in saved state (pig in chunk [6,3], sheep in [8,1]). This does not identify the race/root cause or establish crash behavior.
+Across all attempts in this fixture's backend logs, Backend A had 55 `RequestEntityPacket` missing-entity warnings and Backend B had 14. Unhandled packet warnings were all `ClientboundAddTransientBlockPacket`: 40 on A and 122 on B. These warning totals span the failed/repeated harness attempts, not a clean normal-play baseline. The unhandled packet path is in `MultiPaperEntitiesHandler.handleEntityUpdate`; both warning classes need root-cause/classification work.
+
+Reproducibility files in this directory preserve the backend/Master logs, client events and errors, metrics CSVs, and copied Master entity-region files. The route and stationary captures are explicitly retained as failed-harness evidence, not performance claims.
+
+Next required capacity step
+Use a protocol-777 client implementation that correctly decodes the server's entity-delta packets, then assert movement from authoritative backend state throughout the run. Build a collision-free route and check that all expected clients remain online on both backend lists. Repeat with normal chunk generation on these rotational HDDs before drawing any capacity conclusion. Investigate duplicate entity insertion, missing-entity requests, and transient-block packet handling alongside that test.

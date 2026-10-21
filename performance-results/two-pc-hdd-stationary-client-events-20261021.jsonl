@@ -1,0 +1,35 @@
+{"event":"client_started","username":"HddM01","elapsedMs":635}
+{"event":"tcp_connected","username":"HddM01","elapsedMs":695}
+{"event":"ready","username":"HddM01","elapsedMs":1173,"position":{"x":17.5,"y":73,"z":-0.5}}
+{"event":"client_started","username":"HddM02","elapsedMs":1453}
+{"event":"tcp_connected","username":"HddM02","elapsedMs":1460}
+{"event":"ready","username":"HddM02","elapsedMs":2120,"position":{"x":12.5,"y":65,"z":-4.5}}
+{"event":"client_error","username":"HddM01","elapsedMs":2251,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM03","elapsedMs":2374}
+{"event":"tcp_connected","username":"HddM03","elapsedMs":2377}
+{"event":"client_error","username":"HddM02","elapsedMs":2378,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"ready","username":"HddM03","elapsedMs":2906,"position":{"x":12.5,"y":66,"z":6.5}}
+{"event":"client_error","username":"HddM03","elapsedMs":3179,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM04","elapsedMs":3405}
+{"event":"tcp_connected","username":"HddM04","elapsedMs":3408}
+{"event":"ready","username":"HddM04","elapsedMs":3761,"position":{"x":9.5,"y":66,"z":0.5}}
+{"event":"client_error","username":"HddM04","elapsedMs":4032,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM05","elapsedMs":4373}
+{"event":"tcp_connected","username":"HddM05","elapsedMs":4375}
+{"event":"ready","username":"HddM05","elapsedMs":4752,"position":{"x":22.5,"y":66,"z":2.5}}
+{"event":"client_error","username":"HddM05","elapsedMs":5158,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM06","elapsedMs":5374}
+{"event":"tcp_connected","username":"HddM06","elapsedMs":5376}
+{"event":"ready","username":"HddM06","elapsedMs":5815,"position":{"x":10.5,"y":65,"z":-9.5}}
+{"event":"client_error","username":"HddM06","elapsedMs":6151,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM07","elapsedMs":6385}
+{"event":"tcp_connected","username":"HddM07","elapsedMs":6386}
+{"event":"ready","username":"HddM07","elapsedMs":6695,"position":{"x":15.5,"y":72,"z":9.5}}
+{"event":"client_error","username":"HddM07","elapsedMs":7094,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"client_started","username":"HddM08","elapsedMs":7363}
+{"event":"tcp_connected","username":"HddM08","elapsedMs":7366}
+{"event":"ready","username":"HddM08","elapsedMs":7819,"position":{"x":9.5,"y":66,"z":-1.5}}
+{"event":"client_error","username":"HddM08","elapsedMs":8094,"error":"Parse error for play.toClient: Read error for undefined : ctx.entityDelta is not a function"}
+{"event":"movement_started","elapsedMs":12830,"ready":8}
+{"event":"client_error","username":"HddM01","elapsedMs":32005,"error":"client timed out after 30000 milliseconds"}
+{"event":"unexpected_socket_end","username":"HddM01","elapsedMs":62010,"reason":"keepAliveError"}

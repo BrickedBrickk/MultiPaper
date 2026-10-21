@@ -1,0 +1,42 @@
+[ProxyServer] Listening on /[0:0:0:0:0:0:0:0]:27910
+[MultiPaperMaster] Listening on 0.0.0.0:37910
+Connection from /100.78.108.117:44338 (pc1-hdd-bench)
+Connection from /100.107.178.51:36268 (pc2-hdd-bench)
+pc1-hdd-bench (100.78.108.117:27911) has started, announcing connected servers...
+pc2-hdd-bench (100.107.178.51:27912) has started, announcing connected servers...
+/100.78.108.117:44338 (pc1-hdd-bench) closed
+/100.107.178.51:36268 (pc2-hdd-bench) closed
+Connection from /100.78.108.117:47056 (pc1-hdd-bench)
+Connection from /100.107.178.51:43346 (pc2-hdd-bench)
+pc1-hdd-bench (100.78.108.117:27911) has started, announcing connected servers...
+pc2-hdd-bench (100.107.178.51:27912) has started, announcing connected servers...
+/127.0.0.1:40506 has connected to /100.78.108.117:27911
+/127.0.0.1:40510 has connected to /100.107.178.51:27912
+/127.0.0.1:40524 has connected to /100.78.108.117:27911
+/127.0.0.1:40528 has connected to /100.107.178.51:27912
+/127.0.0.1:40536 has connected to /100.107.178.51:27912
+/127.0.0.1:40546 has connected to /100.107.178.51:27912
+/127.0.0.1:40554 has connected to /100.107.178.51:27912
+/127.0.0.1:40560 has connected to /100.107.178.51:27912
+/127.0.0.1:36162 has connected to /100.78.108.117:27911
+/127.0.0.1:36176 has connected to /100.78.108.117:27911
+/127.0.0.1:36186 has connected to /100.107.178.51:27912
+/127.0.0.1:36202 has connected to /100.78.108.117:27911
+/127.0.0.1:36214 has connected to /100.107.178.51:27912
+/127.0.0.1:36222 has connected to /100.107.178.51:27912
+/127.0.0.1:36232 has connected to /100.107.178.51:27912
+/127.0.0.1:36240 has connected to /100.78.108.117:27911
+/127.0.0.1:49650 has connected to /100.107.178.51:27912
+/127.0.0.1:49656 has connected to /100.78.108.117:27911
+/127.0.0.1:49658 has connected to /100.78.108.117:27911
+/127.0.0.1:49674 has connected to /100.78.108.117:27911
+/127.0.0.1:49678 has connected to /100.107.178.51:27912
+/127.0.0.1:49688 has connected to /100.78.108.117:27911
+/127.0.0.1:49692 has connected to /100.78.108.117:27911
+/127.0.0.1:57990 has connected to /100.107.178.51:27912
+/100.78.108.117:47056 (pc1-hdd-bench) closed
+/100.107.178.51:43346 (pc2-hdd-bench) closed
+Exiting safely...
+Waiting for async tasks...
+Shutting down event loop...
+Waiting for async tasks...

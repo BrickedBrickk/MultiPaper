@@ -1,0 +1,42 @@
+{"event":"client_started","username":"Hdd901","elapsedMs":585}
+{"event":"tcp_connected","username":"Hdd901","elapsedMs":639}
+{"event":"client_started","username":"Hdd902","elapsedMs":1467}
+{"event":"tcp_connected","username":"Hdd902","elapsedMs":1472}
+{"event":"ready","username":"Hdd902","elapsedMs":2134,"position":{"x":20.5,"y":71,"z":-4.5}}
+{"event":"client_started","username":"Hdd903","elapsedMs":2400}
+{"event":"tcp_connected","username":"Hdd903","elapsedMs":2403}
+{"event":"ready","username":"Hdd903","elapsedMs":3220,"position":{"x":9.5,"y":66,"z":5.5}}
+{"event":"client_started","username":"Hdd904","elapsedMs":3433}
+{"event":"tcp_connected","username":"Hdd904","elapsedMs":3440}
+{"event":"ready","username":"Hdd904","elapsedMs":3837,"position":{"x":19.5,"y":71,"z":-7.5}}
+{"event":"client_started","username":"Hdd905","elapsedMs":4395}
+{"event":"tcp_connected","username":"Hdd905","elapsedMs":4401}
+{"event":"ready","username":"Hdd905","elapsedMs":4762,"position":{"x":23.5,"y":70,"z":7.5}}
+{"event":"ready","username":"Hdd901","elapsedMs":5060,"position":{"x":21.5,"y":71,"z":-4.5}}
+{"event":"client_started","username":"Hdd906","elapsedMs":5382}
+{"event":"tcp_connected","username":"Hdd906","elapsedMs":5390}
+{"event":"ready","username":"Hdd906","elapsedMs":5807,"position":{"x":13.5,"y":74,"z":10.5}}
+{"event":"client_started","username":"Hdd907","elapsedMs":6389}
+{"event":"tcp_connected","username":"Hdd907","elapsedMs":6404}
+{"event":"ready","username":"Hdd907","elapsedMs":6686,"position":{"x":8.5,"y":65,"z":9.5}}
+{"event":"client_started","username":"Hdd908","elapsedMs":7381}
+{"event":"tcp_connected","username":"Hdd908","elapsedMs":7391}
+{"event":"ready","username":"Hdd908","elapsedMs":7876,"position":{"x":14.5,"y":66,"z":-1.5}}
+{"event":"server_position_update","username":"Hdd901","elapsedMs":8195,"position":{"x":100.5,"y":64,"z":-27.5}}
+{"event":"server_position_update","username":"Hdd902","elapsedMs":8356,"position":{"x":220.5,"y":64,"z":-19.5}}
+{"event":"server_position_update","username":"Hdd903","elapsedMs":8491,"position":{"x":100.5,"y":64,"z":-11.5}}
+{"event":"server_position_update","username":"Hdd904","elapsedMs":8558,"position":{"x":220.5,"y":64,"z":-3.5}}
+{"event":"server_position_update","username":"Hdd905","elapsedMs":8781,"position":{"x":100.5,"y":64,"z":4.5}}
+{"event":"server_position_update","username":"Hdd906","elapsedMs":9243,"position":{"x":220.5,"y":64,"z":12.5}}
+{"event":"server_position_update","username":"Hdd907","elapsedMs":9388,"position":{"x":100.5,"y":64,"z":20.5}}
+{"event":"server_position_update","username":"Hdd908","elapsedMs":9430,"position":{"x":220.5,"y":64,"z":28.5}}
+{"event":"movement_started","elapsedMs":27880,"ready":8}
+{"event":"expected_socket_end","username":"Hdd901","elapsedMs":148172,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd902","elapsedMs":148174,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd903","elapsedMs":148174,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd904","elapsedMs":148174,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd907","elapsedMs":148174,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd905","elapsedMs":148175,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd906","elapsedMs":148175,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"Hdd908","elapsedMs":148175,"reason":"moving-client probe complete"}
+{"event":"summary","requested":8,"ready":8,"protocolDisconnects":0,"unexpectedSocketEnds":0,"errors":[],"movementPackets":16708,"durationSeconds":121,"clients":[{"username":"Hdd901","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148172,"disconnectPacket":null,"errorCount":0,"chunks":364,"movementPackets":2089,"finalPositionSent":{"x":97.35000000000011,"y":64,"z":-27.5},"lastServerPosition":{"x":100.5,"y":64,"z":-27.5}},{"username":"Hdd902","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148174,"disconnectPacket":null,"errorCount":0,"chunks":556,"movementPackets":2089,"finalPositionSent":{"x":201.17999999999927,"y":64,"z":-19.5},"lastServerPosition":{"x":220.5,"y":64,"z":-19.5}},{"username":"Hdd903","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148174,"disconnectPacket":null,"errorCount":0,"chunks":448,"movementPackets":2089,"finalPositionSent":{"x":111.2099999999997,"y":64,"z":-11.5},"lastServerPosition":{"x":100.5,"y":64,"z":-11.5}},{"username":"Hdd904","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148174,"disconnectPacket":null,"errorCount":0,"chunks":545,"movementPackets":2089,"finalPositionSent":{"x":206.21999999999946,"y":64,"z":-3.5},"lastServerPosition":{"x":220.5,"y":64,"z":-3.5}},{"username":"Hdd905","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148175,"disconnectPacket":null,"errorCount":0,"chunks":389,"movementPackets":2088,"finalPositionSent":{"x":105.95999999999985,"y":64,"z":4.5},"lastServerPosition":{"x":100.5,"y":64,"z":4.5}},{"username":"Hdd906","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148175,"disconnectPacket":null,"errorCount":0,"chunks":502,"movementPackets":2088,"finalPositionSent":{"x":220.92000000000002,"y":64,"z":12.5},"lastServerPosition":{"x":220.5,"y":64,"z":12.5}},{"username":"Hdd907","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148174,"disconnectPacket":null,"errorCount":0,"chunks":363,"movementPackets":2088,"finalPositionSent":{"x":101.13,"y":64,"z":20.5},"lastServerPosition":{"x":100.5,"y":64,"z":20.5}},{"username":"Hdd908","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":148175,"disconnectPacket":null,"errorCount":0,"chunks":401,"movementPackets":2088,"finalPositionSent":{"x":222.18000000000006,"y":64,"z":28.5},"lastServerPosition":{"x":220.5,"y":64,"z":28.5}}]}
