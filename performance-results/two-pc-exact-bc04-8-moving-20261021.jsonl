@@ -1,0 +1,35 @@
+(node:34812) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{"event":"tcp_connected","username":"ExactBC0401","tcpConnected":1,"elapsedMs":302}
+{"event":"ready","username":"ExactBC0401","ready":1,"chunks":0,"elapsedMs":1667}
+{"event":"movement_started","username":"ExactBC0401","elapsedMs":4139}
+{"event":"tcp_connected","username":"ExactBC0402","tcpConnected":2,"elapsedMs":5198}
+{"event":"ready","username":"ExactBC0402","ready":2,"chunks":213,"elapsedMs":7045}
+{"event":"movement_started","username":"ExactBC0402","elapsedMs":7273}
+{"event":"tcp_connected","username":"ExactBC0403","tcpConnected":3,"elapsedMs":10338}
+{"event":"ready","username":"ExactBC0403","ready":3,"chunks":426,"elapsedMs":11094}
+{"event":"movement_started","username":"ExactBC0403","elapsedMs":11326}
+{"event":"tcp_connected","username":"ExactBC0404","tcpConnected":4,"elapsedMs":15095}
+{"event":"ready","username":"ExactBC0404","ready":4,"chunks":639,"elapsedMs":15391}
+{"event":"movement_started","username":"ExactBC0404","elapsedMs":15624}
+{"event":"tcp_connected","username":"ExactBC0405","tcpConnected":5,"elapsedMs":20055}
+{"event":"ready","username":"ExactBC0405","ready":5,"chunks":867,"elapsedMs":22931}
+{"event":"movement_started","username":"ExactBC0405","elapsedMs":23129}
+{"event":"tcp_connected","username":"ExactBC0406","tcpConnected":6,"elapsedMs":25040}
+{"event":"ready","username":"ExactBC0406","ready":6,"chunks":1015,"elapsedMs":25446}
+{"event":"movement_started","username":"ExactBC0406","elapsedMs":25675}
+{"event":"tcp_connected","username":"ExactBC0407","tcpConnected":7,"elapsedMs":30071}
+{"event":"tcp_connected","username":"ExactBC0408","tcpConnected":8,"elapsedMs":35069}
+{"event":"ready","username":"ExactBC0407","ready":7,"chunks":1338,"elapsedMs":35295}
+{"event":"ready","username":"ExactBC0408","ready":8,"chunks":1338,"elapsedMs":35437}
+{"event":"movement_started","username":"ExactBC0407","elapsedMs":35530}
+{"event":"movement_started","username":"ExactBC0408","elapsedMs":35682}
+{"event":"summary","requested":8,"tcpConnected":8,"ready":8,"chunkPackets":1974,"movementPackets":14624,"movementMode":"moving","disconnects":0,"errors":[],"durationMs":120012}
+{"event":"ended","username":"ExactBC0403","elapsedMs":120018}
+{"event":"ended","username":"ExactBC0402","elapsedMs":120019}
+{"event":"ended","username":"ExactBC0401","elapsedMs":120019}
+{"event":"ended","username":"ExactBC0405","elapsedMs":120019}
+{"event":"ended","username":"ExactBC0407","elapsedMs":120019}
+{"event":"ended","username":"ExactBC0404","elapsedMs":120020}
+{"event":"ended","username":"ExactBC0406","elapsedMs":120020}
+{"event":"ended","username":"ExactBC0408","elapsedMs":120020}

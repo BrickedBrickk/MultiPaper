@@ -1,0 +1,36 @@
+Exact current-artifact two-PC moving-client probe
+Date: 2026-10-21
+
+Artifacts and isolation
+-----------------------
+Paperclip SHA-256: BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155
+Master SHA-256:    BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968
+Runtime: Temurin JRE 25.0.4.1 on both PCs (archive SHA-256 verified against Adoptium metadata)
+
+PC1 ran the Master and Backend A on the i5-7600/16 GB/HDD host. PC2 ran Backend B on the i5-6600/16 GB/HDD host. Each used a new, private `/tmp/multipaper-release-probe-20261021` fixture with a fresh world, offline-mode test clients, separate game/RCON ports, and matching current JARs. The proxy and all backends were isolated from production processes, worlds, configuration, and Crafty. Eight protocol-777 clients connected through the Master proxy, began synthetic straight-line movement, and remained for the full 120 seconds.
+
+Client results
+--------------
+- 8/8 TCP connections; 8/8 reached player-ready state.
+- 1,974 chunk packets and 14,624 movement packets; zero client disconnects and zero client errors.
+- Both backends reported the same eight online players. An `/slist` snapshot while six clients had joined showed four on Backend A and two on Backend B.
+- The client harness sends protocol movement packets and does not simulate normal collision, gravity, or human input. This is not a GUI gameplay test.
+
+Performance samples
+-------------------
+The collector recorded five samples at 10.5, 22.2, 34.0, 46.4, and 58.2 seconds after sampling began. The first four samples had all eight players online; the fifth was after the clients disconnected.
+
+| Sample | 1m TPS A/B | 1m avg MSPT A/B | 1m max MSPT A/B | CPU one-core A/B | RSS A/B |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 20 / 20 | 6.5 / 7.2 ms | 120.8 / 60.4 ms | 69.28 / 64.31% | 1.687 / 1.573 GiB |
+| 2 | 20 / 20 | 7.4 / 7.6 ms | 120.8 / 60.4 ms | 63.01 / 67.42% | 1.689 / 1.599 GiB |
+| 3 | 20 / 20 | 8.3 / 8.1 ms | 120.8 / 49.0 ms | 68.82 / 48.46% | 1.689 / 1.599 GiB |
+| 4 | 20 / 20 | 9.1 / 8.8 ms | 56.9 / 60.8 ms | 70.43 / 63.20% | 1.689 / 1.612 GiB |
+
+The first four intervals reported HDD write latency of 2.1–6.8 ms on PC1 and 3.7–29.3 ms on PC2; average queue depth stayed below 0.064. One-minute maximum MSPT includes fresh-world and chunk warm-up. The Master used 0.209–0.214 GiB RSS and 5.2–6.5% of one core during the first four samples. Raw client events are in `two-pc-exact-bc04-8-moving-20261021.jsonl`; all five metric samples are in `two-pc-exact-bc04-8-moving-metrics-20261021.csv`.
+
+Warnings and limits
+-------------------
+Backend A logged two Mojang session-profile HTTP read timeouts during offline-mode synthetic sessions. Backend B logged five `RequestEntityPacket` warnings for entity UUIDs it could not find on Backend A. No test client disconnected or errored, but the entity warnings are not classified by this probe and should not be counted as a clean gameplay result. The run contains no farms, redstone, container transactions, exploration, or crash recovery. It does not establish capacity beyond eight players or a safe maximum; retain eight as a conservative soft cap pending representative gameplay and warning classification.
+
+Both backends completed `save-all flush` with zero clients online and stopped after their RegionFile I/O completed. The Master then logged `Exiting safely`; all fixture game, RCON, proxy, and Master listeners were confirmed closed on both PCs. The temporary runtime and world data remained confined to the unique disposable `/tmp` fixture paths.
