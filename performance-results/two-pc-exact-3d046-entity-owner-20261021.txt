@@ -1,0 +1,50 @@
+Exact-build two-physical-PC ownership-aware replication test
+Date: 2026-10-21
+
+Artifacts
+---------
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Paperclip SHA-256 on both backends: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`.
+Runtime: Temurin JRE 25.0.4.1 on both PCs. PC1 (i5-7600) ran Master and Backend A; PC2 (i5-6600) ran Backend B. SSH used strict saved host-key verification. The test used the isolated disposable world `capacity_12_moving_20261021`; no Crafty panel, production process, or production world was accessed.
+
+`scripts/Verify-TwoBackendReplication.ps1` ran at test coordinates `(18000,102,18000)` with a 15-second polling timeout. Both backend logs for this test contained zero `Entity uuid already exists` warnings and zero `RequestEntityPacket` warnings for missing entities.
+
+Verified results
+----------------
+- Cross-backend marker, chest, and shulker reads passed.
+- Two same-owner hoppers conserved exactly 8 diamonds and 8 iron ingots across a chunk boundary; counts remained exact after Backend 2 took ownership.
+- Redstone-powered piston movement and retraction replicated. The observer pulse/reset replicated (189 ms rise, 82 ms reset).
+- Sticky pistons pulled redstone blocks back correctly from both backend owners; both peers retained the block and no item entity appeared.
+- Spawned entity UUID subscription and movement matched on both backends.
+- Owner-side entity removal passed: an area-effect-cloud UUID was confirmed on both servers, killed on its owner, and disappeared on the subscriber.
+- Non-owner entity removal passed: the entity was confirmed on both servers, killed from the non-owner, then disappeared from its authoritative owner.
+- Nether entity transfer and subsequent removal passed.
+- The optional player inventory replication step was skipped because this run did not include a connected player.
+
+After the verifier completed, both backends were save-all flushed and stopped; both completed chunk I/O and Master-connection flushing. The disposable Master exited safely afterward, and all local SSH forwarding ports were closed. This run provides direct ownership-aware evidence for entity removal on the exact current artifact pair. It does not classify the separate missing-entity request warnings seen during synthetic player login, because no player logged in here. It also does not cover player inventory, concurrent gameplay edits, crashes, disk failure, or longer-term persistence.
+
+Verifier output
+---------------
+Probe entity tag: multipaper_regression_fe9bc993d8d44ba98cd5da9e1e042d91
+PASS: both backends read the other backend's marker after requesting its chunk.
+PASS: Server 2 read the chest block entity contents after requesting the marker chunk.
+PASS: Server 2 read the shulker block entity contents after requesting the marker chunk.
+PASS: two same-owner hoppers transferred 8 diamonds and 8 iron ingots across a chunk boundary with exact conservation; counts persisted after transfer to Backend 2.
+PASS: Backend 1 owns the base redstone test chunk.
+PASS: redstone-powered piston extension and block movement replicate from Backend 1.
+PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.
+PASS: observer pulse and reset replicated to both backends (rise observed in 189 ms; reset in 82 ms).
+PASS: Backend 1 sticky piston pulls the redstone block back; both backends retain it without an item drop.
+PASS: Backend 2 sticky-piston circuit runs in a locally owned chunk.
+PASS: peer backend sticky piston pulls the redstone block back; both backends retain it without an item drop.
+SKIP: player inventory replication requires -PlayerName.
+PASS: spawned entity subscription matches UUID [I; -1430096097, 1021725027, -1417688949, -708298535].
+PASS: entity teleport position replicated as '[18032.5d, 102.0d, 18001.5d]'.
+Owner-side entity-removal kill response: Killed Area Effect Cloud
+PASS: owner-side entity removal replicated to Backend 2.
+Non-owner entity-removal probe chunk: 1667,1667
+Non-owner entity-removal kill response: Killed Area Effect Cloud
+PASS: non-owner entity removal reached Backend 2 and disappeared from its authoritative entity list.
+PASS: entity dimension transfer replicated with UUID [I; 2062390844, -2011347823, -1316918398, 1456103412].
+PASS: Nether entity removal replicated to Server 2.
+
