@@ -7,4 +7,6 @@ The attempted ordinary-player, two-backend disposable protocol probe did not ver
 
 Then the Java 25 Master and messaging protocol suites were rerun with `--rerun-tasks`: Master 49 tests passed (0 failures, 0 errors, 0 skipped); messaging protocol 6 passed (0 failures, 0 errors, 0 skipped). This includes `pendingContainerTransactionSurvivesAbruptMasterRestart`, `pendingEntityInventoryTransactionSurvivesAbruptMasterRestart`, and the test that submits a second inventory edit after recovery, crashes the recovered Master, and checks the resulting snapshots after another restart.
 
+The new focused server regression suite also passed 2 tests with 0 failures/errors/skips. It checks the command's permission node and verifies that `MultiPaperCommandPermissions` registers that node as `PermissionDefault.TRUE`.
+
 This does not replace a current-artifact ordinary-player `/slist` probe, the full server regression/build after this command change, or any open gameplay/performance release gates. No Crafty panel or production server/world was accessed.
