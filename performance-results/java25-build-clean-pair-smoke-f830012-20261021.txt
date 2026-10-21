@@ -33,6 +33,14 @@ completed on both; both backends then stopped cleanly. The disposable Master
 was stopped after its backends had disconnected. Logs are retained in that
 temporary fixture directory.
 
+During startup, Backend A logged three `AddChunkSubscriberMessage for unloaded
+chunk` warnings for `clean-f830012_the_end` chunks `(-6,-6)`, `(-7,8)`, and
+`(5,9)`. No player was connected and no entity/block replication assertion
+covered these End chunks, so their effect is unclassified. The backend logs
+also contain OSHI/Windows performance-counter errors while building system
+reports; these did not prevent either backend from starting, but this run does
+not verify host performance telemetry.
+
 The protocol-777 player command smoke was attempted against this exact pair,
 but the installed `minecraft-protocol` package rejected version `26.3` before
 opening a connection (`unsupported protocol version: 26.3`). This attempt
