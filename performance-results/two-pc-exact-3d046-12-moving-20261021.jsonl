@@ -1,0 +1,74 @@
+{"event":"client_started","username":"LoadTest01","elapsedMs":536}
+{"event":"tcp_connected","username":"LoadTest01","elapsedMs":591}
+{"event":"ready","username":"LoadTest01","elapsedMs":1103,"position":{"x":-8.5,"y":81,"z":-5.5}}
+{"event":"client_started","username":"LoadTest02","elapsedMs":1418}
+{"event":"tcp_connected","username":"LoadTest02","elapsedMs":1421}
+{"event":"client_started","username":"LoadTest03","elapsedMs":2343}
+{"event":"tcp_connected","username":"LoadTest03","elapsedMs":2349}
+{"event":"client_started","username":"LoadTest04","elapsedMs":3369}
+{"event":"tcp_connected","username":"LoadTest04","elapsedMs":3375}
+{"event":"client_started","username":"LoadTest05","elapsedMs":4349}
+{"event":"tcp_connected","username":"LoadTest05","elapsedMs":4353}
+{"event":"ready","username":"LoadTest05","elapsedMs":4914,"position":{"x":-2.5,"y":80,"z":10.5}}
+{"event":"client_started","username":"LoadTest06","elapsedMs":5350}
+{"event":"tcp_connected","username":"LoadTest06","elapsedMs":5354}
+{"event":"ready","username":"LoadTest06","elapsedMs":5714,"position":{"x":-2.5,"y":81,"z":-4.5}}
+{"event":"ready","username":"LoadTest04","elapsedMs":6129,"position":{"x":1.5,"y":71,"z":-2.5}}
+{"event":"ready","username":"LoadTest02","elapsedMs":6198,"position":{"x":3.5,"y":70,"z":9.5}}
+{"event":"client_started","username":"LoadTest07","elapsedMs":6342}
+{"event":"tcp_connected","username":"LoadTest07","elapsedMs":6346}
+{"event":"ready","username":"LoadTest07","elapsedMs":6769,"position":{"x":3.5,"y":80,"z":-7.5}}
+{"event":"ready","username":"LoadTest03","elapsedMs":6801,"position":{"x":-7.5,"y":70,"z":-0.5}}
+{"event":"client_started","username":"LoadTest08","elapsedMs":7329}
+{"event":"tcp_connected","username":"LoadTest08","elapsedMs":7339}
+{"event":"ready","username":"LoadTest08","elapsedMs":7639,"position":{"x":3.5,"y":81,"z":-9.5}}
+{"event":"client_started","username":"LoadTest09","elapsedMs":8351}
+{"event":"tcp_connected","username":"LoadTest09","elapsedMs":8364}
+{"event":"ready","username":"LoadTest09","elapsedMs":8667,"position":{"x":3.5,"y":81,"z":-8.5}}
+{"event":"client_started","username":"LoadTest10","elapsedMs":9351}
+{"event":"tcp_connected","username":"LoadTest10","elapsedMs":9366}
+{"event":"ready","username":"LoadTest10","elapsedMs":10250,"position":{"x":-2.5,"y":79,"z":8.5}}
+{"event":"client_started","username":"LoadTest11","elapsedMs":10371}
+{"event":"tcp_connected","username":"LoadTest11","elapsedMs":10381}
+{"event":"ready","username":"LoadTest11","elapsedMs":10779,"position":{"x":5.5,"y":80,"z":-9.5}}
+{"event":"client_started","username":"LoadTest12","elapsedMs":11377}
+{"event":"tcp_connected","username":"LoadTest12","elapsedMs":11391}
+{"event":"ready","username":"LoadTest12","elapsedMs":11739,"position":{"x":-4.5,"y":80,"z":-7.5}}
+{"event":"server_position_update","username":"LoadTest01","elapsedMs":18189,"position":{"x":140.5,"y":64,"z":-15.5}}
+{"event":"server_position_update","username":"LoadTest02","elapsedMs":18237,"position":{"x":140.5,"y":64,"z":-12.5}}
+{"event":"server_position_update","username":"LoadTest03","elapsedMs":18315,"position":{"x":140.5,"y":64,"z":-9.5}}
+{"event":"server_position_update","username":"LoadTest04","elapsedMs":18428,"position":{"x":140.5,"y":64,"z":-6.5}}
+{"event":"server_position_update","username":"LoadTest05","elapsedMs":18544,"position":{"x":140.5,"y":64,"z":-3.5}}
+{"event":"server_position_update","username":"LoadTest06","elapsedMs":18639,"position":{"x":140.5,"y":64,"z":-0.5}}
+{"event":"server_position_update","username":"LoadTest07","elapsedMs":18744,"position":{"x":140.5,"y":64,"z":2.5}}
+{"event":"server_position_update","username":"LoadTest08","elapsedMs":18817,"position":{"x":140.5,"y":64,"z":5.5}}
+{"event":"server_position_update","username":"LoadTest09","elapsedMs":18939,"position":{"x":140.5,"y":64,"z":8.5}}
+{"event":"server_position_update","username":"LoadTest10","elapsedMs":19054,"position":{"x":140.5,"y":64,"z":11.5}}
+{"event":"server_position_update","username":"LoadTest11","elapsedMs":19319,"position":{"x":140.5,"y":64,"z":14.5}}
+{"event":"server_position_update","username":"LoadTest12","elapsedMs":19490,"position":{"x":140.5,"y":64,"z":17.5}}
+{"event":"movement_started","elapsedMs":36753,"ready":12}
+{"event":"server_position_update","username":"LoadTest09","elapsedMs":38650,"position":{"x":147.64000000000027,"y":64,"z":8.5}}
+{"event":"server_position_update","username":"LoadTest11","elapsedMs":38925,"position":{"x":148.6900000000003,"y":64,"z":14.5}}
+{"event":"server_position_update","username":"LoadTest07","elapsedMs":39433,"position":{"x":150.58000000000038,"y":64,"z":2.5}}
+{"event":"server_position_update","username":"LoadTest08","elapsedMs":41990,"position":{"x":120.33999999999976,"y":64,"z":5.5}}
+{"event":"server_position_update","username":"LoadTest05","elapsedMs":44261,"position":{"x":169.6900000000011,"y":64,"z":-3.5}}
+{"event":"server_position_update","username":"LoadTest03","elapsedMs":44519,"position":{"x":170.53000000000114,"y":64,"z":-9.5}}
+{"event":"server_position_update","username":"LoadTest04","elapsedMs":45022,"position":{"x":108.37000000000012,"y":64,"z":-6.5}}
+{"event":"server_position_update","username":"LoadTest10","elapsedMs":47220,"position":{"x":100.39000000000036,"y":64,"z":11.5}}
+{"event":"server_position_update","username":"LoadTest12","elapsedMs":47250,"position":{"x":100.39000000000036,"y":64,"z":17.5}}
+{"event":"server_position_update","username":"LoadTest01","elapsedMs":47575,"position":{"x":182.5000000000016,"y":64,"z":-15.5}}
+{"event":"server_position_update","username":"LoadTest06","elapsedMs":67290,"position":{"x":171.58000000000118,"y":64,"z":-0.5}}
+{"event":"server_position_update","username":"LoadTest02","elapsedMs":69942,"position":{"x":181.66000000000156,"y":64,"z":-12.5}}
+{"event":"expected_socket_end","username":"LoadTest01","elapsedMs":156764,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest04","elapsedMs":156764,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest02","elapsedMs":156765,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest08","elapsedMs":156765,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest12","elapsedMs":156766,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest06","elapsedMs":156766,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest10","elapsedMs":156766,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest03","elapsedMs":156766,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest05","elapsedMs":156766,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest07","elapsedMs":156767,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest11","elapsedMs":156767,"reason":"moving-client probe complete"}
+{"event":"expected_socket_end","username":"LoadTest09","elapsedMs":156768,"reason":"moving-client probe complete"}
+{"event":"summary","requested":12,"ready":12,"protocolDisconnects":0,"unexpectedSocketEnds":0,"errors":[],"movementPackets":27023,"durationSeconds":121,"clients":[{"username":"LoadTest01","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156764,"disconnectPacket":null,"errorCount":0,"chunks":393,"movementPackets":2252,"finalPositionSent":{"x":182.5000000000016,"y":64,"z":-15.5},"lastServerPosition":{"x":182.5000000000016,"y":64,"z":-15.5}},{"username":"LoadTest02","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156765,"disconnectPacket":null,"errorCount":0,"chunks":456,"movementPackets":2252,"finalPositionSent":{"x":181.66000000000156,"y":64,"z":-12.5},"lastServerPosition":{"x":181.66000000000156,"y":64,"z":-12.5}},{"username":"LoadTest03","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156766,"disconnectPacket":null,"errorCount":0,"chunks":378,"movementPackets":2252,"finalPositionSent":{"x":170.53000000000114,"y":64,"z":-9.5},"lastServerPosition":{"x":170.53000000000114,"y":64,"z":-9.5}},{"username":"LoadTest04","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156764,"disconnectPacket":null,"errorCount":0,"chunks":363,"movementPackets":2252,"finalPositionSent":{"x":108.37000000000012,"y":64,"z":-6.5},"lastServerPosition":{"x":108.37000000000012,"y":64,"z":-6.5}},{"username":"LoadTest05","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156766,"disconnectPacket":null,"errorCount":0,"chunks":380,"movementPackets":2252,"finalPositionSent":{"x":169.6900000000011,"y":64,"z":-3.5},"lastServerPosition":{"x":169.6900000000011,"y":64,"z":-3.5}},{"username":"LoadTest06","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156766,"disconnectPacket":null,"errorCount":0,"chunks":453,"movementPackets":2252,"finalPositionSent":{"x":171.58000000000118,"y":64,"z":-0.5},"lastServerPosition":{"x":171.58000000000118,"y":64,"z":-0.5}},{"username":"LoadTest07","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156767,"disconnectPacket":null,"errorCount":0,"chunks":351,"movementPackets":2252,"finalPositionSent":{"x":150.58000000000038,"y":64,"z":2.5},"lastServerPosition":{"x":150.58000000000038,"y":64,"z":2.5}},{"username":"LoadTest08","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156765,"disconnectPacket":null,"errorCount":0,"chunks":351,"movementPackets":2252,"finalPositionSent":{"x":120.33999999999976,"y":64,"z":5.5},"lastServerPosition":{"x":120.33999999999976,"y":64,"z":5.5}},{"username":"LoadTest09","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156768,"disconnectPacket":null,"errorCount":0,"chunks":351,"movementPackets":2252,"finalPositionSent":{"x":147.64000000000027,"y":64,"z":8.5},"lastServerPosition":{"x":147.64000000000027,"y":64,"z":8.5}},{"username":"LoadTest10","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156766,"disconnectPacket":null,"errorCount":0,"chunks":378,"movementPackets":2252,"finalPositionSent":{"x":100.39000000000036,"y":64,"z":11.5},"lastServerPosition":{"x":100.39000000000036,"y":64,"z":11.5}},{"username":"LoadTest11","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156767,"disconnectPacket":null,"errorCount":0,"chunks":351,"movementPackets":2252,"finalPositionSent":{"x":148.6900000000003,"y":64,"z":14.5},"lastServerPosition":{"x":148.6900000000003,"y":64,"z":14.5}},{"username":"LoadTest12","connected":true,"ready":true,"expectedEnd":true,"endedAtMs":156766,"disconnectPacket":null,"errorCount":0,"chunks":384,"movementPackets":2251,"finalPositionSent":{"x":100.39000000000036,"y":64,"z":17.5},"lastServerPosition":{"x":100.39000000000036,"y":64,"z":17.5}}]}

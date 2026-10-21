@@ -1,0 +1,180 @@
+SAMPLE 0 2026-10-21T17:37:30.8525637Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a9.6§7/§a3.2§7/§c51.2§e, §a9.1§7/§a3.0§7/§c51.2§e, §a9.5§7/§a2.3§7/§c54.9
+
+A host_cpu_percent_rss_kb_elapsed 75.1 1316724     03:38
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.0§7/§a2.6§7/§a16.4§e, §a7.2§7/§a2.6§7/§a16.4§e, §a7.4§7/§a2.1§7/§c52.0
+
+B host_cpu_percent_rss_kb_elapsed 68.7 1574804     03:38
+SAMPLE 1 2026-10-21T17:37:41.8998468Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a10.1§7/§a4.2§7/§a14.2§e, §a9.6§7/§a3.4§7/§a14.2§e, §a9.7§7/§a2.3§7/§c51.2
+
+A host_cpu_percent_rss_kb_elapsed 74.2 1316740     03:49
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.8§7/§a3.2§7/§a10.2§e, §a7.7§7/§a3.2§7/§a10.3§e, §a7.5§7/§a2.1§7/§c52.0
+
+B host_cpu_percent_rss_kb_elapsed 67.5 1574812     03:49
+SAMPLE 2 2026-10-21T17:37:52.9594508Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a10.1§7/§a4.1§7/§e45.3, §a10.0§7/§a3.5§7/§e45.3, §a10.1§7/§a3.0§7/§c51.2
+
+A host_cpu_percent_rss_kb_elapsed 73.3 1316748     04:00
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.4§7/§a3.3§7/§a9.9§e, §a7.7§7/§a3.3§7/§a39.6§e, §a7.7§7/§a2.6§7/§e43.7
+
+B host_cpu_percent_rss_kb_elapsed 66.2 1574820     04:00
+SAMPLE 3 2026-10-21T17:38:04.0149105Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a9.3§7/§a3.0§7/§a38.4§e, §a9.2§7/§a3.0§7/§a38.4§e, §a9.8§7/§a3.0§7/§c51.2
+
+A host_cpu_percent_rss_kb_elapsed 72.5 1316772     04:11
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.7§7/§a2.9§7/§c50.5§e, §a7.5§7/§a2.9§7/§c50.5§e, §a7.5§7/§a2.6§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 65.3 1574912     04:11
+SAMPLE 4 2026-10-21T17:38:15.0953081Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a9.3§7/§a7.8§7/§a12.4§e, §a9.4§7/§a7.7§7/§a16.2§e, §a9.6§7/§a3.0§7/§c51.2
+
+A host_cpu_percent_rss_kb_elapsed 71.4 1316800     04:22
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.1§7/§a2.5§7/§a12.1§e, §a7.3§7/§a2.5§7/§a12.1§e, §a7.5§7/§a2.5§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 64.2 1574932     04:22
+SAMPLE 5 2026-10-21T17:38:26.1326266Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a8.7§7/§a3.9§7/§a11.6§e, §a9.1§7/§a3.2§7/§e45.7, §a9.5§7/§a3.0§7/§c51.2
+
+A host_cpu_percent_rss_kb_elapsed 70.5 1316832     04:33
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.6§7/§a3.2§7/§a10.1§e, §a7.3§7/§a2.7§7/§a12.8§e, §a7.5§7/§a2.5§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 63.5 1575004     04:33
+SAMPLE 6 2026-10-21T17:38:37.1751470Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a9.4§7/§a5.7§7/§a13.2§e, §a8.9§7/§a2.6§7/§a13.2§e, §a9.4§7/§a2.6§7/§e45.7
+
+A host_cpu_percent_rss_kb_elapsed 69.6 1316844     04:44
+B There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.8§7/§a6.3§7/§a14.0§e, §a7.6§7/§a3.2§7/§a14.0§e, §a7.5§7/§a2.5§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 62.6 1575052     04:44
+SAMPLE 7 2026-10-21T17:38:48.2343793Z
+A There are 12 of a max of 20 players online: LoadTest01, LoadTest05, LoadTest06, LoadTest04, LoadTest02, LoadTest07, LoadTest03, LoadTest08, LoadTest09, LoadTest10, LoadTest11, LoadTest12
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a9.5§7/§a7.4§7/§e44.8, §a9.4§7/§a3.3§7/§e44.8, §a9.3§7/§a2.6§7/§e45.7
+
+A host_cpu_percent_rss_kb_elapsed 68.9 1316920     04:56
+B There are 2 of a max of 20 players online: LoadTest10, LoadTest11
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a7.7§7/§a2.2§7/§e47.8, §a7.8§7/§a2.2§7/§e47.8, §a7.5§7/§a2.2§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 61.8 1575088     04:55
+SAMPLE 8 2026-10-21T17:38:59.3681211Z
+A There are 0 of a max of 20 players online: 
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a5.8§7/§a0.7§7/§c68.6§e, §a5.4§7/§a0.7§7/§c68.6§e, §a8.6§7/§a0.7§7/§c118.0
+
+A host_cpu_percent_rss_kb_elapsed 68.0 1318900     05:07
+B There are 0 of a max of 20 players online: 
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a3.2§7/§a0.5§7/§a15.8§e, §a3.7§7/§a0.5§7/§a15.8§e, §a6.8§7/§a0.5§7/§c50.5
+
+B host_cpu_percent_rss_kb_elapsed 60.6 1575136     05:07
+SAMPLE 9 2026-10-21T17:39:10.9572060Z
+A There are 0 of a max of 20 players online: 
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a2.0§7/§a0.8§7/§a3.9§e, §a2.0§7/§a0.7§7/§a10.3§e, §a7.3§7/§a0.7§7/§c118.0
+
+A host_cpu_percent_rss_kb_elapsed 66.2 1330156     05:18
+B There are 0 of a max of 20 players online: 
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a1.1§7/§a0.5§7/§a8.1§e, §a1.0§7/§a0.5§7/§a8.1§e, §a5.6§7/§a0.5§7/§e47.8
+
+B host_cpu_percent_rss_kb_elapsed 58.9 1576864     05:18
+SAMPLE 10 2026-10-21T17:39:21.9739346Z
+A There are 0 of a max of 20 players online: 
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a1.8§7/§a0.8§7/§a2.9§e, §a1.8§7/§a0.8§7/§a2.9§e, §a5.9§7/§a0.7§7/§c118.0
+
+A host_cpu_percent_rss_kb_elapsed 64.4 1330164     05:29
+B There are 0 of a max of 20 players online: 
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a0.9§7/§a0.8§7/§a1.7§e, §a0.9§7/§a0.8§7/§a1.9§e, §a4.4§7/§a0.5§7/§e47.8
+
+B host_cpu_percent_rss_kb_elapsed 57.2 1576876     05:29
+SAMPLE 11 2026-10-21T17:39:32.9930447Z
+A There are 0 of a max of 20 players online: 
+A §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+A §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a1.8§7/§a0.7§7/§a3.5§e, §a1.8§7/§a0.7§7/§a3.5§e, §a4.6§7/§a0.7§7/§c118.0
+
+A host_cpu_percent_rss_kb_elapsed 62.8 1330172     05:40
+B There are 0 of a max of 20 players online: 
+B §6TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a20.0§r, §a20.0§r, §a20.0
+
+B §6Server tick times §e(§7avg§e/§7min§e/§7max§e)§6 from last 5s§7,§6 10s§7,§6 1m§e:
+§6◴ §a1.0§7/§a0.6§7/§a2.6§e, §a0.9§7/§a0.5§7/§a2.6§e, §a3.2§7/§a0.5§7/§e47.8
+
+B host_cpu_percent_rss_kb_elapsed 55.5 1576908     05:41

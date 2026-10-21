@@ -1,0 +1,38 @@
+Exact-build 12-client cross-PC movement probe
+Date: 2026-10-21
+
+Artifacts and fixture
+---------------------
+Source: `feature/port-26.3`, commit `813b4f8`.
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Paperclip SHA-256 on both backends: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`.
+Runtime: Temurin JRE 25.0.4.1 on both PCs.
+
+PC1 was an Intel i5-7600 with 16 GB RAM and ran the Master and Backend A. PC2 was an Intel i5-6600 with 16 GB RAM and ran Backend B. Both backends used the exact same Paperclip hash. The Master proxy and backend ports were isolated to a disposable test fixture; strict SSH host key verification was enabled for the forwards. No Crafty panel or production process, world, or configuration was accessed.
+
+The test used a disposable world named `capacity_12_moving_20261021`. It was reused from earlier setup attempts, with a prefilled and force-loaded stone lane at y=63, x=80..240. `/difficulty peaceful` was set on both backends. The lane crossed the x=160 backend ownership boundary. This world and its `/tmp` fixture paths were not production data. `/tmp` was mounted as `tmpfs`, so this run did not measure HDD latency or durable disk throughput.
+
+Client and command results
+--------------------------
+Twelve offline protocol-777 clients connected through the Master proxy and reached the server-ready state. The owner backend for each player was read from its login log; RCON teleports were sent only to that owning backend, and each client reported the server's resulting position. The clients then moved at a requested 4.2 blocks/second in separate z lanes for 120 seconds, bouncing between x=96 and x=224 so the test exercised both sides of the ownership boundary.
+
+- 12/12 clients connected and became ready.
+- 12/12 stayed connected for the full movement interval; no protocol disconnect packet, unexpected socket close, or client error was recorded.
+- 27,023 movement packets were sent (about 2,252 per client); the client summary reports 121 seconds of movement.
+- The clients received between 333 and 456 chunk packets each.
+- All 12 appeared in both backends' `/list` snapshots for samples 0–6. The final near-disconnect sample showed 12 on A and 2 on B, followed by 0 on both after planned client close. The probe did not log a client TCP loss during this change.
+- The Node stderr contained only the `punycode` deprecation warning. There were no packet parse warnings in this run.
+
+The client harness sends movement packets and confirms server teleports; it does not model normal client physics, collision, human input, combat, or vanilla GUI rendering. Two initial-spawn “moved too quickly” warnings occurred before the controlled lane teleports. No such correction warnings were logged after the lane positions were confirmed.
+
+Performance while all 12 clients were present
+---------------------------------------------
+Eight paired samples were taken at roughly 11-second intervals from 17:37:30 UTC through 17:38:48 UTC. Both backends reported 20 TPS in every sample. The one-minute average MSPT ranged from 9.3–10.1 ms on Backend A and 7.4–7.7 ms on Backend B; one-minute maximum MSPT ranged from 45.7–54.9 ms on A and 50.5–52.0 ms on B. Backend process CPU averaged about 72% of one core on A and 65% on B. RSS was about 1.26 GiB on A and 1.50 GiB on B. These are per-process measurements; total host CPU and Master process use were not sampled in this run.
+
+Entity and capacity limits
+--------------------------
+During the login/chunk-attachment period, Backend A logged five `RequestEntityPacket` missing-UUID warnings from Backend B, and Backend B logged seven corresponding warnings from Backend A. The requests were not identified as players, and this probe did not determine whether the UUIDs were stale removals, unloaded entities, or a missed live entity. They remain unclassified and prevent treating this as a clean entity/gameplay result. This is consistent with the unresolved warning class from the earlier eight-client run.
+
+This establishes only that this synthetic 12-client movement workload held 20 TPS on the two test machines for two minutes with modest average tick times. It does not establish a safe public-server capacity or clear entity consistency. Keep the conservative eight-player soft cap; do not infer that 12 real players are safe. Exploration, chunk generation, farms, redstone, inventories, player deaths, disk persistence, and crash recovery were not part of this run.
+
+Raw client events are in `two-pc-exact-3d046-12-moving-20261021.jsonl`; the paired `/list`, `/tps`, `/mspt`, and process CPU/RSS samples are in `two-pc-exact-3d046-12-moving-metrics-20261021.txt`.
