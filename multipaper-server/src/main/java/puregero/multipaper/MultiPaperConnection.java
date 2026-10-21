@@ -123,8 +123,8 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
                 ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolders().forEach(chunkHolder -> {
                     chunkHolder.externalSubscribers.clear();
                     channel.write(new SubscribeChunkMessage(level.getWorld().getName(), chunkHolder.chunkX, chunkHolder.chunkZ));
-                    if (chunkHolder.getEntityChunk() != null) {
-                        chunkHolder.externalEntitiesSubscribers.clear();
+                    chunkHolder.externalEntitiesSubscribers.clear();
+                    if (chunkHolder.multiPaperEntitiesReady) {
                         channel.write(new SubscribeEntitiesMessage(level.getWorld().getName(), chunkHolder.chunkX, chunkHolder.chunkZ));
                     }
                     if (chunkHolder.hasExternalLockRequest) {
@@ -212,15 +212,37 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     public <T extends ServerBoundMessage> CompletableFuture<T> sendAndAwaitReply(MasterBoundMessage message, Class<T> expectedClass) {
         CompletableFuture<T> future = new CompletableFuture<>();
 
-        send(message, reply -> {
-            try {
-                future.complete((T) reply);
-            } catch (ClassCastException e) {
-                e.printStackTrace();
-            }
-        });
+        send(message, reply -> completeReply(future, expectedClass, reply));
 
         return future;
+    }
+
+    public <T extends ServerBoundMessage> CompletableFuture<T> trySendAndAwaitReply(MasterBoundMessage message, Class<T> expectedClass) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        MasterBoundMessage request = setCallback(message, reply -> {
+            unhandledRequests.remove(message);
+            completeReply(future, expectedClass, reply);
+        });
+        unhandledRequests.add(request);
+
+        if (!trySendIfActive(request)) {
+            unhandledRequests.remove(request);
+            removeCallback(request);
+            future.completeExceptionally(new IllegalStateException("Master connection is not active"));
+        }
+
+        return future;
+    }
+
+    static <T extends ServerBoundMessage> void completeReply(CompletableFuture<T> future, Class<T> expectedClass, ServerBoundMessage reply) {
+        if (!expectedClass.isInstance(reply)) {
+            future.completeExceptionally(new IllegalStateException(
+                    "Expected " + expectedClass.getName() + " reply but received " + reply.getClass().getName()
+            ));
+            return;
+        }
+
+        future.complete(expectedClass.cast(reply));
     }
 
     public Map<String, ExternalServer> getServersMap() {
@@ -281,9 +303,9 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     @Override
     public void handle(SetChunkOwnerMessage message) {
         ExternalServer server = message.owner.isEmpty() ? null : getOrCreateServer(message.owner);
+        MultiPaperContainerHandler.onChunkOwnershipChanged(message.world, message.cx, message.cz, server == null || server.isMe());
 
         NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
-        MultiPaper.debug("setOwner " + message.world + "," + message.cx + "," + message.cz + " owner='" + message.owner + "' holder=" + (newChunkHolder != null)); // MultiPaper
         if (newChunkHolder != null) {
             if (newChunkHolder.externalOwner != null && newChunkHolder.externalOwner.isMe() && server != null && !server.isMe()) {
                 if (newChunkHolder.getCurrentChunk() instanceof LevelChunk levelChunk) {
@@ -323,7 +345,6 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
         MultiPaper.runSync(() -> {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
-            MultiPaper.debug("addSubscriber " + message.world + "," + message.cx + "," + message.cz + " += " + message.server + " holder=" + (newChunkHolder != null)); // MultiPaper
             if (newChunkHolder != null) {
                 newChunkHolder.externalSubscribers.add(server);
             } else {
@@ -356,7 +377,6 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
         MultiPaper.runSync(() -> {
             NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
-            MultiPaper.debug("syncSubs " + message.world + "," + message.cx + "," + message.cz + " owner='" + message.owner + "' subs=[" + String.join(",", message.subscribers) + "] holder=" + (newChunkHolder != null)); // MultiPaper
             if (newChunkHolder != null) {
                 newChunkHolder.externalOwner = ownerServer;
                 newChunkHolder.externalSubscribers.clear();

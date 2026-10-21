@@ -2,11 +2,11 @@ package puregero.multipaper.server.handlers;
 
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteJsonMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
+import puregero.multipaper.server.FileLocker;
 import puregero.multipaper.server.ServerConnection;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 
@@ -22,16 +22,20 @@ public class WriteJsonHandler {
                         writesInProgress.put(message.file, message.data);
                     }
 
-                    Files.write(new File(message.file).toPath(), message.data);
-
-                    synchronized (writesInProgress) {
-                        writesInProgress.remove(message.file);
+                    try {
+                        FileLocker.writeBytes(new File(message.file), message.data);
+                    } finally {
+                        synchronized (writesInProgress) {
+                            writesInProgress.remove(message.file);
+                        }
                     }
                 }
 
                 connection.sendReply(new BooleanMessageReply(true), message);
             } catch (IOException e) {
+                System.err.println("Failed to persist JSON file " + message.file);
                 e.printStackTrace();
+                connection.sendReply(new BooleanMessageReply(false), message);
             }
         });
     }

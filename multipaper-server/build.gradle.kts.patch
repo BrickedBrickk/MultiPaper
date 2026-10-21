@@ -77,13 +77,15 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,3 @@
+@@ -266,2 +_,4 @@
  tasks.withType<JavaCompile>().configureEach {
++    dependsOn("applyMinecraftPatches")
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
      options.forkOptions.memoryMaximumSize = "1G"
-@@ -269,1 +_,5 @@
+@@ -269,1 +_,6 @@
  }
 +
 +tasks.withType<ProcessResources>().configureEach {
++    dependsOn("applyMinecraftPatches")
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
 +}

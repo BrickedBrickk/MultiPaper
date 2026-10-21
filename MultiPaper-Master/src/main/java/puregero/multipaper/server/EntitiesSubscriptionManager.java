@@ -14,7 +14,8 @@ public class EntitiesSubscriptionManager {
     private static final Queue<List<ServerConnection>> objectPool = new LinkedList<>();
 
     private static final Map<ChunkKey, List<ServerConnection>> chunkSubscribers = new ConcurrentHashMap<>();
-    private static final Map<ServerConnection, HashSet<ChunkKey>> subscribedChunks = new HashMap<>();
+    // Different server connections process entity subscriptions on different Netty event loops.
+    private static final Map<ServerConnection, Set<ChunkKey>> subscribedChunks = new ConcurrentHashMap<>();
 
     public static ServerConnection getSubscriber(String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
@@ -53,7 +54,7 @@ public class EntitiesSubscriptionManager {
             if (!serverConnections.contains(serverConnection)) {
                 updateSubscriberAdd(serverConnections, serverConnection, world, cx, cz);
                 serverConnections.add(serverConnection);
-                subscribedChunks.computeIfAbsent(serverConnection, k -> new HashSet<>()).add(key);
+                subscribedChunks.computeIfAbsent(serverConnection, k -> ConcurrentHashMap.newKeySet()).add(key);
             }
         }
     }
@@ -77,7 +78,7 @@ public class EntitiesSubscriptionManager {
                 }
             }
 
-            HashSet<ChunkKey> chunks = subscribedChunks.get(serverConnection);
+            Set<ChunkKey> chunks = subscribedChunks.get(serverConnection);
             if (chunks != null) {
                 chunks.remove(key);
             }
@@ -114,7 +115,7 @@ public class EntitiesSubscriptionManager {
     }
 
     public static void unsubscribeAll(ServerConnection serverConnection) {
-        HashSet<ChunkKey> chunks = subscribedChunks.remove(serverConnection);
+        Set<ChunkKey> chunks = subscribedChunks.remove(serverConnection);
         if (chunks != null) {
             chunks.forEach(chunk -> unsubscribe(serverConnection, chunk));
         }

@@ -12,24 +12,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkSubscriptionManager {
 
-    // MultiPaper start - opt-in protocol tracing, enabled with -Dmultipaper.debug=true
-    private static final boolean DEBUG = Boolean.getBoolean("multipaper.debug");
-
-    public static void debug(String message) {
-        if (DEBUG) {
-            System.out.println("[MP] " + message);
-        }
-    }
-    // MultiPaper end - opt-in protocol tracing
-
     private static final Queue<List<ServerConnection>> objectPool = new LinkedList<>();
 
     // Index 0 in the list is the current chunk owning it
     private static final Map<ChunkKey, List<ServerConnection>> chunkLocks = new ConcurrentHashMap<>();
     private static final Map<ChunkKey, List<ServerConnection>> chunkSubscribers = new ConcurrentHashMap<>();
 
-    private static final Map<ServerConnection, Set<ChunkKey>> lockedChunks = new HashMap<>();
-    private static final Map<ServerConnection, Set<ChunkKey>> subscribedChunks = new HashMap<>();
+    // Different server connections process messages on different Netty event loops, so
+    // ownership and subscription bookkeeping must support concurrent per-connection updates.
+    private static final Map<ServerConnection, Set<ChunkKey>> lockedChunks = new ConcurrentHashMap<>();
+    private static final Map<ServerConnection, Set<ChunkKey>> subscribedChunks = new ConcurrentHashMap<>();
 
     public static ServerConnection getOwner(String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
@@ -89,7 +81,6 @@ public class ChunkSubscriptionManager {
 
                 lockedChunks.computeIfAbsent(serverConnection, k -> ConcurrentHashMap.newKeySet()).add(key);
 
-                debug("lock " + world + "," + cx + "," + cz + " by " + serverConnection.getBungeeCordName() + " force=" + force + " -> owner=" + serverConnections.get(0).getBungeeCordName());
 
                 if (serverConnections.size() == 1 || force) {
                     if (chunkSubscribers.get(key) != null) {
@@ -174,7 +165,6 @@ public class ChunkSubscriptionManager {
                 updateSubscriberAdd(serverConnections, serverConnection, world, cx, cz);
                 serverConnections.add(serverConnection);
                 subscribedChunks.computeIfAbsent(serverConnection, k -> ConcurrentHashMap.newKeySet()).add(key);
-                debug("subscribe " + world + "," + cx + "," + cz + " by " + serverConnection.getBungeeCordName());
             }
 
             if (chunkLocks.get(key) != null && !chunkLocks.get(key).isEmpty()) {
@@ -213,7 +203,6 @@ public class ChunkSubscriptionManager {
         String subscriber = serverConnection.getBungeeCordName();
         for (ServerConnection connection : serverConnections) {
             if (connection != serverConnection) {
-                debug("addSub " + world + "," + cx + "," + cz + " telling " + connection.getBungeeCordName() + " that " + subscriber + " subscribes");
                 connection.send(new AddChunkSubscriberMessage(world, cx, cz, subscriber));
             }
         }
@@ -251,6 +240,10 @@ public class ChunkSubscriptionManager {
     }
 
     public static List<ServerConnection> getSubscribers(String world, int cx, int cz) {
-        return chunkSubscribers.getOrDefault(new ChunkKey(world, cx, cz), Collections.emptyList());
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        synchronized (ChunkLock.getChunkLock(key)) {
+            List<ServerConnection> subscribers = chunkSubscribers.get(key);
+            return subscribers == null ? Collections.emptyList() : List.copyOf(subscribers);
+        }
     }
 }

@@ -175,12 +175,25 @@ public class MultiPaperInventoryHandler {
                         LOGGER.warn(player.getScoreboardName() + ": Trying to merge the same item same tags, but neither the count nor the durability is different. " + item + " and " + replacingItem + " and " + currentItem);
                     }
                 } else {
-                    addItem(item, player);
                     if (!replacingItem.isEmpty()) {
-                        // The item has probably duplicated, try to find one of the copies and remove it
+                        if (!hasPlayerOwnedItems(replacingItem, player.containerMenu.getCarried(), player.getInventory().compartments)) {
+                            LOGGER.warn("{}: Ignoring stale inventory replacement {} -> {}; the source item is no longer in player-owned inventory. Re-syncing the authoritative slot.",
+                                    player.getScoreboardName(), replacingItem, item);
+                            markInventorySlotForSync(component, slot);
+                            return;
+                        }
+
                         LOGGER.info(player.getScoreboardName() + ": An external server tried to replace " + replacingItem + " with a " + item + ", but that item is now a " + currentItem + ". Reconciling against the player's inventory...");
-                        removeFromPlayerOwnedItems(player, replacingItem);
+                        if (!removeFromPlayerOwnedItems(player, replacingItem.copy())) {
+                            // The synchronous preflight above should make this unreachable. Fail closed
+                            // if a custom inventory implementation changes during reconciliation.
+                            LOGGER.error("{}: Could not atomically remove stale replacement source {}; ignoring replacement {}.",
+                                    player.getScoreboardName(), replacingItem, item);
+                            markInventorySlotForSync(component, slot);
+                            return;
+                        }
                     }
+                    addItem(item, player);
                 }
             } else {
                 component.set(slot, item);
@@ -196,10 +209,15 @@ public class MultiPaperInventoryHandler {
         }
     }
 
-    private static void removeFromPlayerOwnedItems(ServerPlayer player, ItemStack itemToRemove) {
+    private static boolean removeFromPlayerOwnedItems(ServerPlayer player, ItemStack itemToRemove) {
         // Only compensate in state owned by this player. Scanning every slot in
         // containerMenu can delete legitimate items from a shared chest, and
         // scanning nearby item entities can delete another player's drops.
+        if (!hasPlayerOwnedItems(itemToRemove, player.containerMenu.getCarried(), player.getInventory().compartments)) {
+            LOGGER.warn("{}: Could not reconcile {} in player-owned inventory; leaving container contents and world item entities untouched.", player.getScoreboardName(), itemToRemove);
+            return false;
+        }
+
         removeItems(itemToRemove, player.containerMenu::getCarried, (item, count) -> {
             LOGGER.info("{}: Removing {}x of {} from cursor", player.getScoreboardName(), count, itemToRemove);
             player.containerMenu.setCarried(item);
@@ -210,8 +228,33 @@ public class MultiPaperInventoryHandler {
         }
 
         if (!itemToRemove.isEmpty()) {
-            LOGGER.warn("{}: Could not reconcile {} in player-owned inventory; leaving container contents and world item entities untouched.", player.getScoreboardName(), itemToRemove);
+            LOGGER.error("{}: Player-owned item preflight passed but {} remained during synchronous removal.", player.getScoreboardName(), itemToRemove);
+            return false;
         }
+        return true;
+    }
+
+    static boolean hasPlayerOwnedItems(ItemStack itemToRemove, ItemStack carried, List<? extends List<ItemStack>> compartments) {
+        if (itemToRemove.isEmpty()) return true;
+        int available = 0;
+        if (ItemStack.isSameItemSameComponents(carried, itemToRemove)) {
+            available += carried.getCount();
+        }
+        for (List<ItemStack> compartment : compartments) {
+            for (ItemStack stack : compartment) {
+                if (ItemStack.isSameItemSameComponents(stack, itemToRemove)) {
+                    available += stack.getCount();
+                    if (available >= itemToRemove.getCount()) return true;
+                }
+            }
+        }
+        return available >= itemToRemove.getCount();
+    }
+
+    private static void markInventorySlotForSync(NonNullListFilter<ItemStack> component, int slot) {
+        component.dirty[slot] = true;
+        component.isDirty = true;
+        modifiedInventories.add(component);
     }
 
     static void removeFromInventory(String playerName, ItemStack itemToRemove, List<NonNullListFilter<ItemStack>> compartments) {

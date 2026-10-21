@@ -14,6 +14,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CallData
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.HelloMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundProtocol;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage.Snapshot;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.FilesToSyncMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
@@ -216,6 +217,11 @@ class ProtocolRoundtripTest {
                     new FilesToSyncMessage.FileToSync("plugins/config.yml", 1728000000000L),
                     new FilesToSyncMessage.FileToSync("server.properties", 1L)
             };
+        } else if (type == Snapshot[].class) {
+            return new Snapshot[]{
+                    new Snapshot(-12, 34, new byte[]{1, 2, 3}, new byte[]{4, 5}),
+                    new Snapshot(56, -78, new byte[]{9}, new byte[]{10, 11, 12})
+            };
         } else {
             fail("Unhandled sample parameter type " + type.getName() + " for " + context);
             return null;
@@ -244,6 +250,14 @@ class ProtocolRoundtripTest {
     private static void assertValuesEqual(Object valueA, Object valueB, String path) throws Exception {
         if (valueA instanceof byte[] arrayA && valueB instanceof byte[] arrayB) {
             assertArrayEquals(arrayA, arrayB, path);
+        } else if (valueA instanceof Snapshot[] snapshotsA && valueB instanceof Snapshot[] snapshotsB) {
+            assertEquals(snapshotsA.length, snapshotsB.length, path + " length");
+            for (int i = 0; i < snapshotsA.length; i++) {
+                assertEquals(snapshotsA[i].chunkX(), snapshotsB[i].chunkX(), path + "[" + i + "].chunkX");
+                assertEquals(snapshotsA[i].chunkZ(), snapshotsB[i].chunkZ(), path + "[" + i + "].chunkZ");
+                assertArrayEquals(snapshotsA[i].beforeData(), snapshotsB[i].beforeData(), path + "[" + i + "].beforeData");
+                assertArrayEquals(snapshotsA[i].afterData(), snapshotsB[i].afterData(), path + "[" + i + "].afterData");
+            }
         } else if (valueA instanceof Object[] arrayA && valueB instanceof Object[] arrayB) {
             assertEquals(arrayA.length, arrayB.length, path + " length");
             for (int i = 0; i < arrayA.length; i++) {

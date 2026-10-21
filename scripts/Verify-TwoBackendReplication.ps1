@@ -16,7 +16,7 @@ param(
     [int]$TimeoutSeconds = 10
 )
 
-# Run this only against disposable worlds: it writes marker blocks, a chest,
+# Run this only against disposable worlds: it writes marker blocks, a chest and shulker,
 # a piston circuit, and tagged pigs, then removes the entities. Marker blocks
 # are intentionally left in place.
 
@@ -188,6 +188,7 @@ function Test-StickyPistonPull([int]$ControllerPort, [int]$ObserverPort, [int]$P
 }
 
 $tag = 'multipaper_regression_' + [Guid]::NewGuid().ToString('N')
+Write-Output "Probe entity tag: $tag"
 $x = $TestX
 $y = $TestY
 $z = $TestZ
@@ -219,6 +220,12 @@ $hopperY = 300
 $hopperZ = $null
 $hopperMiddleZ = $null
 $hopperSecondZ = $null
+$ownerRemovalX = $null
+$ownerRemovalZ = $null
+$remoteRemovalX = $null
+$remoteRemovalZ = $null
+$dimensionX = $null
+$dimensionZ = $null
 $baseChunkOwners = @{}
 $block1ChunkKey = "$([Math]::Floor($block1X / 16)),$([Math]::Floor($z / 16))"
 $baseChunkOwners[$block1ChunkKey] = $Server1RconPort
@@ -263,9 +270,12 @@ try {
     Write-Output 'PASS: both backends read the other backend''s marker after requesting its chunk.'
 
     $containerCommand = "data get block $containerX $y $z Items"
+    $shulkerX = $null
     if ($SkipContainerCheck) {
-        Write-Output 'SKIP: chest block entity contents check disabled by -SkipContainerCheck.'
+        Write-Output 'SKIP: chest and shulker block entity contents checks disabled by -SkipContainerCheck.'
     } else {
+        $shulkerX = $containerX + 1
+        $shulkerCommand = "data get block $shulkerX $y $z Items"
         Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:air" | Out-Null
         Send-Rcon $Server1RconPort "setblock $containerX $y $z minecraft:chest" | Out-Null
         Send-Rcon $Server1RconPort "item replace block $containerX $y $z container.0 with minecraft:diamond 5" | Out-Null
@@ -279,6 +289,21 @@ try {
         } while ([DateTime]::UtcNow -lt $containerDeadline)
         Assert-Contains $containerItems2 'minecraft:diamond' 'Server 2 could not read the chest block entity contents after requesting the marker chunk.'
         Write-Output 'PASS: Server 2 read the chest block entity contents after requesting the marker chunk.'
+
+        Send-Rcon $Server1RconPort "setblock $shulkerX $y $z minecraft:air" | Out-Null
+        Send-Rcon $Server1RconPort "setblock $shulkerX $y $z minecraft:shulker_box" | Out-Null
+        Send-Rcon $Server1RconPort "item replace block $shulkerX $y $z container.0 with minecraft:emerald 7" | Out-Null
+        Assert-Contains (Send-Rcon $Server1RconPort $shulkerCommand) 'minecraft:emerald' 'Server 1 could not read the shulker marker item.'
+        Send-Rcon $Server2RconPort "forceload add $shulkerX $z" | Out-Null
+        $shulkerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        $shulkerItems2 = ''
+        do {
+            $shulkerItems2 = Send-Rcon $Server2RconPort $shulkerCommand
+            if ($shulkerItems2.IndexOf('minecraft:emerald', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $shulkerDeadline)
+        Assert-Contains $shulkerItems2 'minecraft:emerald' 'Server 2 could not read the shulker block entity contents after requesting its marker chunk.'
+        Write-Output 'PASS: Server 2 read the shulker block entity contents after requesting the marker chunk.'
     }
 
     $hopperSourceX = ([Math]::Floor(($x + 1024) / 16) * 16) + 15
@@ -449,6 +474,57 @@ try {
         Assert-Contains $retractedBlock2 'Index (' 'The peer did not observe the piston-moved stone after retraction.'
         Write-Output 'PASS: redstone power removal retracts the piston and both servers retain the moved stone at its destination.'
 
+        # Exercise the observer's scheduled pulse, not just static block replication.
+        # All blocks stay inside the already loaded base chunk while both backends read it.
+        $observerX = $x + 2
+        $observerZ = $z + 6
+        $observedBlockZ = $z + 7
+        $observerTrueCommand = "execute if block $observerX $circuitY $observerZ minecraft:observer[facing=south,powered=true] run help"
+        $observerFalseCommand = "execute if block $observerX $circuitY $observerZ minecraft:observer[facing=south,powered=false] run help"
+        Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observedBlockZ minecraft:air" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observerZ minecraft:observer[facing=south,powered=false]" | Out-Null
+        $observerReadyDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $observerLowController = Send-Rcon $baseCircuitControllerPort $observerFalseCommand
+            $observerLowPeer = Send-Rcon $baseCircuitObserverPort $observerFalseCommand
+            if ($observerLowController -match 'Index \(\d+/\d+\)' -and $observerLowPeer -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 25
+        } while ([DateTime]::UtcNow -lt $observerReadyDeadline)
+        Assert-Contains $observerLowController 'Index (' "$baseCircuitControllerName observer did not begin unpowered."
+        Assert-Contains $observerLowPeer 'Index (' 'The peer did not observe the unpowered observer state.'
+
+        $observerRiseStart = [DateTime]::UtcNow
+        Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observedBlockZ minecraft:stone" | Out-Null
+        $observerPulseDeadline = $observerRiseStart.AddSeconds(2)
+        do {
+            $observerHighController = Send-Rcon $baseCircuitControllerPort $observerTrueCommand
+            if ($observerHighController -match 'Index \(\d+/\d+\)') {
+                $observerHighPeer = Send-Rcon $baseCircuitObserverPort $observerTrueCommand
+                if ($observerHighPeer -match 'Index \(\d+/\d+\)') { break }
+            }
+            Start-Sleep -Milliseconds 20
+        } while ([DateTime]::UtcNow -lt $observerPulseDeadline)
+        $observerRiseMilliseconds = [int]([DateTime]::UtcNow - $observerRiseStart).TotalMilliseconds
+        Assert-Contains $observerHighController 'Index (' "$baseCircuitControllerName observer did not pulse after its input block changed."
+        Assert-Contains $observerHighPeer 'Index (' 'The peer did not receive the observer powered-state pulse.'
+        if ($observerRiseMilliseconds -gt 1000) { throw "Observer pulse arrived too late ($observerRiseMilliseconds ms)." }
+
+        $observerFallStart = [DateTime]::UtcNow
+        $observerFallDeadline = $observerFallStart.AddSeconds(2)
+        do {
+            $observerResetController = Send-Rcon $baseCircuitControllerPort $observerFalseCommand
+            $observerResetPeer = Send-Rcon $baseCircuitObserverPort $observerFalseCommand
+            if ($observerResetController -match 'Index \(\d+/\d+\)' -and $observerResetPeer -match 'Index \(\d+/\d+\)') { break }
+            Start-Sleep -Milliseconds 20
+        } while ([DateTime]::UtcNow -lt $observerFallDeadline)
+        $observerFallMilliseconds = [int]([DateTime]::UtcNow - $observerFallStart).TotalMilliseconds
+        Assert-Contains $observerResetController 'Index (' "$baseCircuitControllerName observer did not reset after its pulse."
+        Assert-Contains $observerResetPeer 'Index (' 'The peer did not receive the observer reset state.'
+        if ($observerFallMilliseconds -gt 1000) { throw "Observer reset took too long ($observerFallMilliseconds ms)." }
+        Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observerZ minecraft:air" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observedBlockZ minecraft:air" | Out-Null
+        Write-Output "PASS: observer pulse and reset replicated to both backends (rise observed in ${observerRiseMilliseconds} ms; reset in ${observerFallMilliseconds} ms)."
+
         Test-StickyPistonPull -ControllerPort $baseCircuitControllerPort -ObserverPort $baseCircuitObserverPort -PistonX $stickyPistonX -PowerX $stickyPowerX -PayloadX $stickyPayloadX -DestinationX $stickyDestinationX -CircuitY $circuitY -CircuitZ $stickyCircuitZ -Direction $baseCircuitControllerName
         Send-Rcon $baseCircuitObserverPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
         $reverseLoadCommand = "execute if loaded $reverseStickyCircuitX $reverseStickyCircuitY $reverseStickyCircuitZ run help"
@@ -563,21 +639,138 @@ try {
     }
     Write-Output "PASS: entity teleport position replicated as '$($positionMatch2.Value)'."
 
-    Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null
+    # Use a non-living entity for deterministic removal. A living mob can
+    # remain in its dying state because only its owner ticks it, so the
+    # command's success message does not prove its removal hook ran.
+    $ownerRemovalTag = $tag + '_owner_remove'
+    $ownerRemovalOffset = 4096 + (Get-Random -Minimum 0 -Maximum 256) * 16
+    $ownerRemovalX = $x + $ownerRemovalOffset
+    $ownerRemovalZ = $z + $ownerRemovalOffset
+    $ownerRemovalChunkLoadCommand = "execute if loaded $ownerRemovalX $y $ownerRemovalZ run help"
+    Send-Rcon $Server1RconPort "forceload add $ownerRemovalX $ownerRemovalZ" | Out-Null
+    $ownerRemovalOwnerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $ownerRemovalOwnerLoaded = Send-Rcon $Server1RconPort $ownerRemovalChunkLoadCommand
+        if ($ownerRemovalOwnerLoaded -match 'Index \(\d+\/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $ownerRemovalOwnerDeadline)
+    Assert-Contains $ownerRemovalOwnerLoaded 'Index (' 'Backend 1 did not load the owner-removal chunk first.'
+    Send-Rcon $Server2RconPort "forceload add $ownerRemovalX $ownerRemovalZ" | Out-Null
+    $ownerRemovalSubscriberDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $ownerRemovalSubscriberLoaded = Send-Rcon $Server2RconPort $ownerRemovalChunkLoadCommand
+        if ($ownerRemovalSubscriberLoaded -match 'Index \(\d+\/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $ownerRemovalSubscriberDeadline)
+    Assert-Contains $ownerRemovalSubscriberLoaded 'Index (' 'Backend 2 did not load the owner-removal subscriber chunk.'
+    Start-Sleep -Seconds 1
+    Send-Rcon $Server1RconPort "summon minecraft:area_effect_cloud $($ownerRemovalX + 0.5) $y $($ownerRemovalZ + 0.5) {Duration:1000000,Radius:0f,WaitTime:0,Tags:[`"$ownerRemovalTag`"]}" | Out-Null
+    $ownerRemovalUuidCommand = "data get entity @e[tag=$ownerRemovalTag,limit=1] UUID"
+    $ownerRemovalUuidDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $ownerRemovalUuid1 = Send-Rcon $Server1RconPort $ownerRemovalUuidCommand
+        $ownerRemovalUuid2 = Send-Rcon $Server2RconPort $ownerRemovalUuidCommand
+        $ownerRemovalMatch1 = [regex]::Match($ownerRemovalUuid1, '\[I;[^\]]+\]')
+        $ownerRemovalMatch2 = [regex]::Match($ownerRemovalUuid2, '\[I;[^\]]+\]')
+        if ($ownerRemovalMatch1.Success -and $ownerRemovalMatch1.Value -ceq $ownerRemovalMatch2.Value) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $ownerRemovalUuidDeadline)
+    if (-not $ownerRemovalMatch1.Success -or -not $ownerRemovalMatch2.Success -or
+        $ownerRemovalMatch1.Value -cne $ownerRemovalMatch2.Value) {
+        throw "The owner-removal probe did not reach both backends: owner '$ownerRemovalUuid1', subscriber '$ownerRemovalUuid2'."
+    }
+    $ownerProbeKill = Send-Rcon $Server1RconPort "kill @e[tag=$ownerRemovalTag]"
+    Write-Output "Owner-side entity-removal kill response: $ownerProbeKill"
+    Assert-Contains $ownerProbeKill 'Killed' 'Backend 1 did not execute the owner-side entity removal probe.'
     $removalDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        $removedEntity = Send-Rcon $Server2RconPort $uuidCommand
+        $removedEntity = Send-Rcon $Server2RconPort $ownerRemovalUuidCommand
         if ($removedEntity.IndexOf('No entity was found', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $removalDeadline)
-    Assert-Contains $removedEntity 'No entity was found' 'Entity removal did not reach Server 2.'
-    Write-Output 'PASS: entity removal replicated to Server 2.'
+    Assert-Contains $removedEntity 'No entity was found' 'Owner-side entity removal did not reach Backend 2.'
+    Write-Output 'PASS: owner-side entity removal replicated to Backend 2.'
+
+    # Exercise a removal issued by a non-owner backend. Give Server 2 the
+    # chunk first, then subscribe Server 1 before creating the entity.
+    $remoteRemovalTag = $tag + '_remote_remove'
+    $remoteRemovalOffset = 8192 + (Get-Random -Minimum 0 -Maximum 256) * 16
+    $remoteRemovalX = $x + $remoteRemovalOffset
+    $remoteRemovalZ = $z + $remoteRemovalOffset
+    Write-Output "Non-owner entity-removal probe chunk: $([Math]::Floor($remoteRemovalX / 16)),$([Math]::Floor($remoteRemovalZ / 16))"
+    $remoteRemovalChunkLoadCommand = "execute if loaded $remoteRemovalX $y $remoteRemovalZ run help"
+    Send-Rcon $Server2RconPort "forceload add $remoteRemovalX $remoteRemovalZ" | Out-Null
+    $remoteRemovalOwnerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $remoteRemovalOwnerLoaded = Send-Rcon $Server2RconPort $remoteRemovalChunkLoadCommand
+        if ($remoteRemovalOwnerLoaded -match 'Index \(\d+/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $remoteRemovalOwnerDeadline)
+    Assert-Contains $remoteRemovalOwnerLoaded 'Index (' 'Server 2 did not load the remote-removal owner chunk.'
+    Send-Rcon $Server1RconPort "forceload add $remoteRemovalX $remoteRemovalZ" | Out-Null
+    $remoteRemovalSubscriberDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $remoteRemovalSubscriberLoaded = Send-Rcon $Server1RconPort $remoteRemovalChunkLoadCommand
+        if ($remoteRemovalSubscriberLoaded -match 'Index \(\d+/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $remoteRemovalSubscriberDeadline)
+    Assert-Contains $remoteRemovalSubscriberLoaded 'Index (' 'Server 1 did not load the remote-removal subscriber chunk.'
+    Start-Sleep -Seconds 1
+
+    # Use a non-living entity: /kill finalizes its removal immediately. A
+    # living mob can remain in its dying state on a non-owner mirror because
+    # only the owner ticks it, which would test death ticking instead of the
+    # removal request/fanout path.
+    Send-Rcon $Server2RconPort "summon minecraft:area_effect_cloud $($remoteRemovalX + 0.5) $y $($remoteRemovalZ + 0.5) {Duration:1000000,Radius:0f,WaitTime:0,Tags:[`"$remoteRemovalTag`"]}" | Out-Null
+    $remoteRemovalUuidCommand = "data get entity @e[tag=$remoteRemovalTag,limit=1] UUID"
+    $remoteRemovalUuidDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $remoteRemovalUuidOwner = Send-Rcon $Server2RconPort $remoteRemovalUuidCommand
+        $remoteRemovalUuidSubscriber = Send-Rcon $Server1RconPort $remoteRemovalUuidCommand
+        $remoteRemovalUuidMatchOwner = [regex]::Match($remoteRemovalUuidOwner, '\[I;[^\]]+\]')
+        $remoteRemovalUuidMatchSubscriber = [regex]::Match($remoteRemovalUuidSubscriber, '\[I;[^\]]+\]')
+        if ($remoteRemovalUuidMatchOwner.Success -and $remoteRemovalUuidMatchOwner.Value -ceq $remoteRemovalUuidMatchSubscriber.Value) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $remoteRemovalUuidDeadline)
+    if (-not $remoteRemovalUuidMatchOwner.Success -or -not $remoteRemovalUuidMatchSubscriber.Success -or
+        $remoteRemovalUuidMatchOwner.Value -cne $remoteRemovalUuidMatchSubscriber.Value) {
+        throw "The entity did not reach both backends before the non-owner removal probe: owner '$remoteRemovalUuidOwner', subscriber '$remoteRemovalUuidSubscriber'."
+    }
+
+    $remoteRemovalKill = Send-Rcon $Server1RconPort "kill @e[tag=$remoteRemovalTag]"
+    Write-Output "Non-owner entity-removal kill response: $remoteRemovalKill"
+    Assert-Contains $remoteRemovalKill 'Killed' 'Server 1 did not execute the non-owner entity removal probe; its copy may have unloaded before the kill command.'
+    $remoteRemovalDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $remoteRemovalResult = Send-Rcon $Server2RconPort $remoteRemovalUuidCommand
+        if ($remoteRemovalResult.IndexOf('No entity was found', [StringComparison]::OrdinalIgnoreCase) -ge 0) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $remoteRemovalDeadline)
+    Assert-Contains $remoteRemovalResult 'No entity was found' 'Entity removal from a non-owner backend did not reach the owner.'
+    Write-Output 'PASS: non-owner entity removal reached Backend 2 and disappeared from its authoritative entity list.'
 
     $dimensionTag = $tag + '_nether'
-    Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload add 0 0' | Out-Null
-    Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload add 0 0' | Out-Null
+    $dimensionX = 4096 + (Get-Random -Minimum 0 -Maximum 256) * 16
+    $dimensionZ = 4096 + (Get-Random -Minimum 0 -Maximum 256) * 16
+    $dimensionChunkLoadCommand = "execute in minecraft:the_nether if loaded $dimensionX 80 $dimensionZ run help"
+    Send-Rcon $Server1RconPort "execute in minecraft:the_nether run forceload add $dimensionX $dimensionZ" | Out-Null
+    $dimensionOwnerDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $dimensionOwnerLoaded = Send-Rcon $Server1RconPort $dimensionChunkLoadCommand
+        if ($dimensionOwnerLoaded -match 'Index \(\d+\/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $dimensionOwnerDeadline)
+    Assert-Contains $dimensionOwnerLoaded 'Index (' 'Backend 1 did not load the Nether entity owner chunk first.'
+    Send-Rcon $Server2RconPort "execute in minecraft:the_nether run forceload add $dimensionX $dimensionZ" | Out-Null
+    $dimensionSubscriberDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $dimensionSubscriberLoaded = Send-Rcon $Server2RconPort $dimensionChunkLoadCommand
+        if ($dimensionSubscriberLoaded -match 'Index \(\d+\/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $dimensionSubscriberDeadline)
+    Assert-Contains $dimensionSubscriberLoaded 'Index (' 'Backend 2 did not load the Nether entity subscriber chunk.'
     Start-Sleep -Seconds 1
-    Send-Rcon $Server1RconPort "execute in minecraft:the_nether run summon minecraft:pig 0 80 0 {Tags:[`"$dimensionTag`"],NoGravity:1b}" | Out-Null
+    Send-Rcon $Server1RconPort "execute in minecraft:the_nether run summon minecraft:area_effect_cloud $($dimensionX + 0.5) 80 $($dimensionZ + 0.5) {Duration:1000000,Radius:0f,WaitTime:0,Tags:[`"$dimensionTag`"]}" | Out-Null
     Start-Sleep -Seconds 1
     $dimensionUuidCommand = "execute in minecraft:the_nether as @e[tag=$dimensionTag,limit=1] run data get entity @s UUID"
     $dimensionUuid1 = [regex]::Match((Send-Rcon $Server1RconPort $dimensionUuidCommand), '\[I;[^\]]+\]')
@@ -600,7 +793,7 @@ try {
 
     if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
         $playerInNetherCommand = "execute as $PlayerName at @s if dimension minecraft:the_nether run help"
-        Send-Rcon $Server1RconPort "execute in minecraft:the_nether run tp $PlayerName 0 80 0" | Out-Null
+        Send-Rcon $Server1RconPort "execute in minecraft:the_nether run tp $PlayerName $($dimensionX + 0.5) 80 $($dimensionZ + 0.5)" | Out-Null
         $playerDimensionDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         do {
             $playerNether1 = Send-Rcon $Server1RconPort $playerInNetherCommand
@@ -644,21 +837,43 @@ try {
 
     }
 
-    Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null
+    Send-Rcon $Server1RconPort "execute in minecraft:the_nether run forceload remove $dimensionX $dimensionZ" | Out-Null
+    Send-Rcon $Server2RconPort "execute in minecraft:the_nether run forceload remove $dimensionX $dimensionZ" | Out-Null
 
     Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
 } finally {
     try { Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "kill @e[tag=${tag}_owner_remove]" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=${tag}_nether] run kill @s" | Out-Null } catch { }
     if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
         try { Send-Rcon $Server1RconPort "execute in minecraft:overworld run tp $PlayerName $($x + 0.5) $($y + 1) $($z + 0.5)" | Out-Null } catch { }
     }
-    try { Send-Rcon $Server1RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
-    try { Send-Rcon $Server2RconPort 'execute in minecraft:the_nether run forceload remove 0 0' | Out-Null } catch { }
+    if ($null -ne $dimensionX) {
+        try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether run kill @e[tag=${tag}_nether]" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "execute in minecraft:the_nether run kill @e[tag=${tag}_nether]" | Out-Null } catch { }
+        try { Send-Rcon $Server1RconPort "execute in minecraft:the_nether run forceload remove $dimensionX $dimensionZ" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "execute in minecraft:the_nether run forceload remove $dimensionX $dimensionZ" | Out-Null } catch { }
+    }
+    if ($null -ne $ownerRemovalX) {
+        try { Send-Rcon $Server1RconPort "kill @e[tag=${tag}_owner_remove]" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "kill @e[tag=${tag}_owner_remove]" | Out-Null } catch { }
+        try { Send-Rcon $Server1RconPort "forceload remove $ownerRemovalX $ownerRemovalZ" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "forceload remove $ownerRemovalX $ownerRemovalZ" | Out-Null } catch { }
+    }
+    if ($null -ne $remoteRemovalX) {
+        try { Send-Rcon $Server1RconPort "kill @e[tag=${tag}_remote_remove]" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "kill @e[tag=${tag}_remote_remove]" | Out-Null } catch { }
+        try { Send-Rcon $Server1RconPort "forceload remove $remoteRemovalX $remoteRemovalZ" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "forceload remove $remoteRemovalX $remoteRemovalZ" | Out-Null } catch { }
+    }
     try { Send-Rcon $Server1RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "fill $stickyPowerX $circuitY $stickyCircuitZ $stickyDestinationX $circuitY $stickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "fill $reverseStickyPowerX $reverseStickyCircuitY $reverseStickyCircuitZ $reverseStickyDestinationX $reverseStickyCircuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "fill $reverseStickyPowerX $reverseStickyCircuitY $reverseStickyCircuitZ $reverseStickyDestinationX $reverseStickyCircuitY $reverseStickyCircuitZ minecraft:air" | Out-Null } catch { }
+    if ($null -ne $baseCircuitControllerPort -and $null -ne $observerX) {
+        try { Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observerZ minecraft:air" | Out-Null } catch { }
+        try { Send-Rcon $baseCircuitControllerPort "setblock $observerX $circuitY $observedBlockZ minecraft:air" | Out-Null } catch { }
+    }
     if ($null -ne $hopperSourceX) { try { Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperZ minecraft:air" | Out-Null } catch { } }
     if ($null -ne $hopperDestinationX) { try { Send-Rcon $hopperObserverPort "setblock $hopperDestinationX $hopperY $hopperZ minecraft:air" | Out-Null } catch { } }
     if ($null -ne $hopperSourceX) { try { Send-Rcon $hopperControllerPort "setblock $hopperSourceX $hopperY $hopperSecondZ minecraft:air" | Out-Null } catch { } }
@@ -673,6 +888,12 @@ try {
     if ($null -ne $baseCircuitControllerPort) { try { Send-Rcon $baseCircuitControllerPort "forceload remove $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null } catch { } }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
+    if ($null -ne $shulkerX) {
+        try { Send-Rcon $Server1RconPort "setblock $shulkerX $y $z minecraft:air" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "setblock $shulkerX $y $z minecraft:air" | Out-Null } catch { }
+        try { Send-Rcon $Server1RconPort "forceload remove $shulkerX $z" | Out-Null } catch { }
+        try { Send-Rcon $Server2RconPort "forceload remove $shulkerX $z" | Out-Null } catch { }
+    }
     foreach ($chunk in $baseChunkLoads) {
         try { Send-Rcon $Server1RconPort "forceload remove $($chunk.X) $($chunk.Z)" | Out-Null } catch { }
         try { Send-Rcon $Server2RconPort "forceload remove $($chunk.X) $($chunk.Z)" | Out-Null } catch { }

@@ -108,10 +108,6 @@ public class MultiPaperChunkHandler {
             return;
         }
         if (blockUpdateChunk == null) { // Don't broadcast the update to other servers if we're handling an update
-            if (MultiPaper.DEBUG) { // MultiPaper
-                String packetDetails = packet instanceof ClientboundBlockUpdatePacket update ? " pos=" + update.getPos() + " state=" + update.getBlockState() : "";
-                MultiPaper.debug("bcast " + packet.getClass().getSimpleName() + packetDetails + " " + newChunkHolder.world.getWorld().getName() + "," + newChunkHolder.chunkX + "," + newChunkHolder.chunkZ + " subs=" + newChunkHolder.externalSubscribers.size());
-            } // MultiPaper
             MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalSubscribers, () -> new SendUpdatePacket(newChunkHolder.world.uuid, packet));
         }
     }
@@ -140,7 +136,6 @@ public class MultiPaperChunkHandler {
         CraftWorld bukkitWorld = ((CraftWorld) Bukkit.getWorld(world));
         ServerLevel level = bukkitWorld != null ? bukkitWorld.getHandle() : null;
         if (level == null) {
-            MultiPaper.debug("handleBlockUpdate dropped " + packet.getClass().getSimpleName() + ": unknown world uuid " + world); // MultiPaper
             return;
         } else if (packet instanceof ClientboundBlockUpdatePacket update) {
             holder = MultiPaper.getChunkHolder(world, update.getPos());
@@ -183,7 +178,6 @@ public class MultiPaperChunkHandler {
         if (holder != null && level.getChunkIfLoaded(holder.chunkX, holder.chunkZ) != null) {
             // Chunk is loaded
             if (packet instanceof ClientboundBlockUpdatePacket update) {
-                if (MultiPaper.DEBUG) MultiPaper.debug("apply " + update.getPos() + " current=" + blockUpdateChunk.getBlockState(update.getPos()) + " incoming=" + update.getBlockState() + " owner=" + (holder.externalOwner == null ? "null" : holder.externalOwner.getName())); // MultiPaper
                 setBlock(((LevelChunk) blockUpdateChunk), update.getPos(), update.getBlockState());
             } else if (packet instanceof ClientboundSectionBlocksUpdatePacket update) {
                 update.runUpdates((pos, state) -> {

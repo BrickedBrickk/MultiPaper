@@ -1,7 +1,6 @@
 package puregero.multipaper.externalserverprotocol;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
@@ -72,20 +71,22 @@ public class AddItemToContainerPacket extends ExternalServerPacket {
             Container container = HopperBlockEntity.getContainerAt(level, pos);
 
             if (container == null) {
-                LOGGER.warn("Tried to set a " + itemStack + " in slot " + slot + " in a non-existant container at " + world + " " + pos);
-            } else if (slot == -1) {
-                ItemStack leftOver = HopperBlockEntity.addItem(null, container, itemStack, Direction.NORTH);
-                if (!leftOver.isEmpty()) {
-                    LOGGER.warn("There was a left over " + leftOver + " after adding an item to " + container.getClass().getSimpleName() + "@" + world + pos);
-                    ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, leftOver);
-                    level.addFreshEntity(item);
-                }
-            } else {
-                if (MultiPaperContainerHandler.addItemToSlot(container, slot, itemStack)) {
+                LOGGER.warn("Destination container is missing for external item transfer: " + itemStack + " at " + world + " " + pos + "; dropping the items to preserve them");
+            }
+
+            MultiPaperContainerHandler.addItemOrDrop(container, slot, itemStack, remainder -> {
+                if (container != null) {
                     container.setChanged();
-                } else {
-                    LOGGER.warn("Could not add " + itemStack + " to slot " + slot + " in " + container.getClass().getSimpleName() + "@" + world + pos);
+                    LOGGER.warn("Destination container rejected part of an external item transfer: " + remainder + " at " + world + " " + pos + "; dropping the remainder");
                 }
+                ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, remainder);
+                if (!level.addFreshEntity(item)) {
+                    LOGGER.error("Could not spawn recovery item entity for rejected external transfer " + remainder + " at " + world + " " + pos);
+                }
+            });
+
+            if (container != null) {
+                container.setChanged();
             }
         });
     }

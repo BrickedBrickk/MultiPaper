@@ -422,6 +422,18 @@ public class ServerConnection extends MasterBoundMessageHandler {
     }
 
     @Override
+    public void handle(PersistContainerTransactionMessage message) {
+        try {
+            ContainerTransactionManager.begin(message);
+            sendReply(new puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply(true), message);
+        } catch (Exception failure) {
+            System.err.println("Failed to persist container transaction " + message.transactionId + " for world " + message.world);
+            failure.printStackTrace();
+            sendReply(new puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply(false), message);
+        }
+    }
+
+    @Override
     public void handle(RequestEntityIdBlock message) {
         RequestEntityIdBlockHandler.handle(this, message);
     }

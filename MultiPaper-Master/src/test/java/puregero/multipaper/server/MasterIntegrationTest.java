@@ -16,12 +16,15 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChun
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ForceReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadDataMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadJsonMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadUidMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestEntityIdBlock;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.StartMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SetPortMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeEntitiesMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnlockChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnsubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
@@ -29,6 +32,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSave
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteDataMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteJsonMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ChunkLoadedOnAnotherServerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
@@ -264,7 +268,14 @@ class MasterIntegrationTest {
         ServerBoundMessage readReply = serverA.request(new ReadChunkMessage(WORLD, "entities", 7, 0));
         assertArrayEquals(ENTITIES_PAYLOAD, ((DataMessageReply) readReply).data);
 
-        // After server-a read the entities chunk it is subscribed, so server-b is redirected.
+        // A storage read alone does not prove the backend has deserialized its entity chunk.
+        ServerBoundMessage beforeReady = serverB.request(new ReadChunkMessage(WORLD, "entities", 7, 0));
+        assertTrue(beforeReady instanceof DataMessageReply, "Expected Master storage before entity readiness, got " + beforeReady.getClass());
+        assertArrayEquals(ENTITIES_PAYLOAD, ((DataMessageReply) beforeReady).data);
+
+        // The backend explicitly subscribes only after its entity data is installed locally.
+        serverA.send(new SubscribeEntitiesMessage(WORLD, 7, 0));
+        serverA.request(new PingMessage());
         ServerBoundMessage replyB = serverB.request(new ReadChunkMessage(WORLD, "entities", 7, 0));
         assertTrue(replyB instanceof ChunkLoadedOnAnotherServerMessage, "Expected redirect, got " + replyB.getClass());
         assertEquals("server-a", ((ChunkLoadedOnAnotherServerMessage) replyB).server);
@@ -733,6 +744,118 @@ class MasterIntegrationTest {
         } finally {
             firstServer.close();
             secondServer.close();
+        }
+    }
+
+    @Test
+    @Order(27)
+    void concurrentChunkLocksAreAllReleasedWhenOneBackendDisconnects() throws Exception {
+        String world = "concurrent-lock-bookkeeping-world";
+        String firstName = "lock-bookkeeping-first";
+        String secondName = "lock-bookkeeping-second";
+        int chunkCountPerServer = 1024;
+        TestServerClient firstServer = TestServerClient.connect(port, firstName);
+        TestServerClient secondServer = TestServerClient.connect(port, secondName);
+        try {
+            // Separate Netty event loops mutate the shared per-connection bookkeeping map
+            // concurrently while registering many distinct chunk locks.
+            for (int i = 0; i < chunkCountPerServer; i++) {
+                firstServer.send(new LockChunkMessage(world, i, 0));
+                secondServer.send(new LockChunkMessage(world, i, 1));
+                firstServer.send(new SubscribeEntitiesMessage(world, i, 2));
+                secondServer.send(new SubscribeEntitiesMessage(world, i, 3));
+            }
+            firstServer.request(new PingMessage());
+            secondServer.request(new PingMessage());
+
+            ServerConnection firstConnection = ServerConnection.getConnection(firstName);
+            ServerConnection secondConnection = ServerConnection.getConnection(secondName);
+            assertTrue(firstConnection != null);
+            assertTrue(secondConnection != null);
+            for (int i = 0; i < chunkCountPerServer; i++) {
+                assertEquals(firstConnection, ChunkSubscriptionManager.getOwner(world, i, 0));
+                assertEquals(secondConnection, ChunkSubscriptionManager.getOwner(world, i, 1));
+                assertEquals(firstConnection, EntitiesSubscriptionManager.getSubscriber(world, i, 2));
+                assertEquals(secondConnection, EntitiesSubscriptionManager.getSubscriber(world, i, 3));
+            }
+
+            int sharedSubscriberChunkZ = 4;
+            firstServer.send(new SubscribeChunkMessage(world, 0, sharedSubscriberChunkZ));
+            secondServer.send(new SubscribeChunkMessage(world, 0, sharedSubscriberChunkZ));
+            firstServer.request(new PingMessage());
+            secondServer.request(new PingMessage());
+            var subscriberSnapshot = ChunkSubscriptionManager.getSubscribers(world, 0, sharedSubscriberChunkZ);
+            assertEquals(2, subscriberSnapshot.size());
+            firstServer.send(new UnsubscribeChunkMessage(world, 0, sharedSubscriberChunkZ));
+            firstServer.request(new PingMessage());
+            assertEquals(2, subscriberSnapshot.size(), "A subscriber snapshot must remain stable while the live list changes");
+            assertEquals(secondConnection, ChunkSubscriptionManager.getSubscribers(world, 0, sharedSubscriberChunkZ).getFirst());
+
+            firstServer.close();
+            firstServer = null;
+
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean allReleased = false;
+            while (System.nanoTime() < deadline) {
+                allReleased = true;
+                for (int i = 0; i < chunkCountPerServer; i++) {
+                    if (ChunkSubscriptionManager.getOwner(world, i, 0) != null
+                            || EntitiesSubscriptionManager.getSubscriber(world, i, 2) != null) {
+                        allReleased = false;
+                        break;
+                    }
+                }
+                if (allReleased) break;
+                Thread.sleep(10);
+            }
+            assertTrue(allReleased, "Disconnect must release every chunk lock tracked during concurrent registration");
+            for (int i = 0; i < chunkCountPerServer; i++) {
+                assertEquals(secondConnection, ChunkSubscriptionManager.getOwner(world, i, 1),
+                        "Disconnecting one backend must preserve the other backend's independently tracked locks");
+                assertEquals(secondConnection, EntitiesSubscriptionManager.getSubscriber(world, i, 3),
+                        "Disconnecting one backend must preserve the other backend's entity subscriptions");
+            }
+        } finally {
+            if (firstServer != null) firstServer.close();
+            secondServer.close();
+        }
+    }
+
+    @Test
+    @Order(28)
+    void acknowledgedJsonWriteIsReadBackThroughMasterStorage() throws Exception {
+        Path jsonFile = Path.of("build", "tmp", "multipaper-json-" + UUID.randomUUID() + ".json");
+        String sharedPath = jsonFile.toString().replace('\\', '/');
+        byte[] json = "{\"checkpoint\":42,\"name\":\"master-json-write\"}".getBytes(StandardCharsets.UTF_8);
+        TestServerClient jsonReader = TestServerClient.connect(port, "json-storage-reader");
+
+        try {
+            ServerBoundMessage writeReply = serverB.request(new WriteJsonMessage(sharedPath, json));
+            assertTrue(((BooleanMessageReply) writeReply).result, "Master must acknowledge the durable JSON replacement");
+
+            ServerBoundMessage readReply = jsonReader.request(new ReadJsonMessage(sharedPath));
+            assertArrayEquals(json, ((DataMessageReply) readReply).data,
+                    "A second backend must read the full acknowledged JSON bytes from Master storage");
+        } finally {
+            jsonReader.close();
+            Files.deleteIfExists(jsonFile);
+            Files.deleteIfExists(jsonFile.resolveSibling(jsonFile.getFileName() + "_new"));
+            Files.deleteIfExists(jsonFile.resolveSibling(jsonFile.getFileName() + "_old"));
+        }
+    }
+
+    @Test
+    @Order(29)
+    void worldUidIsCreatedOnceAndSharedAcrossBackends() throws Exception {
+        TestServerClient uidReader = TestServerClient.connect(port, "uid-storage-reader");
+        try {
+            byte[] uid = ((DataMessageReply) serverB.request(new ReadUidMessage(WORLD))).data;
+            assertEquals(16, uid.length);
+
+            byte[] secondUid = ((DataMessageReply) uidReader.request(new ReadUidMessage(WORLD))).data;
+            assertArrayEquals(uid, secondUid);
+        } finally {
+            uidReader.close();
         }
     }
 }

@@ -1,26 +1,91 @@
 --- a/net/minecraft/world/level/block/entity/HopperBlockEntity.java
 +++ b/net/minecraft/world/level/block/entity/HopperBlockEntity.java
-@@ -29,1 +29,2 @@
+@@ -27,6 +27,7 @@
+ import net.minecraft.world.level.storage.ValueOutput;
+ import net.minecraft.world.phys.AABB;
  import org.jspecify.annotations.Nullable;
 +import puregero.multipaper.MultiPaperContainerHandler;
-@@ -581,2 +582,5 @@
+ 
+ public class HopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper {
+     public static final int MOVE_ITEM_SPEED = 8;
+@@ -231,6 +232,7 @@
+                 foundItem = true;
+                 ItemStack origItemStack = item;
+                 ItemStack movedItem = origItemStack;
++                MultiPaperContainerHandler.TransferSnapshot transferSnapshot = MultiPaperContainerHandler.snapshotTransfer(hopper, destination); // MultiPaper - capture the pre-transfer inventory state for the durable cross-chunk journal
+ 
+                 final int originalItemCount = origItemStack.getCount();
+                 final int movedItemCount = Math.min(level.spigotConfig.hopperAmount, originalItemCount);
+@@ -255,6 +257,10 @@
+                         origItemStack.setCount(originalItemCount - movedItemCount + remainingItemCount);
+                     }
+                     hopper.setItem(i, origItemStack);
++                    if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++                        MultiPaperContainerHandler.restore(transferSnapshot);
++                        return false;
++                    }
+                     destination.setChanged();
+                     return true;
+                 }
+@@ -269,6 +275,7 @@
+ 
+     private static boolean hopperPull(final Level level, final Hopper hopper, final Container container, ItemStack origItemStack, final int i) {
+         ItemStack movedItem = origItemStack;
++        MultiPaperContainerHandler.TransferSnapshot transferSnapshot = MultiPaperContainerHandler.snapshotTransfer(container, (Container) hopper); // MultiPaper - capture the pre-transfer inventories
+         final int originalItemCount = origItemStack.getCount();
+         final int movedItemCount = Math.min(level.spigotConfig.hopperAmount, originalItemCount);
+         movedItem.setCount(movedItemCount);
+@@ -297,6 +304,9 @@
+             container.setItem(i, origItemStack);
+             ignoreBlockEntityUpdates = false;
+             container.setChanged();
++            if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++                MultiPaperContainerHandler.restore(transferSnapshot);
++            }
+             return true;
+         }
+         origItemStack.setCount(originalItemCount);
+@@ -306,6 +316,10 @@
+             updatedContainer = i >= compoundContainer.container1.getContainerSize() ? compoundContainer.container2 : compoundContainer.container1;
+         }
+         updatedContainer.setChanged();
++        if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++            MultiPaperContainerHandler.restore(transferSnapshot);
++            return true;
++        }
+ 
+         if (level.paperConfig().hopper.cooldownWhenFull) {
+             applyCooldown(hopper);
+@@ -579,6 +593,8 @@
+         final @Nullable Container from, final Container container, ItemStack itemStack, final int slot, final @Nullable Direction direction
+     ) {
          ItemStack current = container.getItem(slot);
-+        int startingStackSize = current.getCount(); // MultiPaper
 +        ItemStack originalDestinationStack = current.copy(); // MultiPaper - restore an external mirror if its owner is unreachable
 +        ItemStack originalSourceStack = itemStack.copy(); // MultiPaper - return the untransferred source items
          if (canPlaceItemInContainer(container, itemStack, slot, direction)) {
-@@ -606,2 +610,9 @@
+             boolean success = false;
+             boolean wasEmpty = container.isEmpty();
+@@ -604,6 +620,12 @@
+             }
+ 
              if (success) {
 +                MultiPaperContainerHandler.ExternalTransferResult externalTransfer = MultiPaperContainerHandler.increaseItemExternal(
-+                    container, slot, container.getItem(slot), container.getItem(slot).getCount() - startingStackSize
-+                ); // MultiPaper - synchronize successful hopper insertion with the remote owner
++                    from, container
++                ); // MultiPaper - acquire the container owner before allowing a cross-backend hopper transfer
 +                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.FAILED) {
 +                    return MultiPaperContainerHandler.rollbackFailedExternalTransfer(container, slot, originalDestinationStack, originalSourceStack);
 +                }
-+
                  if (wasEmpty && container instanceof HopperBlockEntity hopperBlockEntity && !hopperBlockEntity.isOnCustomCooldown()) {
-@@ -616,1 +627,3 @@
+                     int skipTickCount = 0;
+                     if (from instanceof HopperBlockEntity fromHopper && hopperBlockEntity.tickedGameTime >= fromHopper.tickedGameTime) {
+@@ -613,7 +635,9 @@
+                     hopperBlockEntity.setCooldown(hopperBlockEntity.level.spigotConfig.hopperTransfer - skipTickCount); // Spigot
+                 }
+ 
 -                container.setChanged();
 +                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.LOCAL) { // MultiPaper - don't change external containers
 +                    container.setChanged();
 +                }
+             }
+         }
+ 

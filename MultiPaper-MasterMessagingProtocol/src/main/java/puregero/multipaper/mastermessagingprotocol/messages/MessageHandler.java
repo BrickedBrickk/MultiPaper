@@ -29,6 +29,10 @@ public abstract class MessageHandler<T extends Message> extends SimpleChannelInb
         return message;
     }
 
+    public boolean removeCallback(Message<?> message) {
+        return callbacks.remove(message.getTransactionId()) != null;
+    }
+
     /**
      * Called when a message is received.
      * @param message The message that has been received

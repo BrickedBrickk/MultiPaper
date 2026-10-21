@@ -6,7 +6,6 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanM
 import puregero.multipaper.server.ChunkSubscriptionManager;
 import puregero.multipaper.server.ServerConnection;
 
-import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
 public class RequestChunkOwnershipHandler {
@@ -17,8 +16,6 @@ public class RequestChunkOwnershipHandler {
                 hasAtLeastOneChunkLocked = true;
             }
         }
-
-        System.out.println(connection.getBungeeCordName() + " is requesting " + Arrays.toString(message.chunks) + " " + hasAtLeastOneChunkLocked);
 
         if (hasAtLeastOneChunkLocked) {
             for (ChunkKey key : message.chunks) {

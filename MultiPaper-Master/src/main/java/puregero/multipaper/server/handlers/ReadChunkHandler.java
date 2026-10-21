@@ -7,6 +7,7 @@ import puregero.multipaper.server.*;
 import puregero.multipaper.server.util.RegionFileCache;
 
 import java.io.File;
+import java.io.IOException;
 
 public class ReadChunkHandler {
     public static void handle(ServerConnection connection, ReadChunkMessage message) {
@@ -19,11 +20,15 @@ public class ReadChunkHandler {
                 if (b == null) {
                     b = new byte[0];
                 }
-                // An entity subscriber is a valid peer read source only once its
-                // initial entity data is available. Register before replying so
-                // subsequent reads can safely be redirected to this connection.
-                if (message.path.equals("entities")) {
-                    EntitiesSubscriptionManager.subscribe(connection, message.world, message.cx, message.cz);
+                if (message.path.equals("region") || message.path.equals("entities")) {
+                    try {
+                        b = ContainerTransactionManager.applyForRead(message.world, message.path, message.cx, message.cz, b);
+                    } catch (IOException failure) {
+                        System.err.println("Could not recover container transactions into chunk " + message.world + " " + message.cx + "," + message.cz);
+                        failure.printStackTrace();
+                        connection.getChannel().close();
+                        return;
+                    }
                 }
                 connection.sendReply(new DataMessageReply(b), message);
             });
@@ -46,11 +51,9 @@ public class ReadChunkHandler {
             ServerConnection alreadyLoadedChunk = ChunkSubscriptionManager.getOwner(world, cx, cz);
             ChunkSubscriptionManager.subscribe(connection, world, cx, cz);
             if (alreadyLoadedChunk != null && alreadyLoadedChunk != connection) {
-                ChunkSubscriptionManager.debug("read " + world + "," + path + "," + cx + "," + cz + " by " + connection.getBungeeCordName() + " -> peer " + alreadyLoadedChunk.getBungeeCordName()); // MultiPaper
                 connection.sendReply(new ChunkLoadedOnAnotherServerMessage(alreadyLoadedChunk.getBungeeCordName()), message);
                 return true;
             }
-            ChunkSubscriptionManager.debug("read " + world + "," + path + "," + cx + "," + cz + " by " + connection.getBungeeCordName() + " -> disk"); // MultiPaper
         }
 
         if (path.equals("entities")) {

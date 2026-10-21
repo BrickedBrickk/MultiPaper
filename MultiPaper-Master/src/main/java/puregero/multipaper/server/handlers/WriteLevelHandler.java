@@ -2,11 +2,11 @@ package puregero.multipaper.server.handlers;
 
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
+import puregero.multipaper.server.FileLocker;
 import puregero.multipaper.server.ServerConnection;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.concurrent.CompletableFuture;
 
 public class WriteLevelHandler {
@@ -15,10 +15,11 @@ public class WriteLevelHandler {
             try {
                 File worldDir = new File(message.world);
                 if (!worldDir.exists()) worldDir.mkdirs();
-                Files.write(new File(worldDir, "level.dat").toPath(), message.data);
+                FileLocker.writeBytes(new File(worldDir, "level.dat"), message.data);
                 connection.sendReply(new BooleanMessageReply(true), message);
             } catch (IOException e) {
                 e.printStackTrace();
+                connection.sendReply(new BooleanMessageReply(false), message);
             }
         });
     }

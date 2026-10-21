@@ -41,7 +41,11 @@
          this.levelLoadListener = new net.minecraft.server.level.progress.LoggingLevelLoadListener(false, this);
          this.worldGenSettings = worldGenSettings;
          this.scheduledEvents = savedDataStorage.computeIfAbsent(net.minecraft.world.level.timers.TimerQueue.TYPE);
-@@ -1538,6 +1542,22 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -912,2 +916,3 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+                     entity -> {
++                        if (!puregero.multipaper.MultiPaperEntitiesHandler.tickEntity(entity)) return; // MultiPaper - tick only on the chunk owner
+                         if (!entity.isRemoved()) {
+@@ -1538,6 +1543,22 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
          }
      }
  
@@ -64,7 +68,7 @@
      @Override
      public boolean mayInteract(final Entity entity, final BlockPos pos) {
          return !(entity instanceof Player player && (this.server.isUnderSpawnProtection(this, pos, player) || !this.getWorldBorder().isWithinBounds(pos)));
-@@ -1733,7 +1753,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -1733,7 +1754,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
              }
              // CraftBukkit end
  
@@ -75,7 +79,7 @@
          }
      }
  
-@@ -1983,12 +2005,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -1983,12 +2006,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
          this.updateNeighborsAt(pos, sourceBlock, ExperimentalRedstoneUtils.initialOrientation(this, null, null));
      }
  
@@ -88,7 +92,7 @@
      @Override
      public void updateNeighborsAtExceptFromFacing(
          final BlockPos pos, final Block blockObject, final Direction skipDirection, final @Nullable Orientation orientation
-@@ -2637,5 +2653,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -2637,5 +2654,6 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
      public WorldBorder getWorldBorder() {
          WorldBorder worldBorder = this.getDataStorage().computeIfAbsent(WorldBorder.TYPE);
          worldBorder.applyInitialSettings(this.levelData.getGameTime());

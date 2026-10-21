@@ -378,14 +378,29 @@ public class MultiPaperEntitiesHandler {
     }
 
     public static void onEntityRemove(Entity entity, Entity.RemovalReason reason) {
-        if (!shouldSyncEntity(entity) && MultiPaperEntitiesHandler.getControllingPassenger(entity) == entity && !entity.isPassenger() && !(entity instanceof Player && reason == Entity.RemovalReason.KILLED)) return;
+        boolean syncEntity = shouldSyncEntity(entity);
+        Entity controllingPassenger = MultiPaperEntitiesHandler.getControllingPassenger(entity);
+        if (!syncEntity && controllingPassenger == entity && !entity.isPassenger() && !(entity instanceof Player && reason == Entity.RemovalReason.KILLED)) return;
         if (removingEntity) return;
         if (entity instanceof ExternalPlayer) return;
         if (reason == Entity.RemovalReason.UNLOADED_TO_CHUNK) return;
 
         NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder((ServerLevel) entity.level(), entity.chunkPosition().x(), entity.chunkPosition().z());
         if (newChunkHolder != null) {
-            MultiPaper.broadcastPacketToExternalServers(newChunkHolder.externalEntitiesSubscribers, () -> new EntityRemovePacket(entity, reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER));
+            boolean unloadedWithPlayer = reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER;
+            if (MultiPaper.isChunkLocal(newChunkHolder)) {
+                if (!unloadedWithPlayer) {
+                    EntityRemovePacket.setEntityRemoved(entity.getUUID(), reason);
+                }
+                // Chunk/world subscriber membership can lag dimension transfers and stale mirror copies.
+                // Entity UUIDs are globally unique, so notify every connected backend.
+                MultiPaper.broadcastPacketToExternalServers(new EntityRemovePacket(entity, unloadedWithPlayer));
+            } else {
+                ExternalServer owner = newChunkHolder.externalOwner;
+                if (owner == null || owner.isMe() || owner.getConnection() == null || !owner.getConnection().send(new RequestEntityRemovePacket(entity, unloadedWithPlayer))) {
+                    LOGGER.warn("Could not route removal of entity " + entity.getUUID() + " from non-owner backend to its chunk owner");
+                }
+            }
         } else {
             LOGGER.warn(entity + " removed in an unloaded chunk");
         }

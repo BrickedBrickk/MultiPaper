@@ -38,6 +38,7 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     private static final long ENTITY_REQUEST_TIMEOUT_MILLIS = Long.getLong("multipaper.peer.entityRequestTimeoutMillis", 15_000L);
 
     private Channel channel;
+    private final boolean outgoing;
     public long nanoTime = 0;
     public ExternalServer externalServer = null;
     public final CompletableFuture<Void> onConnect = new CompletableFuture<>();
@@ -52,10 +53,11 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
     public final ConcurrentHashMap<ChunkKey, Consumer<DataInputStream>> entitiesCallbacks = new ConcurrentHashMap<>();
 
     public ExternalServerConnection() {
-
+        this.outgoing = true;
     }
 
     public ExternalServerConnection(Channel channel) {
+        this.outgoing = false;
         this.channel = channel;
         setupPipeline();
         nanoTime = System.nanoTime();
@@ -151,6 +153,10 @@ public class ExternalServerConnection extends ChannelInitializer<SocketChannel> 
 
     public Channel getChannel() {
         return channel;
+    }
+
+    public boolean isOutgoing() {
+        return outgoing;
     }
 
     public void failPendingDataRequests() {

@@ -51,7 +51,6 @@ public class RequestChunkPacket extends ExternalServerPacket {
 
     @Override
     public void handle(ExternalServerConnection connection) {
-        puregero.multipaper.MultiPaper.debug("peer-req " + connection.externalServer.getName() + " requested " + world + "," + cx + "," + cz); // MultiPaper
         World bukkitWorld = Bukkit.getWorld(world);
 
         if (!(bukkitWorld instanceof CraftWorld craftWorld)) {

@@ -81,6 +81,7 @@ public class ExternalServerPacketSerializer {
         addPacket(AddPendingMessagePacket.class, AddPendingMessagePacket::new);
         addPacket(SetPlayerChatStatePacket.class, SetPlayerChatStatePacket::new);
         addPacket(EntityPersistentDataUpdatePacket.class, EntityPersistentDataUpdatePacket::new);
+        addPacket(RequestEntityRemovePacket.class, RequestEntityRemovePacket::new);
     }
 
     private static void addPacket(Class<? extends ExternalServerPacket> clazz, Function<FriendlyByteBuf, ExternalServerPacket> deserializer) {

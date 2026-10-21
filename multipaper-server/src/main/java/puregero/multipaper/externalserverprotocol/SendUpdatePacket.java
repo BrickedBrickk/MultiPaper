@@ -45,10 +45,6 @@ public class SendUpdatePacket extends ExternalServerPacket {
 
     @Override
     public void handle(ExternalServerConnection connection) {
-        if (MultiPaper.DEBUG) { // MultiPaper
-            String packetDetails = packet instanceof ClientboundBlockUpdatePacket update ? " pos=" + update.getPos() + " state=" + update.getBlockState() : "";
-            MultiPaper.debug("recv " + packet.getClass().getSimpleName() + packetDetails + " world=" + world + " from=" + connection.externalServer.getName());
-        } // MultiPaper
         if (packet instanceof ClientboundBlockUpdatePacket || packet instanceof ClientboundSectionBlocksUpdatePacket || packet instanceof ClientboundLightUpdatePacket || packet instanceof ClientboundBlockEntityDataPacket) {
             MultiPaper.runSync(() -> MultiPaperChunkHandler.handleBlockUpdate(world, packet, 0));
         } else if (packet instanceof ClientboundSetBorderSizePacket || packet instanceof ClientboundSetBorderLerpSizePacket || packet instanceof ClientboundSetBorderCenterPacket || packet instanceof ClientboundSetBorderWarningDelayPacket || packet instanceof ClientboundSetBorderWarningDistancePacket) {

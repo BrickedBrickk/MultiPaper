@@ -5,8 +5,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.entity.Visibility;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.scheduler.CraftScheduler;
@@ -18,9 +16,6 @@ import java.util.HashMap;
 import java.util.UUID;
 
 public class EntityRemovePacket extends ExternalServerPacket {
-
-    private static final Logger LOGGER = LogManager.getLogger(EntityRemovePacket.class.getSimpleName());
-
     public static final HashMap<UUID, Entity.RemovalReason> removedEntities = new HashMap<>();
 
     private final String world;
@@ -59,17 +54,21 @@ public class EntityRemovePacket extends ExternalServerPacket {
         ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
 
         Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
+        Entity.RemovalReason reason = entity instanceof Player ? Entity.RemovalReason.KILLED : Entity.RemovalReason.DISCARDED;
+        if (this.unloadedWithPlayer) reason = Entity.RemovalReason.UNLOADED_WITH_PLAYER;
+
+        // Reject any queued entity updates that arrive after this removal packet.
+        if (reason != Entity.RemovalReason.UNLOADED_WITH_PLAYER) {
+            setEntityRemoved(uuid, reason);
+        }
 
         if (entity != null) {
             MultiPaperEntitiesHandler.removingEntity = true;
-            Entity.RemovalReason reason = entity instanceof Player ? Entity.RemovalReason.KILLED : Entity.RemovalReason.DISCARDED;
-            if (this.unloadedWithPlayer) reason = Entity.RemovalReason.UNLOADED_WITH_PLAYER;
-
-            entity.setRemoved(reason);
-
-            MultiPaperEntitiesHandler.removingEntity = false;
-        } else if (!this.unloadedWithPlayer) {
-            setEntityRemoved(uuid, Entity.RemovalReason.DISCARDED);
+            try {
+                entity.setRemoved(reason);
+            } finally {
+                MultiPaperEntitiesHandler.removingEntity = false;
+            }
         }
     }
 

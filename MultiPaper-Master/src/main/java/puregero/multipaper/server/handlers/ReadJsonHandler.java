@@ -2,12 +2,11 @@ package puregero.multipaper.server.handlers;
 
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadJsonMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.server.FileLocker;
 import puregero.multipaper.server.ServerConnection;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.util.concurrent.CompletableFuture;
 
 public class ReadJsonHandler {
@@ -22,12 +21,8 @@ public class ReadJsonHandler {
                     }
                 }
 
-                try {
-                    byte[] b = Files.readAllBytes(new File(message.file).toPath());
-                    connection.sendReply(new DataMessageReply(b), message);
-                } catch (NoSuchFileException e) {
-                    connection.sendReply(new DataMessageReply(new byte[0]), message);
-                }
+                byte[] b = FileLocker.readBytes(new File(message.file));
+                connection.sendReply(new DataMessageReply(b), message);
             } catch (IOException e) {
                 e.printStackTrace();
             }

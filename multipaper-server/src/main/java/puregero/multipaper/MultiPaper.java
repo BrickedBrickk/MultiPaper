@@ -57,6 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -68,16 +69,6 @@ public class MultiPaper {
 
     private static MultiPaperConnection multiPaperConnection = null;
     private static final Logger LOGGER = LogManager.getLogger(MultiPaper.class.getSimpleName());
-
-    // MultiPaper start - opt-in protocol tracing, enabled with -Dmultipaper.debug=true
-    public static final boolean DEBUG = Boolean.getBoolean("multipaper.debug");
-
-    public static void debug(final String message) {
-        if (DEBUG) {
-            LOGGER.info("[MP] " + message);
-        }
-    }
-    // MultiPaper end - opt-in protocol tracing
 
     public static boolean levelDatNeedsSaving = false;
     private static long last1Seconds = System.currentTimeMillis();
@@ -375,18 +366,15 @@ public class MultiPaper {
                     LOGGER.warn(Thread.currentThread() + " has no chunk holder for reading chunk " + world + "," + path + "," + cx + "," + cz + ", reading it straight from disk instead");
                 }
 
-                debug("read " + world + "," + path + "," + cx + "," + cz + " -> forceRead (worldLoaded=" + (bukkitWorld != null) + ", holder=" + (MultiPaper.getChunkHolder(world, cx, cz) != null) + ")");
                 return forceReadChunk(world, path, cx, cz).thenApply(MultiPaper::dataInputStreamFromDeflatedBytes);
             }
         }
 
-        debug("read " + world + "," + path + "," + cx + "," + cz + " -> master");
         return getConnection().sendAndAwaitReply(new ReadChunkMessage(world, path, cx, cz), ServerBoundMessage.class).thenCompose(message -> {
             if (message instanceof ChunkLoadedOnAnotherServerMessage chunkLoadedOnAnotherServerMessage) {
                 if (!path.equals("region") && !path.equals("entities")) {
                     throw new IllegalArgumentException("Cannot load a " + path + " chunk from an external server");
                 }
-                debug("read " + world + "," + path + "," + cx + "," + cz + " -> peer " + chunkLoadedOnAnotherServerMessage.server);
                 ExternalServer server = getConnection().getServersMap().get(chunkLoadedOnAnotherServerMessage.server);
                 ExternalServerConnection peerConnection = server == null ? null : server.getConnection();
                 if (peerConnection == null || !peerConnection.getChannel().isActive()) {
@@ -406,7 +394,6 @@ public class MultiPaper {
                 }
                 return readPeerDataOrMaster(future, () -> forceReadChunk(world, path, cx, cz));
             } else if (message instanceof DataMessageReply dataMessageReply) {
-                debug("read " + world + "," + path + "," + cx + "," + cz + " -> master data len=" + dataMessageReply.data.length);
                 return CompletableFuture.completedFuture(dataInputStreamFromDeflatedBytes(dataMessageReply.data));
             } else {
                 throw new IllegalArgumentException("Unexpected message reply " + message);
@@ -438,7 +425,21 @@ public class MultiPaper {
             bytes = baos.toByteArray();
         }
 
-        getConnection().send(new WriteChunkMessage(world, path, cx, cz, bytes, isTransientEntities), message -> { /* Do nothing */ });
+        // RegionFileStorage calls this from Moonrise's asynchronous compression/write worker. Wait for
+        // the Master's persistence reply so the chunk save is not reported complete before it is stored.
+        try {
+            BooleanMessageReply reply = getConnection()
+                    .sendAndAwaitReply(new WriteChunkMessage(world, path, cx, cz, bytes, isTransientEntities), BooleanMessageReply.class)
+                    .get();
+            if (!reply.result) {
+                throw new IOException("Master rejected persistence of " + path + " chunk " + cx + "," + cz + " in world " + world);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while persisting " + path + " chunk " + cx + "," + cz + " in world " + world, e);
+        } catch (ExecutionException e) {
+            throw new IOException("Could not confirm persistence of " + path + " chunk " + cx + "," + cz + " in world " + world, e);
+        }
     }
  
     public static CompoundTag readRegionFileNBT(File path, ChunkPos chunkPos) throws IOException {
@@ -540,9 +541,6 @@ public class MultiPaper {
         try (DataInputStream in = readUid(world)) {
             if (in.available() >= 16) {
                 UUID uuid = new UUID(in.readLong(), in.readLong());
-                if (!uuid.equals(fallback)) {
-                    debug("world uid for '" + world + "' resolved to " + uuid + " (local was " + fallback + ")");
-                }
                 return uuid;
             }
         } catch (Throwable t) {

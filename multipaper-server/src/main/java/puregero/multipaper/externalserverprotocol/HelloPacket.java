@@ -60,13 +60,30 @@ public class HelloPacket extends ExternalServerPacket {
     public void handle(ExternalServerConnection connection) {
         connection.externalServer = MultiPaper.getConnection().getOrCreateServer(bungeecordName);
 
-        ExternalServerConnection previousConnection = connection.externalServer.getConnection();
-        if (previousConnection == null || previousConnection.nanoTime < nanoTime) {
+        String localName = MultiPaperConfiguration.get().masterConnection.myName;
+        boolean preferred = isPreferredConnection(localName, bungeecordName, connection.isOutgoing());
+        boolean accepted = false;
+        boolean sameNonce = false;
+        if (preferred) {
+            synchronized (connection.externalServer) {
+                ExternalServerConnection previousConnection = connection.externalServer.getConnection();
+                if (previousConnection == null || previousConnection.nanoTime < nanoTime) {
+                    connection.externalServer.setConnection(connection);
+                    accepted = true;
+                } else {
+                    sameNonce = previousConnection.nanoTime == nanoTime;
+                }
+            }
+        }
+
+        if (!preferred) {
+            LOGGER.info("Rejecting non-preferred peer connection to " + bungeecordName);
+            connection.getChannel().close();
+        } else if (accepted) {
             LOGGER.info("Connected to external server " + bungeecordName);
             initCompression(connection);
-            connection.externalServer.setConnection(connection);
             onConnect(connection);
-        } else if (previousConnection.nanoTime == nanoTime) {
+        } else if (sameNonce) {
             // How lucky do you have to be for nano time to be the same?
             LOGGER.info("A new connection to external server " + bungeecordName + " had the same nano time as a previous connection, resending with a new nano time...");
             HelloPacket helloPacket = new HelloPacket(MultiPaperConfiguration.get().masterConnection.myName, connection.getSupportedCompressionFlags());
@@ -77,7 +94,15 @@ public class HelloPacket extends ExternalServerPacket {
             connection.getChannel().writeAndFlush(helloPacket);
         } else {
             LOGGER.info("A new connection to external server " + bungeecordName + " failed as a previous connection had a newer nano time.");
+            connection.getChannel().close();
         }
+    }
+
+    static boolean isPreferredConnection(String localName, String peerName, boolean outgoing) {
+        // Both sides derive the same direction: the lexicographically first server initiates
+        // the connection and the other server accepts it. This avoids comparing nanoTime
+        // values produced by different JVM clocks when both sides connect simultaneously.
+        return outgoing == (localName.compareTo(peerName) < 0);
     }
 
     private void initCompression(ExternalServerConnection connection) {

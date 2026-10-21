@@ -1,0 +1,30 @@
+MultiPaper 26.3 current-artifact two-PC smoke and stationary load
+Date: 2026-10-21 UTC
+
+Artifacts
+---------
+Paperclip SHA-256: 3161FD4E5E882970C61FE52C3B98060E0E4B250A0E6021C1F937847C15348A30
+Master SHA-256:    BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968
+Runtime: Temurin JRE 25.0.4.1 on both PCs
+
+Method
+------
+Used newly created, unique /tmp/multipaper-release-smoke-20261021 directories on PC1 and PC2. PC1 ran the Master and Backend A; PC2 ran Backend B. Both backends used the same fresh world name, private test ports, offline mode, and a temporary RCON password. The built-in proxy ran on PC1. No Crafty panel, production process, production config, or production world was accessed. The isolated world was saved and the backends stopped before the temporary directories were removed.
+
+Cross-PC connection and replication
+-----------------------------------
+- Both backends connected to the Master and advertised their Tailscale addresses and private test game ports.
+- The peer logs show both sides selecting the same preferred connection; Backend B rejected the non-preferred duplicate and then connected to Backend A.
+- Fresh-chunk block reads and writes crossed the PC boundary in both directions. In a controlled repeat, Backend A loaded and changed a new chunk, Backend B loaded it and observed the block, Backend B changed a second block, and Backend A observed that change. The receiving backend needed time to finish loading the fresh chunk; an earlier query made before that completed returned no match.
+- An offline Minecraft 26.3 protocol client logged in through the built-in proxy, received chunks, and passed /list, /tps, /mspt, /slist, /mpdebug, and /version. /slist showed both backend names and the client on its assigned backend.
+
+12-client stationary sample
+---------------------------
+- Twelve offline 26.3 protocol clients logged in through the proxy with five seconds between joins. All 12 reached player placement; the load script recorded 2,556 chunk packets, zero disconnects, and zero client errors during its 90-second run. All 12 were online together for about 35 seconds at the end. Movement was disabled.
+- At the end-of-run sample, both backends reported 20 TPS. Backend A reported 1-minute average MSPT 9.3 ms and maximum 75.2 ms; Backend B reported 3.1 ms average and 42.4 ms maximum. These maxima include startup/chunk warm-up.
+- Process CPU averages since startup were 71.8% of one logical core on A and 66.1% on B. Each Java process used about 1.70 GiB RSS; each host reported about 12 GiB available RAM. These are snapshots, not interval-averaged CPU or disk measurements.
+- Raw client events are in two-pc-current-3161-12-stationary-20261021.jsonl. Backend logs captured from the isolated run are available under the local Windows Temp directory as multipaper-two-pc-current-backend-*-20261021.log.
+
+Limits
+------
+This is a stationary synthetic-client smoke, not a safe-capacity result. It does not cover moving players, real Mojang accounts/clients, exploration, farms, redstone load, player-driven inventory contention, backend/Master crash recovery on two PCs, or long-duration world integrity. Keep the existing 8-player soft cap recommendation; 12 is only demonstrated for mostly stationary synthetic clients. Do not infer capacity above 12 from this run.

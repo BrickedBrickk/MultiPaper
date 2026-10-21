@@ -2,12 +2,12 @@ package puregero.multipaper.server.handlers;
 
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadUidMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.server.FileLocker;
 import puregero.multipaper.server.ServerConnection;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -33,11 +33,9 @@ public class ReadUidHandler {
     }
 
     private static byte[] readOrCreate(File file) throws IOException {
-        if (file.isFile()) {
-            byte[] existing = Files.readAllBytes(file.toPath());
-            if (existing.length == 16) {
-                return existing;
-            }
+        byte[] existing = FileLocker.readBytes(file);
+        if (existing.length == 16) {
+            return existing;
         }
 
         final UUID uuid = UUID.randomUUID();
@@ -50,7 +48,7 @@ public class ReadUidHandler {
         if (parent != null) {
             parent.mkdirs();
         }
-        Files.write(file.toPath(), uid);
+        FileLocker.writeBytes(file, uid);
         return uid;
     }
 }

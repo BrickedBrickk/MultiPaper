@@ -1,0 +1,45 @@
+--- a/net/minecraft/world/level/block/entity/HopperBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/HopperBlockEntity.java
+@@ -28,2 +28,3 @@
+ import net.minecraft.world.phys.AABB;
+ import org.jspecify.annotations.Nullable;
++import puregero.multipaper.MultiPaperContainerHandler;
+@@ -225,5 +226,6 @@
+                 ItemStack origItemStack = item;
+                 ItemStack movedItem = origItemStack;
++                MultiPaperContainerHandler.TransferSnapshot transferSnapshot = MultiPaperContainerHandler.snapshotTransfer(hopper, destination); // MultiPaper - capture the pre-transfer inventory state for the durable cross-chunk journal
+ 
+                 final int originalItemCount = origItemStack.getCount();
+                 final int movedItemCount = Math.min(level.spigotConfig.hopperAmount, originalItemCount);
+@@ -255,4 +257,8 @@
+                     }
+                     hopper.setItem(i, origItemStack);
++                    if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++                        MultiPaperContainerHandler.restore(transferSnapshot);
++                        return false;
++                    }
+                     destination.setChanged();
+                     return true;
+@@ -271,5 +277,6 @@
+     private static boolean hopperPull(final Level level, final Hopper hopper, final Container container, ItemStack origItemStack, final int i) {
+         ItemStack movedItem = origItemStack;
++        MultiPaperContainerHandler.TransferSnapshot transferSnapshot = MultiPaperContainerHandler.snapshotTransfer(container, (Container) hopper); // MultiPaper - capture the pre-transfer inventories
+         final int originalItemCount = origItemStack.getCount();
+         final int movedItemCount = Math.min(level.spigotConfig.hopperAmount, originalItemCount);
+         movedItem.setCount(movedItemCount);
+@@ -299,2 +306,5 @@
+             container.setChanged();
++            if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++                MultiPaperContainerHandler.restore(transferSnapshot);
++            }
+             return true;
+@@ -305,5 +315,9 @@
+         }
+         updatedContainer.setChanged();
++        if (!MultiPaperContainerHandler.persistCrossChunkTransfer(transferSnapshot)) {
++            MultiPaperContainerHandler.restore(transferSnapshot);
++            return true;
++        }
+ 
+         if (level.paperConfig().hopper.cooldownWhenFull) {
+             applyCooldown(hopper);

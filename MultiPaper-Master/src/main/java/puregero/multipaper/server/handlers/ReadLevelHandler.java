@@ -2,12 +2,11 @@ package puregero.multipaper.server.handlers;
 
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.server.FileLocker;
 import puregero.multipaper.server.ServerConnection;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -19,10 +18,10 @@ public class ReadLevelHandler {
     public static void handle(ServerConnection connection, ReadLevelMessage message) {
         CompletableFuture.runAsync(() -> {
             try {
-                try {
-                    byte[] b = Files.readAllBytes(new File(message.world, "level.dat").toPath());
+                byte[] b = FileLocker.readBytes(new File(message.world, "level.dat"));
+                if (b.length > 0) {
                     connection.sendReply(new DataMessageReply(b), message);
-                } catch (NoSuchFileException e) {
+                } else {
                     synchronized (emptyLevelDatLockTimes) {
                         if (!connection.getBungeeCordName().equals(emptyLevelDatLocker.get(message.world))) {
                             if (emptyLevelDatLockTimes.getOrDefault(message.world, 0L) > System.currentTimeMillis() - 120 * 1000L) {

@@ -1,0 +1,35 @@
+--- a/net/minecraft/world/level/block/entity/HopperBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/HopperBlockEntity.java
+@@ -593,6 +593,8 @@
+         final @Nullable Container from, final Container container, ItemStack itemStack, final int slot, final @Nullable Direction direction
+     ) {
+         ItemStack current = container.getItem(slot);
++        ItemStack originalDestinationStack = current.copy(); // MultiPaper - restore an external mirror if its owner is unreachable
++        ItemStack originalSourceStack = itemStack.copy(); // MultiPaper - return the untransferred source items
+         if (canPlaceItemInContainer(container, itemStack, slot, direction)) {
+             boolean success = false;
+             boolean wasEmpty = container.isEmpty();
+@@ -618,6 +620,12 @@
+             }
+ 
+             if (success) {
++                MultiPaperContainerHandler.ExternalTransferResult externalTransfer = MultiPaperContainerHandler.increaseItemExternal(
++                    from, container
++                ); // MultiPaper - acquire the container owner before allowing a cross-backend hopper transfer
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.FAILED) {
++                    return MultiPaperContainerHandler.rollbackFailedExternalTransfer(container, slot, originalDestinationStack, originalSourceStack);
++                }
+                 if (wasEmpty && container instanceof HopperBlockEntity hopperBlockEntity && !hopperBlockEntity.isOnCustomCooldown()) {
+                     int skipTickCount = 0;
+                     if (from instanceof HopperBlockEntity fromHopper && hopperBlockEntity.tickedGameTime >= fromHopper.tickedGameTime) {
+@@ -627,7 +635,9 @@
+                     hopperBlockEntity.setCooldown(hopperBlockEntity.level.spigotConfig.hopperTransfer - skipTickCount); // Spigot
+                 }
+ 
+-                container.setChanged();
++                if (externalTransfer == MultiPaperContainerHandler.ExternalTransferResult.LOCAL) { // MultiPaper - don't change external containers
++                    container.setChanged();
++                }
+             }
+         }
+ 

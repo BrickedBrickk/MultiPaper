@@ -43,4 +43,33 @@ class MultiPaperContainerHandlerTest {
         assertFalse(MultiPaperContainerHandler.addItemToSlot(destination, 1, new ItemStack(Items.EMERALD, 1)));
         assertEquals(6, destination.getItem(1).getCount());
     }
+
+    @Test
+    void rejectedExternalAdditionReturnsTheFullStackForRecoveryDrop() {
+        SimpleContainer destination = new SimpleContainer(1);
+        destination.setItem(0, new ItemStack(Items.EMERALD, 3));
+        ItemStack addition = new ItemStack(Items.DIAMOND, 5);
+        java.util.List<ItemStack> recoveryDrops = new java.util.ArrayList<>();
+
+        MultiPaperContainerHandler.addItemOrDrop(destination, 0, addition, recoveryDrops::add);
+
+        assertEquals(3, destination.getItem(0).getCount());
+        assertEquals(1, recoveryDrops.size());
+        assertEquals(Items.DIAMOND, recoveryDrops.getFirst().getItem());
+        assertEquals(5, recoveryDrops.getFirst().getCount());
+        assertEquals(5, addition.getCount(), "The packet stack must not be consumed while preparing a recovery drop");
+    }
+
+    @Test
+    void insertionIntoMissingDestinationPreservesTheEntireStackForRecoveryDrop() {
+        ItemStack addition = new ItemStack(Items.IRON_INGOT, 7);
+        java.util.List<ItemStack> recoveryDrops = new java.util.ArrayList<>();
+
+        MultiPaperContainerHandler.addItemOrDrop(null, -1, addition, recoveryDrops::add);
+
+        assertEquals(1, recoveryDrops.size());
+        assertEquals(Items.IRON_INGOT, recoveryDrops.getFirst().getItem());
+        assertEquals(7, recoveryDrops.getFirst().getCount());
+        assertEquals(7, addition.getCount());
+    }
 }

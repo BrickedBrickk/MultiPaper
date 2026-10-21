@@ -29,6 +29,7 @@ import java.io.*;
 import java.lang.ref.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import puregero.multipaper.server.ContainerTransactionManager;
 
 public class RegionFileCache {
 
@@ -188,9 +189,26 @@ public class RegionFileCache {
     }
 
     public static CompletableFuture<Void> putChunkDeflatedDataAsync(File basePath, int chunkX, int chunkZ, byte[] data) {
+        return putChunkDeflatedDataAsync(basePath, null, chunkX, chunkZ, data);
+    }
+
+    public static CompletableFuture<Void> putChunkDeflatedDataAsync(File basePath, String world, int chunkX, int chunkZ, byte[] data) {
+        return putChunkDeflatedDataAsync(basePath, world, "region", chunkX, chunkZ, data);
+    }
+
+    public static CompletableFuture<Void> putChunkDeflatedDataAsync(File basePath, String world, String path, int chunkX, int chunkZ, byte[] data) {
         RegionFile r = getRegionFile(basePath, chunkX, chunkZ);
         return r.submitTask(regionFile -> {
-            regionFile.putDeflatedBytes(chunkX, chunkZ, data);
+            if (world == null) {
+                regionFile.putDeflatedBytes(chunkX, chunkZ, data);
+            } else {
+                try {
+                    ContainerTransactionManager.persistChunk(world, path, chunkX, chunkZ, data,
+                            updated -> regionFile.putDeflatedBytes(chunkX, chunkZ, updated));
+                } catch (IOException failure) {
+                    throw new java.util.concurrent.CompletionException(failure);
+                }
+            }
             return null;
         });
     }
