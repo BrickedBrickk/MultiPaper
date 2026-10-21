@@ -1,0 +1,26 @@
+# Two physical PCs: player-driven remote chest transaction — 2026-10-21
+
+## Result
+
+PASS. An offline 26.3 protocol client connected through the isolated Master built-in proxy on PC1, was routed to Backend A, and opened a chest owned by Backend B. The existing `scripts/Run-PlayerContainerClickProbe.js` performed ordinary normal clicks through the chest GUI.
+
+- Backend B started with a fresh disposable world and generated/loaded chunk `[375, 375]` (block coordinate `6005, 6005`) before the chest was placed.
+- Backend A did not load that test chunk before the client teleported there. While the client was online after the transfer, Backend A's RCON returned `That position is not loaded` for the chest; Backend B returned chest block data and an empty `Items` list.
+- Client output: `WINDOW_OPEN`, clicks on chest slot 0 and player slot 27, then `PASS: normal chest GUI clicks moved exactly 16 diamonds into player inventory slot 9.`
+- While the player was connected, both Backend A and Backend B returned `[{Slot: 9b, id: "minecraft:diamond", count: 16}]` for the player's inventory. Backend B returned `Items: []` for the source chest. This conserves all 16 diamonds across a physical-PC boundary.
+- `save-all flush` succeeded on both backends. The isolated backends stopped, and the Master logged `Exiting safely`; the test listeners closed.
+
+## Exact artifacts and environment
+
+- Paperclip SHA-256: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D` (same exact JAR on both PCs).
+- Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+- Java: Temurin JRE 25.0.4.1 on both hosts.
+- PC1: `100.78.108.117`, Master and Backend A. PC2: `100.107.178.51`, Backend B. SSH used saved host keys with strict host-key checking.
+- Isolated ports: Master `37863`, proxy `27875`, backend A `27866`/RCON `27885`, backend B `27867`/RCON `27886`. No production ports, worlds, or Crafty were used.
+- Disposable fixture: `/tmp/multipaper-current-crosspc-chest-20261021`; Java runtime: `/tmp/multipaper-current-java25-20261021`.
+
+An earlier attempt at `(2005,90,2005)` timed out after a diagnostic RCON `forceload` on Backend A loaded the test chunk before the player did. That attempt was invalid for testing remote ownership. The passing run used the fresh `(6005,90,6005)` chunk and did not read or load it on A before the client request.
+
+## Limits
+
+This verifies one normal chest click transfer across the two physical PCs and a synchronized online player inventory. It does not test a backend or Master crash during the open transaction, a disconnect before save, shulkers/chests with concurrent users, online-mode Mojang authentication, or sustained survival play. It is not a complete item conservation or public-SMP safety certification.
