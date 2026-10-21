@@ -294,6 +294,11 @@ public class MultiPaperEntitiesHandler {
             if (trackedEntity != null) {
                 trackedEntity.sendToTrackingPlayers(new ClientboundEntityEventPacket(entity, entityEventPacket.getEventId()));
             }
+        } else if (packet instanceof ClientboundAddTransientBlockPacket transientBlockPacket) {
+            ChunkMap.TrackedEntity trackedEntity = ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) entity).moonrise$getTrackedEntity();
+            if (trackedEntity != null) {
+                trackedEntity.sendToTrackingPlayers(new ClientboundAddTransientBlockPacket(transientBlockPacket.getPos(), transientBlockPacket.getBlockState()));
+            }
         } else if (packet instanceof ClientboundSetEquipmentPacket setEquipmentPacket) {
             if (entity instanceof LivingEntity livingEntity) for (Pair<EquipmentSlot, ItemStack> pair : setEquipmentPacket.getSlots()) {
                 livingEntity.setItemSlot(pair.getFirst(), pair.getSecond());

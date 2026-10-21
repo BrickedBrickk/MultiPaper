@@ -1058,7 +1058,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..9df5cd764adfb07c53988a67406e9bc1307844f5
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/MultiPaperEntitiesHandler.java
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,393 @@
 +package puregero.multipaper;
 +
 +import com.mojang.datafixers.util.Pair;
@@ -1315,6 +1315,11 @@ index 0000000000000000000000000000000000000000..9df5cd764adfb07c53988a67406e9bc1
 +            ChunkMap.TrackedEntity trackedEntity = entity.tracker;
 +            if (trackedEntity != null) {
 +                trackedEntity.broadcast(new ClientboundEntityEventPacket(entity, entityEventPacket.getEventId()));
++            }
++        } else if (packet instanceof ClientboundAddTransientBlockPacket transientBlockPacket) {
++            ChunkMap.TrackedEntity trackedEntity = entity.tracker;
++            if (trackedEntity != null) {
++                trackedEntity.broadcast(new ClientboundAddTransientBlockPacket(transientBlockPacket.getPos(), transientBlockPacket.getBlockState()));
 +            }
 +        } else if (packet instanceof ClientboundSetEquipmentPacket setEquipmentPacket) {
 +            for (Pair<EquipmentSlot, ItemStack> pair : setEquipmentPacket.getSlots()) {

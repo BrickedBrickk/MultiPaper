@@ -1,0 +1,11 @@
+
+Transient block entity packet forwarding — 2026-10-21
+
+The persistent-HDD backend logs showed `ClientboundAddTransientBlockPacket` reaching MultiPaper's entity mirror handler without a branch. In 26.3 the packet carries a block position and block state that the client keeps temporarily; vanilla sends it to players tracking a landing FallingBlockEntity. MultiPaper now forwards a reconstructed packet to players tracking the mirrored entity on the receiving backend. The change is in `multipaper-server/src/main/java/puregero/multipaper/MultiPaperEntitiesHandler.java` and the source patch `patches/server/0027-Sync-entities.patch`.
+
+The full configured Java 25 build passed with `build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar --exclude-task :multipaper-server:applyMinecraftResourcePatches --no-daemon`. Paperweight applied 63 Minecraft patches and 13 Paper patches; server compilation passed. Results: Server 10,159 tests (0 failures/errors, 86 skipped), Master 49 (0 failures/errors/skips), Master messaging protocol 6 (0 failures/errors/skips), API 481 (0 failures/errors, 2 skipped). The resource patch task was excluded after it remained stalled for several minutes; there are no MultiPaper Minecraft resource patches, and no resource files were changed by this work.
+
+Paperclip SHA-256: `BBFADB051088F6978C111C661AD3227586B626A6CCB0DC6C62085AE133998C78`.
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+This is compile and regression-suite evidence. A dedicated two-backend client-visible falling-block test has not yet verified that a player on the receiving backend observes the transient effect, and the unrelated duplicate-UUID and `RequestEntityPacket` warnings remain open.
