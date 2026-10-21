@@ -1,0 +1,21 @@
+# MultiPaper 26.3 pearl stasis and chunk-ticket probe — 2026-10-21
+
+## Scope and exact pair
+
+This used the staged RC1 Paperclip SHA-256 `B31E80322C7A980D42D1D91932551DA406C939DD167F9C795F856C73FDC456F2` and Master SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`, on Java 25. The Master and two backends ran as separate processes on one Windows workstation in disposable directories. The clean end-to-end run used a newly created Master directory and empty backend world. It did not connect to Crafty or production.
+
+The reusable RCON probe is `scripts/Test-PearlStasisChunkUnload.ps1`. It creates a soul-sand bubble column under a top-half waterlogged trapdoor, summons a stationary pearl, checks its UUID and position on both backends, removes force-load tickets, observes ticket behavior, and validates unload/reload after pearl removal.
+
+## Results
+
+On the first successful chamber run, the pearl rose to y=90.156 and stayed in the trapdoor pocket for 300 seconds. Across 60 five-second samples, both backends reported the same pearl UUID and the pearl stayed between y=89 and y=91. This was a disposable existing test world and the run stopped at the unload assertion.
+
+The clean-world end-to-end rerun held the pearl in the chamber for 60 seconds across 12 samples with the same UUID on both backends. After the explicit `/forceload` tickets were removed, both backends still reported the chunk loaded and continued to report the same pearl. This is expected vanilla behavior: Mojang's Java 1.21.2 release notes say Ender Pearls keep the chunk they occupy or enter loaded and ticking ([official release notes](https://www.minecraft.net/en-us/article/minecraft-java-edition-1-21-2)). Therefore an active pearl should not be expected to survive a natural unload/reload cycle; its own ticket prevents that unload.
+
+After the pearl was killed, both backends confirmed the chunk unloaded. The probe then explicitly reloaded the chunk on both and confirmed the bubble-column block remained and the removed pearl did not reappear. Both backends completed `save-all flush` and graceful shutdown. All fixture listeners closed.
+
+## Interpretation and limits
+
+This validates local two-backend stasis position/UUID replication, five-minute pearl stability in the first run, vanilla-compatible ticking-chunk behavior without explicit force-load tickets, and chamber block persistence across an unload/reload after the pearl is removed. It does not test player ownership or teleport release in this probe; those have separate two-physical-PC evidence in the deployment log. It is not a two-PC RC1 test, a GUI-client test, or proof of hours-long player-owned pearl persistence across a server restart. Since vanilla's pearl ticket keeps an active pearl's chunk ticking, chunk-unload persistence of that same live pearl is not a valid natural gameplay gate.
+
+Captured clean-run console output and backend logs are under `C:\Users\elibo\AppData\Local\Temp\multipaper-26.3-pearlticket-empty-20261021`.
