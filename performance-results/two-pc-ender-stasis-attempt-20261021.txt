@@ -15,3 +15,8 @@ An earlier throw with a solid glass cap teleported the player into water and cau
 ## Disposition
 
 INCONCLUSIVE. Do not count this as a stasis pass or failure. Ender pearl stasis remains a release gate. A follow-up needs to confirm the client trajectory actually enters the bubble column and sample the pearl while stationary before assessing replication.
+## Controlled stationary-pearl follow-up — partial pass
+
+To isolate the chamber and replication from aiming, Backend B summoned an ownerless ender pearl at `(12005.5,80.5,12005.5)` with zero initial motion. The test chunk used a soul-sand bubble column from y=60 through y=89 and a waterlogged oak trapdoor at y=90 with `half=top`. RCON confirmed the bubble-column block at y=89. Over two seconds, the pearl rose to y=87.42 with upward motion. It then remained in the top pocket near y=90 for 12 seconds: Backend B positions ranged from y=89.953 to 90.064; Backend A positions ranged from y=89.969 to 90.080. Both reported UUID `[I; -106125561, 1217085579, -1279399334, 519852209]`, with x/z fixed at 12005.5. The sampled vertical motion varied around zero, between approximately -0.033 and +0.093. Backend A saw the entity after an automated client loaded the chunk. The pair saved and stopped cleanly after the sample.
+
+This is evidence that the top-half waterlogged-trapdoor chamber holds a pearl entity and synchronizes it between the two PCs. The entity was summoned without an owner, so this does not verify a normal player-thrown pearl, player ownership, release/teleport behavior, or a Mojang client. A separate protocol `use_item` attempt consumed the test pearl but produced no entity in the first RCON sample; it remains unresolved and is not counted as a pass. Overall stasis verification remains partial.
