@@ -1,0 +1,35 @@
+(node:26220) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{"event":"tcp_connected","username":"Move2601","tcpConnected":1,"elapsedMs":475}
+{"event":"ready","username":"Move2601","ready":1,"chunks":0,"elapsedMs":4158}
+{"event":"tcp_connected","username":"Move2602","tcpConnected":2,"elapsedMs":5160}
+{"event":"ready","username":"Move2602","ready":2,"chunks":21,"elapsedMs":5467}
+{"event":"movement_started","username":"Move2601","elapsedMs":7962}
+{"event":"movement_started","username":"Move2602","elapsedMs":8000}
+{"event":"tcp_connected","username":"Move2603","tcpConnected":3,"elapsedMs":10069}
+{"event":"ready","username":"Move2603","ready":3,"chunks":426,"elapsedMs":14705}
+{"event":"movement_started","username":"Move2603","elapsedMs":14991}
+{"event":"tcp_connected","username":"Move2604","tcpConnected":4,"elapsedMs":15149}
+{"event":"ready","username":"Move2604","ready":4,"chunks":447,"elapsedMs":15395}
+{"event":"movement_started","username":"Move2604","elapsedMs":15613}
+{"event":"tcp_connected","username":"Move2605","tcpConnected":5,"elapsedMs":20066}
+{"event":"ready","username":"Move2605","ready":5,"chunks":744,"elapsedMs":20290}
+{"event":"movement_started","username":"Move2605","elapsedMs":20497}
+{"event":"tcp_connected","username":"Move2606","tcpConnected":6,"elapsedMs":25103}
+{"event":"ready","username":"Move2606","ready":6,"chunks":1065,"elapsedMs":25260}
+{"event":"movement_started","username":"Move2606","elapsedMs":25457}
+{"event":"tcp_connected","username":"Move2607","tcpConnected":7,"elapsedMs":30052}
+{"event":"ready","username":"Move2607","ready":7,"chunks":1293,"elapsedMs":30276}
+{"event":"movement_started","username":"Move2607","elapsedMs":30506}
+{"event":"tcp_connected","username":"Move2608","tcpConnected":8,"elapsedMs":35046}
+{"event":"ready","username":"Move2608","ready":8,"chunks":1506,"elapsedMs":35177}
+{"event":"movement_started","username":"Move2608","elapsedMs":35406}
+{"event":"summary","requested":8,"tcpConnected":8,"ready":8,"chunkPackets":2048,"movementPackets":14351,"movementMode":"moving","disconnects":0,"errors":[],"durationMs":120003}
+{"event":"ended","username":"Move2601","elapsedMs":120010}
+{"event":"ended","username":"Move2608","elapsedMs":120012}
+{"event":"ended","username":"Move2602","elapsedMs":120012}
+{"event":"ended","username":"Move2604","elapsedMs":120012}
+{"event":"ended","username":"Move2605","elapsedMs":120012}
+{"event":"ended","username":"Move2606","elapsedMs":120012}
+{"event":"ended","username":"Move2603","elapsedMs":120012}
+{"event":"ended","username":"Move2607","elapsedMs":120012}

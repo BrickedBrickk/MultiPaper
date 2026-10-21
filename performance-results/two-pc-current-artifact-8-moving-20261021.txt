@@ -1,0 +1,22 @@
+Current-artifact two-PC moving-client probe
+Date: 2026-10-21
+
+Artifacts and fixture
+---------------------
+Paperclip SHA-256: 3161FD4E5E882970C61FE52C3B98060E0E4B250A0E6021C1F937847C15348A30
+Master SHA-256:    BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968
+Both hosts ran Temurin JRE 25.0.4.1. PC1 hosted the Master and Backend A; PC2 hosted Backend B. The services used new isolated /tmp directories, a fresh world, and private test ports. No Crafty panel, production process, configuration, or world was touched.
+
+Client result
+-------------
+Eight offline Minecraft 26.3 protocol clients logged in five seconds apart through the built-in proxy. All eight reached player placement and remained connected for the full 120-second run. The harness counted 2,048 chunk packets and 14,351 movement packets; it recorded zero client disconnects and zero client errors. All eight were online together for about 85 seconds. This probe moves clients along synthetic straight paths and does not simulate normal collision, gravity, or player input choices, so it is not equivalent to real gameplay.
+
+Performance sample
+------------------
+Both backends reported 20 TPS over five seconds and 19.9 TPS over one minute during the sample. One-minute average/max MSPT were A 9.0/576.5 ms and B 6.2/443.2 ms; five-second average MSPT was A 7.9 ms and B 6.9 ms. The one-minute maxima include fresh-world generation and chunk loading. At the snapshot, process CPU averages since startup were about 102% of one logical core on A and 104% on B; RSS was about 1.69 GiB and 1.71 GiB. Each host reported about 12 GiB available RAM. These are snapshots, not interval-averaged CPU or disk measurements.
+
+Warnings requiring follow-up
+----------------------------
+Backend A logged one ERROR from vanilla `LevelTicks.schedule`: `Trying to schedule tick in not loaded position BlockPos{x=31, y=-40, z=26}`. It also logged four requests from Backend B for entity UUIDs that did not exist on A, plus one add-subscriber message for an unloaded chunk. Both backends logged synthetic clients as moving too quickly; Backend B logged duplicate messages for one such client. Backend B's initial peer-handshake log showed the expected non-preferred duplicate being rejected and the preferred connection then established.
+
+The test did not crash, time out, or disconnect a client, but the LevelTicks ERROR has not been attributed to vanilla/Paper behavior versus MultiPaper chunk ownership. Treat this run as a successful connection/load probe with an unresolved server-side error, not as a clean active-gameplay release gate. Backend logs captured from the run are in the local Windows Temp directory as `multipaper-two-pc-current-move-backend-*-20261021.log`.
