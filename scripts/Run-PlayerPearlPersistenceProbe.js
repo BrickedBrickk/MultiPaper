@@ -1,16 +1,18 @@
 'use strict'
 
 // Disposable protocol probe for a real player-owned ender pearl.
-// The caller should prepare the stasis chamber and teleport/give the player
-// before throwDelayMs expires. This script does not grant items or teleport.
+// The caller should prepare the stasis chamber and give the player an ender
+// pearl before throwDelayMs expires. This script does not grant items or teleport.
 const mc = require('minecraft-protocol')
 
-const [host = '127.0.0.1', portText = '25565', username = 'PearlPersist01', throwDelayText = '12000', holdDurationText = '180000', version = '26.3'] = process.argv.slice(2)
+const [host = '127.0.0.1', portText = '25565', username = 'PearlPersist01', throwDelayText = '12000', holdDurationText = '180000', version = '26.3', yawText = '0', pitchText = '0'] = process.argv.slice(2)
 const port = Number(portText)
 const throwDelayMs = Number(throwDelayText)
 const holdDurationMs = Number(holdDurationText)
-if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(throwDelayMs) || throwDelayMs < 1000 || !Number.isInteger(holdDurationMs) || holdDurationMs < 10000 || username.length > 16) {
-  console.error('Usage: node scripts/Run-PlayerPearlPersistenceProbe.js [host [port [username [throwDelayMs [holdDurationMs [version]]]]]]')
+const throwYaw = Number(yawText)
+const throwPitch = Number(pitchText)
+if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(throwDelayMs) || throwDelayMs < 1000 || !Number.isInteger(holdDurationMs) || holdDurationMs < 10000 || username.length > 16 || !Number.isFinite(throwYaw) || !Number.isFinite(throwPitch) || throwPitch < -90 || throwPitch > 90) {
+  console.error('Usage: node scripts/Run-PlayerPearlPersistenceProbe.js [host [port [username [throwDelayMs [holdDurationMs [version [yaw [pitch]]]]]]]]')
   process.exit(2)
 }
 
@@ -62,13 +64,17 @@ client.on('packet', (packet, meta) => {
       ready = true
       client.write('player_loaded', {})
       client.write('player_input', { inputs: {} })
+      yaw = throwYaw
+      pitch = throwPitch
+      client.write('look', { yaw, pitch, flags: { onGround: false, hasHorizontalCollision: false } })
       client.write('tick_end', {})
       console.log(`PLAYER_READY ${JSON.stringify({ ...position, yaw, pitch })}`)
+      console.log(`CLIENT_LOOK ${JSON.stringify({ yaw, pitch })}`)
       timer = setTimeout(() => {
         if (ended) return
         throwSent = true
-        client.write('use_item', { hand: 0, sequence: 1, rotation: { x: yaw, y: pitch } })
-        console.log(`USE_ITEM ${JSON.stringify({ yaw, pitch })}`)
+        client.write('use_item', { hand: 0, sequence: 1, rotation: { x: throwYaw, y: throwPitch } })
+        console.log(`USE_ITEM ${JSON.stringify({ yaw: throwYaw, pitch: throwPitch })}`)
       }, throwDelayMs)
     }
     return
@@ -108,12 +114,6 @@ client.on('end', reason => {
 const movementTimer = setInterval(() => {
   if (!ready || !position || ended) return
   client.write('player_input', { inputs: {} })
-  client.write('position', {
-    x: position.x,
-    y: position.y,
-    z: position.z,
-    flags: { onGround: false, hasHorizontalCollision: false }
-  })
   client.write('tick_end', {})
 }, 100)
 

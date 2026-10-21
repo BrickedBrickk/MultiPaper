@@ -1,0 +1,27 @@
+# Player-owned pearl across a first-owner backend restart — 2026-10-21
+
+## Exact artifacts and fixture
+
+Paperclip SHA-256: `B31E80322C7A980D42D1D91932551DA406C939DD167F9C795F856C73FDC456F2`.
+
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+Both backends and the Master ran as separate Java 25 processes on one Windows workstation, in a disposable test world. Backend B started first and was the only backend running when it force-loaded and built the chamber at `(16005,*,16005)`; Backend A was started afterward. A protocol-777 offline test client joined through the built-in proxy. No Crafty panel, production world, or production service was accessed.
+
+## Probe correction
+
+The previous client harness replayed its last position every 100 ms. That fought RCON teleports and caused the earlier thrown pearl to miss. `scripts/Run-PlayerPearlPersistenceProbe.js` now accepts optional yaw and pitch arguments, sends the 26.3 `look` packet, and sends player input/tick packets without replaying a stale position. The client started at the proxy spawn, was moved by RCON to the test chamber, and received the server position update before throwing.
+
+The client threw with yaw `0`, pitch `-90`. It received the pearl spawn packet for UUID `1cbb3976-a8b1-4053-9335-1a292cb1450d`. Backend RCON identified the pearl as `[I; 482031990, -1464778669, -1825236439, 749815053]`; both backends reported the same `Owner` UUID array `[I; -1857008167, 1646869566, -1079748629, -183513879]`, matching the protocol player's offline UUID `91504dd9-6229-3c3e-bfa4-57ebf50fcce9`. The pearl settled in the stasis pocket at approximately y=90.01 on Backend A and y=89.997 on Backend B. `/slist` showed the player on Backend A and zero players on Backend B.
+
+## Backend B restart and recovery
+
+Both backends completed `save-all flush`. Backend B was stopped through RCON and exited gracefully. The Master and Backend A remained running, and the player stayed connected through Backend A. Backend B was restarted from the same directory with the same JAR and re-registered with the Master. The chamber chunk loaded again; both backends reported the same pearl UUID and unchanged `Owner` UUID. Post-restart positions were y=89.993 on A and y=89.981 on B. Each backend reported exactly one pearl UUID using an `execute as @e[type=minecraft:ender_pearl,limit=2]` query. No `Entity uuid already exists` warnings appeared in the three test backend logs.
+
+The test fixture was saved and all local test listeners were closed after the probe.
+
+## Interpretation and limits
+
+This is a local two-backend player-owned pearl recovery pass across a graceful restart of the backend that first loaded the chamber chunk, while the peer backend, Master, and player connection remained online. The precise local load sequence is recorded; the test did not use the `/mpdebug` overlay to independently sample ownership immediately before stopping Backend B. This does not replace repeating the owner-backend restart on the two physical HDD PCs, a crash-cut restart, a Mojang launcher client, or redstone-triggered release. It does not change the conservative eight-player guidance.
+
+Captured fixture logs and client output are under `C:\Users\elibo\AppData\Local\Temp\multipaper-26.3-pearlticket-empty-20261021`.
