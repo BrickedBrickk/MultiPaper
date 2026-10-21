@@ -1,0 +1,14 @@
+Disposable two-backend Nether portal mob-transfer probe
+Date: 2026-10-21
+Fixture: `%TEMP%\multipaper-26.3-portal-smoke-loaded-20261021`; offline-mode worlds, local-only listeners; no production/Crafty access.
+
+Artifacts used:
+
+- Paperclip SHA-256: `BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155`
+- Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+The disposable pair registered as `portal-a` and `portal-b`. RCON created matching obsidian frames and portal blocks at the origin in the Overworld and Nether, force-loaded the Nether destination chunk on both backends, and confirmed on each backend that `(1,80,0)` was loaded before spawning a tagged pig at `(1.5,80,0.5)` in the Overworld.
+
+The final RCON reads were inconsistent: `portal-a` found the tagged pig at `[1.5d, 80.0d, 0.5d]` from both `execute in minecraft:overworld` and `execute in minecraft:the_nether`; `portal-b` reported `No entity was found` in both dimensions. The probe did not record UUIDs or independently prove which backend owned either chunk. Therefore it does not establish correct portal transfer or cross-backend entity replication, and it is not enough to attribute a defect to portal code. Treat portal transfer as unverified until a controlled test determines the entity's authoritative dimension and UUID on each backend.
+
+The harness saved and stopped both backends. All six fixture listeners were confirmed closed.
