@@ -13,6 +13,7 @@ param(
     [int] $ExpectedZombieCount2 = -1,
     [string] $ZombieTag2 = '',
     [int] $MasterProcessId = 0,
+    [ValidatePattern('^[A-Za-z]:?$')] [string] $DiskDriveLetter = 'C',
     [ValidateRange(1, 10000)] [int] $SampleCount = 9,
     [ValidateRange(1, 3600)] [int] $IntervalSeconds = 10,
     [Parameter(Mandatory = $true)] [string] $OutputPath
@@ -140,6 +141,22 @@ function Get-ZombieCount([string] $HostName, [int] $Port, [string] $Tag, [int] $
     return $count
 }
 
+function Get-DiskSample([string] $DriveLetter) {
+    $drive = [regex]::Escape($DriveLetter.TrimEnd(':').ToLowerInvariant())
+    $sample = Get-Counter -Counter '\PhysicalDisk(*)\Avg. Disk sec/Read', '\PhysicalDisk(*)\Avg. Disk sec/Write', '\PhysicalDisk(*)\Current Disk Queue Length' -ErrorAction Stop
+    $read = $sample.CounterSamples | Where-Object { $_.Path -match '\\physicaldisk\([^)]*\)\\avg\. disk sec/read$' -and $_.InstanceName -match "(^|\s)$drive`:$" } | Select-Object -First 1
+    $write = $sample.CounterSamples | Where-Object { $_.Path -match '\\physicaldisk\([^)]*\)\\avg\. disk sec/write$' -and $_.InstanceName -match "(^|\s)$drive`:$" } | Select-Object -First 1
+    $queue = $sample.CounterSamples | Where-Object { $_.Path -match '\\physicaldisk\([^)]*\)\\current disk queue length$' -and $_.InstanceName -match "(^|\s)$drive`:$" } | Select-Object -First 1
+    if ($null -eq $read -or $null -eq $write -or $null -eq $queue) {
+        throw "Could not find PhysicalDisk read/write/queue counters for drive $DriveLetter`:"
+    }
+    [pscustomobject] @{
+        ReadLatencyMs = [math]::Round([double]$read.CookedValue * 1000, 3)
+        WriteLatencyMs = [math]::Round([double]$write.CookedValue * 1000, 3)
+        QueueLength = [math]::Round([double]$queue.CookedValue, 3)
+    }
+}
+
 $processIds = [ordered]@{ S1 = $ProcessId1 }
 if ($ProcessId2 -gt 0) { $processIds.S2 = $ProcessId2 }
 if ($MasterProcessId -gt 0) { $processIds.Master = $MasterProcessId }
@@ -188,6 +205,11 @@ for ($sample = 1; $sample -le $SampleCount; $sample++) {
         $row.CpuS2PercentOfOneCore = $cpu.S2; $row.ZombieCountS2 = $zombies2; $row.PlayersS2 = $list2
     }
     if ($MasterProcessId -gt 0) { $row.CpuMasterPercentOfOneCore = $cpu.Master }
+    $disk = Get-DiskSample $DiskDriveLetter
+    $row.DiskDrive = $DiskDriveLetter.TrimEnd(':').ToUpperInvariant()
+    $row.DiskReadLatencyMs = $disk.ReadLatencyMs
+    $row.DiskWriteLatencyMs = $disk.WriteLatencyMs
+    $row.DiskQueueLength = $disk.QueueLength
     $row.CpuTotalPercentOfOneCore = [math]::Round(($cpu.Values | Measure-Object -Sum).Sum, 2)
     $row.TotalWorkingSetGiB = [math]::Round($workingSet / 1GB, 2)
     $rows.Add([pscustomobject]$row)

@@ -13,9 +13,11 @@ param(
     [string] $MasterHost = '100.78.108.117',
     [string] $MasterUser = 'crafty1',
     [int] $MasterProcessId = 0,
+    [string] $DiskDevice1 = 'sda',
+    [string] $DiskDevice2 = 'sda',
     [string] $Tag1 = 'bench_a',
     [string] $Tag2 = 'bench_b',
-    [ValidateRange(1, 10000)] [int] $ExpectedZombieCount = 16,
+    [ValidateRange(0, 10000)] [int] $ExpectedZombieCount = 16,
     [int] $ExpectedZombieCount1 = -1,
     [int] $ExpectedZombieCount2 = -1,
     [ValidateRange(1, 1000)] [int] $SampleCount = 9,
@@ -35,8 +37,8 @@ foreach ($tag in @($Tag1, $Tag2)) {
 }
 if ($ExpectedZombieCount1 -lt 0) { $ExpectedZombieCount1 = $ExpectedZombieCount }
 if ($ExpectedZombieCount2 -lt 0) { $ExpectedZombieCount2 = $ExpectedZombieCount }
-if ($ExpectedZombieCount1 -lt 1 -or $ExpectedZombieCount1 -gt 10000) { throw 'ExpectedZombieCount1 must be between 1 and 10000.' }
-if ($ExpectedZombieCount2 -lt 1 -or $ExpectedZombieCount2 -gt 10000) { throw 'ExpectedZombieCount2 must be between 1 and 10000.' }
+if ($ExpectedZombieCount1 -lt 0 -or $ExpectedZombieCount1 -gt 10000) { throw 'ExpectedZombieCount1 must be between 0 and 10000.' }
+if ($ExpectedZombieCount2 -lt 0 -or $ExpectedZombieCount2 -gt 10000) { throw 'ExpectedZombieCount2 must be between 0 and 10000.' }
 $RconScript = Join-Path $PSScriptRoot '..\Send-RconCommand.ps1'
 if (-not (Test-Path -LiteralPath $RconScript -PathType Leaf)) { throw "RCON helper not found: $RconScript" }
 
@@ -90,6 +92,24 @@ function Get-RemoteProcess([string] $HostName, [string] $User, [int] $TargetProc
     }
 }
 
+function Get-RemoteDiskStats([string] $HostName, [string] $User, [string] $Device) {
+    $lines = @(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 "$User@$HostName" 'cat /proc/diskstats')
+    if ($LASTEXITCODE -ne 0) { throw "Could not read /proc/diskstats from $HostName over strict-host-key SSH." }
+    $line = $lines | Where-Object { ($_.Trim() -split '\s+')[2] -eq $Device } | Select-Object -First 1
+    if (-not $line) { throw "Block device '$Device' was not present in /proc/diskstats on $HostName." }
+    $fields = $line.Trim() -split '\s+'
+    if ($fields.Count -lt 14) { throw "Unexpected /proc/diskstats row for $Device on $HostName." }
+    [pscustomobject]@{
+        Reads = [long]$fields[3]
+        ReadSectors = [long]$fields[5]
+        ReadMs = [long]$fields[6]
+        Writes = [long]$fields[7]
+        WriteSectors = [long]$fields[9]
+        WriteMs = [long]$fields[10]
+        WeightedMs = [long]$fields[13]
+    }
+}
+
 function Assert-PlayerState([string] $HostName, [int] $Port, [string] $Password) {
     $players = Get-RconText $HostName $Port $Password 'list'
     if (-not $AllowPlayers -and $players -notmatch '^There are 0 of ') {
@@ -101,6 +121,8 @@ function Assert-PlayerState([string] $HostName, [int] $Port, [string] $Password)
 $process = @{
     B1 = Get-RemoteProcess $RemoteHost1 $RemoteUser1 $ProcessId1
     B2 = Get-RemoteProcess $RemoteHost2 $RemoteUser2 $ProcessId2
+    D1 = Get-RemoteDiskStats $RemoteHost1 $RemoteUser1 $DiskDevice1
+    D2 = Get-RemoteDiskStats $RemoteHost2 $RemoteUser2 $DiskDevice2
 }
 if ($MasterProcessId -gt 0) { $process.Master = Get-RemoteProcess $MasterHost $MasterUser $MasterProcessId }
 $previous = $process
@@ -128,6 +150,8 @@ for ($sample = 1; $sample -le $SampleCount; $sample++) {
     $current = @{
         B1 = Get-RemoteProcess $RemoteHost1 $RemoteUser1 $ProcessId1
         B2 = Get-RemoteProcess $RemoteHost2 $RemoteUser2 $ProcessId2
+        D1 = Get-RemoteDiskStats $RemoteHost1 $RemoteUser1 $DiskDevice1
+        D2 = Get-RemoteDiskStats $RemoteHost2 $RemoteUser2 $DiskDevice2
     }
     if ($MasterProcessId -gt 0) { $current.Master = Get-RemoteProcess $MasterHost $MasterUser $MasterProcessId }
     $row = [ordered]@{
@@ -139,6 +163,16 @@ for ($sample = 1; $sample -le $SampleCount; $sample++) {
         CpuOneCorePctB1 = [math]::Round((($current.B1.CpuTicks - $previous.B1.CpuTicks) / $current.B1.ClockTicks) / $elapsed * 100, 2)
         CpuOneCorePctB2 = [math]::Round((($current.B2.CpuTicks - $previous.B2.CpuTicks) / $current.B2.ClockTicks) / $elapsed * 100, 2)
         RssGiBB1 = $current.B1.RssGiB; RssGiBB2 = $current.B2.RssGiB
+        DiskReadLatencyMsB1 = if ($current.D1.Reads -gt $previous.D1.Reads) { [math]::Round(($current.D1.ReadMs - $previous.D1.ReadMs) / ($current.D1.Reads - $previous.D1.Reads), 3) } else { 0 }
+        DiskWriteLatencyMsB1 = if ($current.D1.Writes -gt $previous.D1.Writes) { [math]::Round(($current.D1.WriteMs - $previous.D1.WriteMs) / ($current.D1.Writes - $previous.D1.Writes), 3) } else { 0 }
+        DiskReadMiBpsB1 = [math]::Round((($current.D1.ReadSectors - $previous.D1.ReadSectors) * 512 / 1MB) / $elapsed, 3)
+        DiskWriteMiBpsB1 = [math]::Round((($current.D1.WriteSectors - $previous.D1.WriteSectors) * 512 / 1MB) / $elapsed, 3)
+        DiskQueueAvgB1 = [math]::Round(($current.D1.WeightedMs - $previous.D1.WeightedMs) / ($elapsed * 1000), 3)
+        DiskReadLatencyMsB2 = if ($current.D2.Reads -gt $previous.D2.Reads) { [math]::Round(($current.D2.ReadMs - $previous.D2.ReadMs) / ($current.D2.Reads - $previous.D2.Reads), 3) } else { 0 }
+        DiskWriteLatencyMsB2 = if ($current.D2.Writes -gt $previous.D2.Writes) { [math]::Round(($current.D2.WriteMs - $previous.D2.WriteMs) / ($current.D2.Writes - $previous.D2.Writes), 3) } else { 0 }
+        DiskReadMiBpsB2 = [math]::Round((($current.D2.ReadSectors - $previous.D2.ReadSectors) * 512 / 1MB) / $elapsed, 3)
+        DiskWriteMiBpsB2 = [math]::Round((($current.D2.WriteSectors - $previous.D2.WriteSectors) * 512 / 1MB) / $elapsed, 3)
+        DiskQueueAvgB2 = [math]::Round(($current.D2.WeightedMs - $previous.D2.WeightedMs) / ($elapsed * 1000), 3)
         ZombiesB1ViewA = $zombies1a; ZombiesB1ViewB = $zombies1b; ZombiesB2ViewA = $zombies2a; ZombiesB2ViewB = $zombies2b
         PlayersB1 = $players1; PlayersB2 = $players2
     }
