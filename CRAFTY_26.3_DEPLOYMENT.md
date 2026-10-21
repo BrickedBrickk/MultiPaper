@@ -1515,7 +1515,7 @@ Current staged package checksums: Paperclip `B31E80322C7A980D42D1D91932551DA406C
 
 The package includes [`CRAFTY_26.3_INSTALLATION.txt`](CRAFTY_26.3_INSTALLATION.txt), with manual three-entry setup, execution commands, Java 25, private port boundaries, backend settings, backup steps, and startup checks. The instructions follow Crafty's documented [Minecraft create/import flow](https://docs.craftycontrol.com/pages/user-guide/server-creation/minecraft/) and [server execution configuration](https://docs.craftycontrol.com/pages/user-guide/server-config/minecraft/). The guide does not depend on Crafty credentials or change a live panel.
 
-The RC1 package has not been published. GUI-client gameplay, broader Survival exploration/farm/redstone coverage, and some entity/chunk recovery cases remain open; the eight-client HDD run is only a synthetic Creative baseline. Complete those release gates before public release.
+The versioned `v26.3-RC1` package is published as a GitHub pre-release at [MultiPaper 26.3 RC1](https://github.com/BrickedBrickk/MultiPaper/releases/tag/v26.3-RC1). It includes both JARs individually, their checksum file, the complete ZIP package, and the README and manual Crafty installation guide. The remote asset SHA-256 digests match the staged local files. This is explicitly an evaluation pre-release, not a stable public SMP release. GUI-client gameplay, broader Survival exploration/farm/redstone coverage, and some entity/chunk recovery cases remain open; the eight-client HDD run is only a synthetic Creative baseline. Do not present this RC1 as having passed those remaining gates.
 
 ### Pearl stasis chunk-ticket behavior and unload/reload — 2026-10-21
 
