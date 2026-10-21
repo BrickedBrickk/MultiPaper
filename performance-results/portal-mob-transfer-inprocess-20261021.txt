@@ -1,0 +1,14 @@
+In-process two-backend Nether portal mob transfer
+Date: 2026-10-21
+Fixture: `%TEMP%\multipaper-26.3-portal-smoke-plugin-long-20261021`; clean disposable worlds, local-only ports, no production/Crafty access.
+
+Artifacts:
+
+- Paperclip SHA-256: `BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155`
+- Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+A temporary Java 25 Bukkit diagnostic plugin enumerated `World#getEntities()` on each backend every 10 ticks and logged the Bukkit world name, UUID, tags, and position of the tagged probe pig. The Overworld and Nether had corresponding portal frames at the origin. Both destination chunks were force-loaded. The pig was summoned on `portal-a` in the Overworld; after the plugin first observed it in the Overworld, it observed it in the Nether under the same UUID. The Nether portal blocks were then removed to prevent a return trip.
+
+Observed UUID on both backends: `9506d655-1d74-471f-95d2-c9348a3b6fd1` (`[I; -1794714027, 494159647, -1781348044, -1975816239]`). `portal-a` first logged the entity in the Nether at 11:17:51; `portal-b` logged the same entity in the Nether at 11:17:51. During the plugin observation window, all post-transfer samples for this UUID were in each backend's `portal_smoke_controlled_20261021_nether` Bukkit world; neither plugin log showed a matching Overworld entity after the transition. RCON's first 15-second peer wait was too short; extending it to 45 seconds returned the matching UUID from both backends.
+
+This verifies one naturally portal-transported pig and its per-world replica on two backend processes on one PC. The plugin was installed only in the disposable fixture. All backends saved and stopped; all six fixture listeners were confirmed closed. It does not verify a player entering a portal, portal generation/linking across distant coordinates, every entity type, a two-physical-PC portal transfer, or ordinary GUI gameplay.
