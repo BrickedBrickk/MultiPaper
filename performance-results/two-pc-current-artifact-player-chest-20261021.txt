@@ -24,3 +24,8 @@ An earlier attempt at `(2005,90,2005)` timed out after a diagnostic RCON `forcel
 ## Limits
 
 This verifies one normal chest click transfer across the two physical PCs and a synchronized online player inventory. It does not test a backend or Master crash during the open transaction, a disconnect before save, shulkers/chests with concurrent users, online-mode Mojang authentication, or sustained survival play. It is not a complete item conservation or public-SMP safety certification.
+## Abrupt player-backend crash after transaction acknowledgement
+
+A second fresh chest was prepared only on Backend B in chunk `[562, 562]` at `(9005,90,9005)`, with 16 diamonds. The same current artifacts and proxy path were used. `Run-PlayerContainerClickProbe.js` completed both normal GUI clicks and printed its PASS line while the client remained connected. Backend A's exact disposable Paperclip process was then terminated with `kill -9`; the Master and Backend B stayed up. Backend B showed the player disconnected and the chest `Items` list empty. After Backend A restarted from its existing disposable directory, the client rejoined through the proxy. Both backends then reported exactly 16 diamonds in slot 9 and Backend B still reported an empty chest. Both backends were flushed and stopped cleanly afterward.
+
+This covers an abrupt Backend A process crash after the client received the transaction result and verifies recovery without duplication or loss. It does not test a crash before acknowledgement, an OS/host power loss, or a Master crash during the live player transaction. Existing Master WAL crash tests remain separate evidence.
