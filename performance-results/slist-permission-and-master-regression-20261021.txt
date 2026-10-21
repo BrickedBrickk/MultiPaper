@@ -10,3 +10,7 @@ Then the Java 25 Master and messaging protocol suites were rerun with `--rerun-t
 The new focused server regression suite also passed 2 tests with 0 failures/errors/skips. It checks the command's permission node and verifies that `MultiPaperCommandPermissions` registers that node as `PermissionDefault.TRUE`.
 
 This does not replace a current-artifact ordinary-player `/slist` probe, the full server regression/build after this command change, or any open gameplay/performance release gates. No Crafty panel or production server/world was accessed.
+
+### Targeted Master pending-WAL process-crash rerun
+
+On the current Java 25 toolchain, the two process-level Master crash tests were rerun directly: `pendingContainerTransactionSurvivesAbruptMasterRestart` and `pendingEntityInventoryTransactionSurvivesAbruptMasterRestart`. Both passed using the current Master JAR (SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`). The container case replays an acknowledged transaction after abrupt termination, persists both snapshots, applies a second edit after recovery, and repeats the crash/replay/persistence cycle. Full command, boundaries, and remaining power-loss limitation are in [master-pending-wal-process-crash-targeted-20261021.txt](master-pending-wal-process-crash-targeted-20261021.txt).

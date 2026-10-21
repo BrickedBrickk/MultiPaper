@@ -1,0 +1,17 @@
+Targeted Master pending-WAL process-crash regression rerun
+Date: 2026-10-21
+
+Command (Temurin Java 25.0.3):
+
+```powershell
+.\gradlew.bat :multipaper-master:test `
+  --tests 'puregero.multipaper.server.MasterProcessRestartPersistenceTest.pendingContainerTransactionSurvivesAbruptMasterRestart' `
+  --tests 'puregero.multipaper.server.MasterProcessRestartPersistenceTest.pendingEntityInventoryTransactionSurvivesAbruptMasterRestart' `
+  --no-daemon
+```
+
+Result: `BUILD SUCCESSFUL`; both targeted process tests passed. The test harness launched the current built Master JAR, SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`, in isolated temporary directories.
+
+The container inventory test writes and acknowledges a two-chunk transaction, confirms its `.txn` record is on disk, and forcibly terminates the Master before the affected chunk snapshots are durable. A new Master process replays the transaction. The test reads the source and destination snapshots, verifies the WAL remains until both are persisted, then submits a second edit after recovery, terminates the Master again, and verifies the second edit through another restart and final persistence pass. The entity-inventory transaction test separately covers acknowledged WAL recovery across an abrupt Master process termination.
+
+This verifies these Master process-crash boundaries and the post-recovery second edit. It does not simulate OS/power loss, storage-device cache loss, or concurrent writes racing with the process termination.
