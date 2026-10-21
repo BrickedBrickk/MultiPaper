@@ -28,4 +28,12 @@ The client received an ender-pearl spawn packet for UUID `a41c097e-9617-44ce-89a
 
 To test release, Backend B replaced the waterlogged trapdoor block at y=90 with stone. Within 300 ms the pearl was gone and both backends reported the owner at the pearl location around `(16005.5075,89.9966,16005.5683)`, up from the starting y=60. The stone was then removed; both backends still listed the player online. Both backends accepted `save-all flush` and stopped cleanly; the Master logged `Exiting safely`; the private test ports were closed.
 
-This verifies one player-thrown pearl entering a stasis hold, ownership replication, short-term cross-PC position agreement, and collision-triggered release. The release used a direct block replacement, not a redstone circuit. It does not test hours-long holds, chunk unload/reload, server restart while held, redstone activation, or a Mojang launcher client.
+This verifies one player-thrown pearl entering a stasis hold, ownership replication, short-term cross-PC position agreement, and collision-triggered release. The release used a direct block replacement, not a redstone circuit. It does not test hours-long holds, chunk unload/reload, player-owned restart persistence, redstone activation, or a Mojang launcher client.
+
+## Clean backend restart persistence — 2026-10-21
+
+Using the exact same Paperclip (`3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`) and Master (`BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`) artifacts under Temurin JRE 25.0.4.1, a tagged ownerless pearl was summoned into the same bubble-column/trapdoor pocket on Backend B at `(16005.5,80.5,16005.5)`. The pearl settled near y=90 and both backends reported the same UUID `[I; 1206402817, 2095858298, -1796113013, -1563822426]`.
+
+The test force-load was removed on both backends, then each backend accepted `save-all flush` and stopped cleanly. A fresh Master and exactly one backend process per PC were started from the same disposable directories; the Master log showed one connection per backend and no duplicate-name warning. After force-loading the test chunk again, both backends reported the same pearl UUID. Backend A read y=90.0256 and Backend B y=89.9492. Both backends were flushed and stopped cleanly afterward, the Master was stopped, and all test ports and SSH tunnels were closed.
+
+This verifies an ownerless pearl survives a clean backend save/stop/restart and is visible on both PCs after the test chunk is loaded again. The test did not independently prove that the chunk had fully unloaded during the interval after its force-load ticket was removed. It does not verify restart persistence for a player-owned pearl, a long-duration hold, redstone release, or Mojang-client behavior.
