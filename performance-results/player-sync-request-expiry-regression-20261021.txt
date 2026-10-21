@@ -1,0 +1,30 @@
+Player resync request expiry regression
+Date: 2026-10-21
+Scope: local code review and focused Java 25 regression test only; no live server or world access.
+
+Finding: `RequestEntityPacket.triedToRequestPlayer` incremented a request count,
+then scheduled an unconditional map removal 10 seconds later for every request.
+An expiry scheduled by an earlier request could therefore erase the count for a
+newer request burst. Because the kick guard depends on that count, repeated
+player resync failures could evade its threshold. The delayed executor also
+mutated a plain `HashMap` from a worker thread while the server thread read and
+wrote it.
+
+Fix: replaced the counter with a concurrent, per-request state map. Every
+increment creates a distinct state object; the delayed task removes the entry
+only if that exact state is still current. A stale expiry cannot clear a newer
+count, including after the previous burst expired and a fresh burst started.
+The existing 10-second expiry window and kick threshold remain in place.
+
+Regression coverage: `ExpiringRequestCounterTestSuite` has two tests for stale
+expiry against a newer count and stale expiry against a new burst after an
+earlier expiry.
+
+Command:
+`JAVA_HOME=<Temurin 25> .\\gradlew.bat :multipaper-server:test --tests puregero.multipaper.externalserverprotocol.ExpiringRequestCounterTestSuite -x :multipaper-server:applyMinecraftResourcePatches --no-daemon`
+
+Result: PASS, 2 tests, 0 failures, 0 errors, 0 skipped. The exclusion was needed
+because Gradle's `applyMinecraftResourcePatches` task hung in its included-build
+controller; the MultiPaper Minecraft resource patch directory is empty. Java
+source patch application ran and compiled this change. This targeted result is
+not a full regression suite or a rebuilt release artifact.
