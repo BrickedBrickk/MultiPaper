@@ -1,0 +1,12 @@
+Final Java 25 Paperclip/Master pair hopper crash-cut recovery
+Date: 2026-10-21
+Disposable fixture: `%TEMP%\multipaper-26.3-current-build-crash-smoke-20261021`.
+
+Exact artifacts:
+
+- Paperclip: `BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+`Run-DeterministicHopperCrashTest.ps1` completed on the exact pair using world `hopper_crash_latest_20261021`. It observed the source chunk `(127,3125)` persist to region `r.3.97.mca` while the destination chunk `(128,3125)` write to `r.4.97.mca` was withheld. Backend A was terminated at that cut and restarted. Recovered owner reads showed source(A)=0 diamonds and destination(B)=8, total=8. The harness saved and stopped both disposable backends; all seven fixture listeners were confirmed closed.
+
+This covers one backend process crash at the observed cross-region save boundary. It does not simulate host power loss or Master termination during the write itself. No Crafty panel, production process, or production world was accessed.
