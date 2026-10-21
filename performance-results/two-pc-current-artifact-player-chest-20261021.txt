@@ -8,7 +8,7 @@ PASS. An offline 26.3 protocol client connected through the isolated Master buil
 - Backend A did not load that test chunk before the client teleported there. While the client was online after the transfer, Backend A's RCON returned `That position is not loaded` for the chest; Backend B returned chest block data and an empty `Items` list.
 - Client output: `WINDOW_OPEN`, clicks on chest slot 0 and player slot 27, then `PASS: normal chest GUI clicks moved exactly 16 diamonds into player inventory slot 9.`
 - While the player was connected, both Backend A and Backend B returned `[{Slot: 9b, id: "minecraft:diamond", count: 16}]` for the player's inventory. Backend B returned `Items: []` for the source chest. This conserves all 16 diamonds across a physical-PC boundary.
-- `save-all flush` succeeded on both backends. The isolated backends stopped, and the Master logged `Exiting safely`; the test listeners closed.
+- `save-all flush` succeeded on both backends. After cleanly stopping and restarting both exact-artifact backends from the same disposable directories, the player rejoined with all 16 diamonds; both backends reported the same inventory and Backend B still reported an empty chest. The restarted pair then saved and stopped cleanly, the Master logged `Exiting safely`, and the test listeners closed.
 
 ## Exact artifacts and environment
 
