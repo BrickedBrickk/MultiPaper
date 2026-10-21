@@ -1,0 +1,8 @@
+Two-PC 12-client moving capture — excluded from capacity evidence
+Date: 2026-10-21
+
+Raw files: `two-pc-i5-7600-i5-6600-12-moving-protocol-clients-20261021.csv` and `two-pc-i5-7600-i5-6600-12-moving-protocol-clients-20261021.jsonl`.
+
+The client event summary says 12/12 connected and reached ready state, with 21,616 movement packets, no protocol disconnect packets or client errors, and a 125-second run. However, it records `ended` events for BenchTwoPC06 and BenchTwoPC02 at 12.663 and 17.550 seconds. The backend `/list` fields in all four server samples from 10.5 through 44.2 seconds show only ten players, omitting BenchTwoPC02 and BenchTwoPC06. The next sample at 55.3 seconds and all later samples through 111.3 seconds show zero players, even though the client event summary does not record those ten sessions ending until 125 seconds.
+
+This mismatch means the run does not establish that 12 players remained connected or that the backends sustained their movement load. The available files do not identify exact JAR hashes, Java runtime versions, server logs, or the client/collector script revision, so the discrepancy cannot be attributed or reproduced from this capture. Exclude it from capacity claims. It is not evidence of a MultiPaper defect or of a 12-player capacity. Retain the conservative eight-player soft cap pending a controlled repeat that reconciles server player lists with client TCP close/end events.
