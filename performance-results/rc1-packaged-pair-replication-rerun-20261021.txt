@@ -1,0 +1,52 @@
+RC1 exact packaged-pair two-backend replication regression rerun
+Date: 2026-10-21
+
+Fixture
+-------
+Fresh disposable Windows directories under
+`%TEMP%\multipaper-26.3-flying-machine-jdk25-20261021`, with a new shared
+world named `fm_disposable_20261021`. No production world, Crafty panel, or
+live service was accessed. The fixture ran the staged package under Temurin
+JRE 25.0.3.9. A first launch attempt used the workstation's PATH Java 17 and
+failed its version check before startup; it was discarded. All reported
+results below are from the corrected Java 25 run.
+
+Artifacts
+---------
+Paperclip SHA-256:
+`B31E80322C7A980D42D1D91932551DA406C939DD167F9C795F856C73FDC456F2`
+
+Master SHA-256:
+`BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+Both backends reached `Done` and registered at the disposable Master.
+
+Results
+-------
+`scripts/Verify-TwoBackendReplication.ps1` passed the following checks:
+
+* Cross-backend marker, chest block-entity, and shulker block-entity reads.
+* Exact conservation of 8 diamonds and 8 iron ingots through hopper transfer
+  across a chunk boundary and subsequent backend handoff.
+* Redstone-powered piston extension and retraction, with the moved block at
+  its expected destination on both backends.
+* Observer pulse and reset replicated to both backends (63 ms rising and
+  93 ms reset observations).
+* Sticky-piston pullback of a redstone block from chunks locally owned by
+  Backend A and Backend B, with the block retained on both backends and no
+  item drop.
+* Entity UUID subscription and movement, owner-side and non-owner entity
+  removal, and Nether entity transfer/removal.
+* No increase in duplicate entity UUID warnings in either backend log.
+
+Player inventory replication was skipped because no player was connected.
+The test verifies the individual piston and observer behaviors used by
+redstone machines; it did not build or run a self-propelled flying machine.
+It is a local two-backend protocol/RCON regression, not GUI-client play,
+physical-PC separation, Survival capacity, or a power-loss test.
+
+Cleanup
+-------
+Both backends were stopped through RCON after the verifier completed. The
+Master and all game, RCON, proxy, and coordination listeners were then stopped
+and confirmed closed. The disposable fixture remains under `%TEMP%` for audit.
