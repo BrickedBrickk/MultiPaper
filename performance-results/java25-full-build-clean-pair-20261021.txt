@@ -1,0 +1,25 @@
+MultiPaper 26.3 Java 25 full build and clean artifact pair smoke
+Date: 2026-10-21
+Source: `feature/port-26.3` at `307cd78` (`Test slist permission defaults`).
+
+Build command:
+
+`gradlew --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar -x :multipaper-server:applyMinecraftResourcePatches`
+
+Result: `BUILD SUCCESSFUL` on Temurin Java 25.0.3. The Minecraft resource patch task was excluded because the task repeatedly stalled in its included-build wait; the MultiPaper Minecraft resources patch directory is empty and Paper/Purpur resource patch tasks were up to date.
+
+Regression results:
+
+- Server: 10,159 tests, 0 failures, 0 errors, 86 skipped. This includes the new two-test `/slist` permission suite.
+- Master: 49 tests, 0 failures, 0 errors, 0 skipped.
+- Master messaging protocol: 6 tests, 0 failures, 0 errors, 0 skipped.
+- API: 481 tests, 0 failures, 0 errors, 2 skipped.
+
+Resulting JAR SHA-256:
+
+- Paperclip: `BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+Both exact artifacts were copied into new, empty disposable directories under `%TEMP%\MultiPaper-26.3-clean-artifact-smoke-20261021`. The Master and two backends started, both backends registered, the built-in proxy status ping returned protocol 777 and `MultiPaper 26.3`, and RCON `/slist` on each backend listed both backend names. Both backends completed `save-all flush` and stopped cleanly; the Master was shut down; all six fixture listeners were confirmed closed.
+
+This clean pair smoke did not use a player client. The ordinary-player command permission is covered by the focused Java test, but the available protocol client cannot decode this build's 26.3 packet schemas, so no ordinary-player runtime `/slist` result is claimed. The artifacts remain development builds: `gradle.properties` still declares `26.3-R0.1-SNAPSHOT`; release metadata, two-PC realistic performance qualification, and remaining vanilla/safety coverage are not complete. No Crafty panel or production server/world was accessed.
