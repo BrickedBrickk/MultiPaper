@@ -1,0 +1,14 @@
+Automated 26.3 protocol player portal entry
+Date: 2026-10-21
+Fixture: `%TEMP%\multipaper-26.3-player-portal-corrected-20261021`; fresh disposable two-backend world, local-only ports, no production/Crafty access.
+
+Artifacts:
+
+- Paperclip SHA-256: `BC04C084AFCB189B454FE5B94CBD8843B569FFFAF25588181603F083D8B99155`
+- Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+An offline protocol-777 client (`PortalRunner`, Minecraft 26.3) connected through the disposable Master proxy and loaded chunks. The temporary Bukkit probe enumerated each world's entities. RCON placed the player on a safe platform just outside an Overworld portal at `(1.5, 80, 1.5)` and added a unique scoreboard tag; the client then sent ordinary 26.3 player-position packets through the portal plane and waited there. The RCON reposition was 38 blocks from the proxy's initial spawn and produced three `moved too quickly` warnings on the receiving backend during setup; these warnings preceded the portal movement.
+
+The client received a `respawn` packet naming `minecraft:the_nether` (`dimension:3`). Its UUID was `a9cb61e4-b477-37f7-9055-54bb612ac884`. Backend A's in-process world-list probe logged that UUID first in the Overworld at `(1.5, 80, 1.5)`, then in the Nether at `(4.5, 99, 13.325)` after portal entry; it did not log a post-transfer Overworld copy. The test removed Nether portal blocks after arrival to avoid a return trip. The client completed without a disconnect or protocol error. RCON on Backend B listed `PortalRunner` online and returned the same destination coordinates from `data get entity PortalRunner Pos`; a per-world plugin sample for Backend B did not capture the player's scoreboard tag, so no peer per-world membership claim is made.
+
+This verifies one automated player portal entry through the proxy and an authoritative per-world dimension change on Backend A in a one-workstation disposable pair. It is not a licensed Mojang GUI session or two-physical-PC run; it does not cover distant portal linking/generation or return travel. The temporary protocol package and probe plugin were used only in this fixture. Both backends saved and stopped and all six fixture listeners closed.
