@@ -1,0 +1,10 @@
+`/slist` default permission correction and Master regression verification
+Date: 2026-10-21
+
+`SListCommand` now uses `multipaper.command.slist`, registered with `PermissionDefault.TRUE`, rather than Paper's operator-only `minecraft.command.list`. The dedicated patch records were updated as well. Java 25 `:multipaper-server:compileJava` succeeded, and `:multipaper-server:createPaperclipJar -x :multipaper-server:applyMinecraftResourcePatches` produced Paperclip SHA-256 `612A85294B81B30C5F2F5A5B900542F416B55CD6D256F363B7CBA500E39AE97C`.
+
+The attempted ordinary-player, two-backend disposable protocol probe did not verify the command. The available protocol client has a 26.3 protocol-number mapping but no compatible 26.3 packet schema; aliasing its 26.1 schema caused decoder errors. No pass is claimed for that run. All disposable test listeners were stopped afterward.
+
+Then the Java 25 Master and messaging protocol suites were rerun with `--rerun-tasks`: Master 49 tests passed (0 failures, 0 errors, 0 skipped); messaging protocol 6 passed (0 failures, 0 errors, 0 skipped). This includes `pendingContainerTransactionSurvivesAbruptMasterRestart`, `pendingEntityInventoryTransactionSurvivesAbruptMasterRestart`, and the test that submits a second inventory edit after recovery, crashes the recovered Master, and checks the resulting snapshots after another restart.
+
+This does not replace a current-artifact ordinary-player `/slist` probe, the full server regression/build after this command change, or any open gameplay/performance release gates. No Crafty panel or production server/world was accessed.
