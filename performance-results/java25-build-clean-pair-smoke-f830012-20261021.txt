@@ -1,0 +1,46 @@
+Java 25 full build and clean packaged-pair smoke — f830012
+Date: 2026-10-21
+Source: `feature/port-26.3` at `f83001279f969805c0f5a34e496856f140305a5a`.
+Environment: Temurin 25.0.3.9, Windows 11; isolated temporary directories only.
+
+Build command:
+`gradlew.bat build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches --no-daemon`
+
+The excluded `applyMinecraftResourcePatches` task has repeatedly hung while
+waiting in Gradle's included-build controller. The MultiPaper Minecraft
+resource patch directory is empty. Paper/Purpur resource tasks and all Java
+source patches ran; Paperweight applied 63 Minecraft patches and 13 Paper
+patches. The build completed successfully in 5m27s.
+
+JUnit XML totals:
+- Server: 10,161 tests, 0 failures, 0 errors, 86 skipped.
+- Master: 49 tests, 0 failures, 0 errors, 0 skipped.
+- Master messaging protocol: 6 tests, 0 failures, 0 errors, 0 skipped.
+- Combined: 10,216 tests, 0 failures, 0 errors, 86 skipped.
+
+Fresh packaged artifact SHA-256:
+- Paperclip: `AF509B7D23186BCDB6C7B2BBA4DFFB1C41057B85FF014E02240710F34C122A2E`
+- Bundler: `B20EF878C0AA571186202DD08A28F50E82FB7E8EABB6169A8257FE334AF948BC`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+Clean startup smoke: copied the built Master and Paperclip JARs into newly
+created empty directories under `%TEMP%\mp-26.3-f830012-clean-smoke-20261021`,
+created a fresh world `clean-f830012`, and started Master plus two backends.
+Both backends reached `Done`, registered with Master, and opened their game and
+RCON ports. The built-in proxy status ping returned `MultiPaper 26.3`, protocol
+777, and 0/5 players. RCON `/list` responded on both backends; `save-all flush`
+completed on both; both backends then stopped cleanly. The disposable Master
+was stopped after its backends had disconnected. Logs are retained in that
+temporary fixture directory.
+
+The protocol-777 player command smoke was attempted against this exact pair,
+but the installed `minecraft-protocol` package rejected version `26.3` before
+opening a connection (`unsupported protocol version: 26.3`). This attempt
+therefore verifies no player commands on this artifact. Prior command-client
+evidence remains tied to the earlier Paperclip hash and is documented in
+`final-clean-build-and-command-smoke-20261021.txt`. A compatible automated
+26.3 player client is still needed to repeat those commands on this build.
+
+This build and startup smoke do not close two-PC performance, warning
+classification, gameplay, or public-SMP safety gates. No Crafty panel,
+production process, or production world was accessed.
