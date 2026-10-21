@@ -1,0 +1,56 @@
+RC1 two-way flying machine chunk-boundary probe
+Date: 2026-10-21
+
+Result: The documented six-block Java two-way Engine A moved across the x=160
+chunk edge in a disposable two-backend run. Both backends reported all six
+blocks at the same final coordinates. The run does not independently prove
+the two adjacent chunks had different owners, so treat this as chunk-boundary
+replication evidence, not a conclusive cross-owner gameplay pass.
+
+Fixture and artifacts
+---------------------
+The fixture was `%TEMP%\multipaper-26.3-flying-machine-jdk25-20261021`, with
+disposable world `fm_disposable_20261021`, Master ports 35795/27820, backend
+game ports 27821/27822, and RCON ports 27831/27832. Both Paperclip JARs had
+SHA-256 `B31E80322C7A980D42D1D91932551DA406C939DD167F9C795F856C73FDC456F2`;
+the Master had SHA-256
+`BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`. The
+pair ran under Temurin JRE 25.0.3.9. No production world, live process, or
+Crafty panel was accessed.
+
+Test and observations
+---------------------
+The schematic used two diagonal slime blocks, two opposing sticky pistons,
+and two observers above the slime blocks facing up (output down). For the
+boundary run, the slime blocks began at `(159,100,12000)` and
+`(160,100,12001)`. The pistons were at `(160,100,12000)` facing west and
+`(159,100,12001)` facing east; observers were at y=101 above the slime blocks.
+The chunks are x=9 and x=10. Backend A force-loaded x=9 first and Backend B
+force-loaded x=10 first, then both loaded both chunks. This was intended to
+assign different owners, but an `/mpdebug` owner-overlay sample was not
+obtained; the owner split is therefore unverified.
+
+Both backends initially confirmed all six blocks. A block update in the
+observer's detection face started the engine. After it ran, both backends
+reported the complete machine at x=169–170, with the same two slime blocks,
+two sticky pistons, and two observers. This is a 10-block eastward movement
+from the x=159–160 layout, across the x=160 chunk boundary, with no block loss
+visible in either backend view.
+
+An identical single-chunk control at x=200–201 also activated and retained
+all six blocks; both backends later reported the translated layout at
+x=200–202. This establishes that the chosen schematic and trigger worked in
+the control run.
+
+Limits and cleanup
+------------------
+An attempted protocol-client `/mpdebug` probe could not decode the 26.3
+client-information packet using the available 26.1 protocol schema. Thus,
+although chunks 9 and 10 were first force-loaded by different backends, their
+final ownership was not independently confirmed. No vanilla launcher GUI
+client was used. The result does not test longer-duration operation, reverse
+travel, obstacles, or other engine designs.
+
+Both backends were save-flushed and stopped cleanly, then the disposable
+Master was stopped. Ports 35795, 27820–27822, and 27831–27832 were confirmed
+closed. The temporary fixture was retained for audit.
