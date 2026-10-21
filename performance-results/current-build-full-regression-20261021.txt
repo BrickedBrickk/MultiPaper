@@ -1,0 +1,35 @@
+Current committed build and regression results
+Date: 2026-10-21
+
+Source commit
+-------------
+`5f7266a` (`Avoid placement callbacks for unloaded replicas`), pushed to `origin/feature/port-26.3`.
+
+Build and suites
+----------------
+Temurin Java 25.0.3 command:
+
+`gradlew --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar -x :multipaper-server:applyMinecraftResourcePatches`
+
+Result: BUILD SUCCESSFUL. The resource-patch task was excluded because it repeatedly waited without completing; resources were unchanged and prior complete builds used the same exclusion.
+
+- Server: 10,157 tests, 0 failures, 0 errors, 86 skipped.
+- Master: 49 tests, 0 failures, 0 errors, 0 skipped.
+- Master messaging protocol: 6 tests, 0 failures, 0 errors, 0 skipped.
+- The new unloaded-replica callback suite is included in the server count and passed 2 tests.
+
+Exact full-build artifact smoke
+-------------------------------
+Copied both packaged JARs into a new disposable local fixture, started the Master and both backends, generated a fresh shared world, and ran eight 26.3 protocol clients through the built-in proxy for 120 seconds in synthetic moving mode.
+
+- All 8 clients reached ready state and remained connected for the run.
+- 3,164 chunk packets and 16,204 movement packets; 0 client disconnects/errors.
+- Both backend logs contained 0 `Trying to schedule tick in not loaded position` entries.
+- Both backends saved and stopped; the Master and all fixture ports were stopped/closed.
+
+Exact artifact hashes:
+
+- Paperclip: `786DE57B4A80F6E3998978583B24A5256E27BD27C201DB62E0DDA4D21FC729D9`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+This is a local startup and synthetic movement smoke, not a GUI gameplay test or a real-player capacity certification.
