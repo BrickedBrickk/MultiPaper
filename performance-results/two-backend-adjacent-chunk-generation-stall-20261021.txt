@@ -1,0 +1,30 @@
+Two-backend adjacent chunk generation stall
+Date: 2026-10-21
+Environment: Disposable local fixture `MultiPaper-26.3-final-clean-smoke-20261021`; no production world or Crafty access.
+Paperclip SHA-256: `0B3543E03C2DEE310BDAA504B405FECB0FD9050CE9FEEF7E98134EF1ABA74476`
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+Reproduction: Backend A force-loaded Overworld chunk `[200,200]` (block `(3215,3208)`). Backend B then received `forceload add` for the adjacent chunk `[201,200]` (block `(3216,3208)`). Backend B stopped answering RCON and remained stalled for over four minutes. Its watchdog repeatedly reported the same blocking state:
+
+```
+Chunk wait: [(201,200) in 'minecraft:overworld']
+NewChunkHolder{chunkX=201, chunkZ=200, lastChunkCompletion=structure_starts,
+currentGenStatus=structure_starts, requestedGenStatus=full,
+generationTask=null, currentChunkStatus=INACCESSIBLE}
+Server thread:
+  ServerChunkCache.syncLoad
+  ServerChunkCache.getChunkFallback
+  ServerChunkCache.getChunk
+  ServerLevel.setChunkForced
+  ForceLoadCommand.changeForceLoad
+Paper I/O Worker #0:
+  CompletableFuture.get
+  puregero.multipaper.MultiPaper.readRegionFile
+  RegionFileStorage.moonrise$readData
+  EntityDataController.readData
+  MoonriseRegionFileIO.ChunkIOTask.performReadIO
+```
+
+Backend B repeatedly logged 15-second timeouts waiting for peer entity chunks from `smoke-a`, beginning with `entities world,200,200` and continuing across neighboring chunks, then fell back to Master storage. Backend A's RCON remained responsive. This reproduces a chunk-generation stall when two backends load adjacent, previously ungenerated chunks; it is a release blocker. The evidence establishes the trigger and blocked call path, but not yet the reason Backend A failed to answer those entity requests. Raw logs and full thread dumps are retained in `%TEMP%\MultiPaper-26.3-final-clean-smoke-20261021\boundary-*.log` and `boundary-backend-*-thread-dump.txt`.
+
+Cleanup: Backend A removed its force-load ticket, flushed, and stopped normally. Backend B had no responding RCON and was force-stopped because it was a disposable fixture. The disposable Master was stopped and all six fixture listeners were confirmed closed. No production process or world was accessed.

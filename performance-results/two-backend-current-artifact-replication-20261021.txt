@@ -1,0 +1,11 @@
+Current Paperclip two-backend replication and command smoke
+Date: 2026-10-21
+Fixture: `%TEMP%\MultiPaper-26.3-final-clean-smoke-20261021`, isolated world `verify-handshake-world`; no production/Crafty access.
+Paperclip SHA-256: `3161FD4E5E882970C61FE52C3B98060E0E4B250A0E6021C1F937847C15348A30`
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+`scripts/Verify-TwoBackendReplication.ps1` passed on this current pair. It verified cross-backend block/chest/shulker reads; exact 8-diamond and 8-iron hopper conservation across a chunk boundary and subsequent Backend 2 handoff; piston and observer update/retract; sticky-piston redstone-block pullback from both backend owners without item drops; entity subscriber UUID agreement and movement; owner-side and non-owner entity removal using an Area Effect Cloud so its removal is immediate; entity transfer/removal in the Nether; and no increase in duplicate-UUID warnings. Player inventory replication was skipped because this verifier run did not include a connected player.
+
+An automated protocol-777 offline player then joined through the built-in proxy, received chunk data, and passed `/list`, `/tps`, `/mspt`, `/slist` (both backend names), `/mpdebug`, and `/version`. `/slist` showed `CommandSmoke` on Backend B. The command probe output is retained at `%TEMP%\MultiPaper-26.3-final-clean-smoke-20261021\current-command-probe.out.log`.
+
+Both backends accepted `save-all flush`, stopped, completed chunk I/O, flushed their Master connections, and completed Moonrise shutdown. The Master was stopped afterward and all fixture listeners closed. The two-backend gameplay and player command checks were on one workstation; they do not demonstrate performance or different JVM clocks on the two physical PCs, a Mojang launcher session, stasis chambers, or sustained player inventory/container interactions.

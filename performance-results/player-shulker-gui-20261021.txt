@@ -1,0 +1,9 @@
+MultiPaper 26.3 player-driven shulker GUI replication
+Date: 2026-10-21
+Disposable fixture: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021`; local Master proxy port 26500, Backend A game/RCON 26501/26511, Backend B 26502/26512. Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904. Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57.
+
+Protocol-777 Survival client `ShulkerGui2` connected to Backend A. The test placed a shulker box at `(5,65,5)`, seeded slot 0 with exactly 16 diamonds, and used the normal main-hand block-use packet to open it. The server opened inventory type 20 (`container.shulkerBox`). The client picked up slot 0 and placed the stack in player inventory slot 9; the probe received server slot updates and passed.
+
+While the player remained online, RCON on both backends reported no shulker `Items` and exactly `[{Slot: 9b, id: "minecraft:diamond", count: 16}]` in the player's inventory. Both `/list` results showed the player online. Both backends completed `save-all flush` and stopped. The Master and all fixture listeners were stopped/closed.
+
+This verifies one ordinary player shulker-box pickup/place sequence and live replication on the tested artifact pair. It does not test a shulker box as an item inside another inventory, shift-click/drag/full-inventory cases, concurrent clicks, disconnect/crash during the GUI transaction, or launcher GUI behavior. Transcript: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021\shulker-gui2.out.log`.

@@ -1,0 +1,9 @@
+MultiPaper 26.3 player-driven chest shift-click replication
+Date: 2026-10-21
+Disposable fixture: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021`; local Master proxy port 26500, Backend A game/RCON 26501/26511, Backend B 26502/26512. Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904. Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57.
+
+A direct 26.3 protocol client, `ChestShift3`, connected to Backend A in the disposable Survival world and opened chest `(5,65,5)` containing 16 diamonds in slot 0. The client issued a standard mode-1 shift-click. Server packets cleared chest slot 0 and populated window slot 62 (player hotbar slot 8) with 16 diamonds. The probe passed after checking both slot updates.
+
+While the player remained online, RCON on both backends independently reported no chest `Items`, exactly `[{Slot: 8b, id: "minecraft:diamond", count: 16}]` in the player inventory, and `/list` showed `ChestShift3` online. Both backends completed `save-all flush` and stopped; the Master and all fixture listeners were stopped/closed.
+
+This verifies one ordinary chest shift-click and live cross-backend replication for this item and container. It does not cover partial stack merges, full inventories, double chests, shulker containers, drag distribution, disconnect/crash cuts during the GUI transaction, concurrent clicks, or a launcher GUI client. Test transcript: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021\chest-shift3.out.log`.

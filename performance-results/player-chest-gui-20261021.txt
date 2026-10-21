@@ -1,0 +1,9 @@
+MultiPaper 26.3 player-driven chest GUI replication
+Date: 2026-10-21
+Disposable fixture: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021`; local Master proxy port 26500, Backend A game/RCON 26501/26511, Backend B 26502/26512. Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904. Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57.
+
+With `gamemode=survival`, a 26.3 protocol client `GuiChest3` connected directly to Backend A and was teleported onto a stone floor beside chest `(5,65,5)`. RCON seeded exactly 16 diamonds into chest slot 0. `scripts/Run-PlayerContainerClickProbe.js` sent the normal main-hand block-use packet, observed a chest window, clicked chest slot 0, then clicked container slot 27 (player inventory slot 9). Server slot packets confirmed the move.
+
+While the player remained online, RCON on both backends reported the chest block entity with no `Items` entries, player inventory `[{Slot: 9b, id: "minecraft:diamond", count: 16}]`, and `/list` showed `GuiChest3` online. Both backends then removed the temporary force-load ticket, completed `save-all flush`, and stopped. All test ports were closed.
+
+This verifies one direct player chest pickup/place transaction and its live replication to both backends in Survival. It does not cover shift-click, drag, double-chest boundary clicks, shulker GUI clicks, crafting, latency races, death while a stack is on the cursor, or a launcher-based GUI client.

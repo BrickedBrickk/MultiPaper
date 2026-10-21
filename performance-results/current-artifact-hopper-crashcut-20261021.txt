@@ -1,0 +1,11 @@
+Current-artifact hopper crash cut with one region write withheld
+Date: 2026-10-21
+Disposable clone: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021`; world `hopper_crash_20261021_run3`; no production or Crafty access.
+Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904
+Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57
+
+`Run-DeterministicHopperCrashTest.ps1` ran against the exact current artifact pair. Source hopper chunk `(127,3125)` and destination chest chunk `(128,3125)` were in separate region files. The test proxy observed the source region write persist while withholding the destination region write, then terminated Backend A. After Backend A restarted and pending transaction replay completed, authoritative RCON reads reported source(A)=0 diamonds and destination(B)=8 diamonds, total 8. Both backends then save-flushed and stopped. The harness confirmed ports 26498, 26499, 26500, 26501, 26502, 26511, and 26512 were closed.
+
+The first attempts exposed two harness assumptions: it used a fixed world name even when the fixture used `level-name=world`, and its `enabled=false` hopper had no redstone power so it re-enabled and moved items before baseline capture. The harness now accepts a validated `-WorldName`, verifies both backend `level-name` settings before startup, and powers the hopper with an adjacent redstone block until the seeded 8/0 baseline is checked. Those changes make the crash cut deterministic on reused disposable fixtures.
+
+This verifies one backend process crash after one chunk-file write and before the second is delivered. It does not emulate host power loss, Master process failure during the region write, or crash at every owner-handoff boundary.

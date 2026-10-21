@@ -1,0 +1,6 @@
+MultiPaper Master initial WAL stage recovery cut
+Date: 2026-10-21
+
+Added `ContainerTransactionManagerTest.discardsUncommittedInitialTransactionStageAfterRestart`. It constructs the persistent state left if a Master stops while writing its first transaction: an incomplete `<sequence>-<uuid>.txn_new` sidecar with no committed `.txn` target. Recovery uses the same world transaction discovery path as Master reads. It discards the uncommitted stage, returns the unchanged source count of 8 and destination count of 0, and creates no committed transaction. The test then writes a valid transaction in the same world and confirms replay yields source 0 and destination 8.
+
+The focused Java 25 test passed, then the full Master suite passed all 49 tests with zero failures, errors, or skips. This is deterministic on-disk crash-state coverage for the cut before atomic promotion; it does not kill a process during the filesystem write or simulate host power loss. Existing coverage separately tests recovery from an interrupted fallback replacement and abrupt Master process termination after the WAL was acknowledged.

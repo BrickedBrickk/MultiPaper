@@ -1,0 +1,7 @@
+MultiPaper 26.3 survival inventory-click probe
+Date: 2026-10-21
+Disposable pair: local Master plus two Paperclip backends in MultiPaper-26.3-player-inventory-smoke-20261021. Player: ClickRunner2, offline protocol client, Survival mode. No Crafty or production access.
+Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904
+Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57
+
+RCON seeded exactly 8 diamonds into hotbar.0 while the player was online. scripts/Run-PlayerInventoryClickProbe.js sent normal window-click packets to pick up hotbar slot 0 and place the stack into inventory slot 0. The client observed both slot updates and passed. Before disconnecting, RCON on both backends reported player NBT [{Slot: 9b, id: "minecraft:diamond", count: 8}], and both `/list` commands showed ClickRunner2 online. This is one standard inventory move, not a coverage claim for shift-clicks, drag distribution, crafting, containers, or all latency races.

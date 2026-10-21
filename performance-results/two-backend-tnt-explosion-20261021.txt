@@ -1,0 +1,9 @@
+Two-backend TNT explosion block replication probe
+Date: 2026-10-21
+Environment: Existing disposable local two-backend fixture `MultiPaper-26.3-final-clean-smoke-20261021`; no production world or Crafty access.
+Paperclip SHA-256: `0B3543E03C2DEE310BDAA504B405FECB0FD9050CE9FEEF7E98134EF1ABA74476`
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+Both backends force-loaded Overworld chunk `(0,0)`. Backend A placed a stone block at `(9,80,8)`; command queries confirmed that both backends observed the stone. Backend A then summoned primed TNT at `(8.5,80,8.5)` with `fuse:3s`. The TNT entity expired, and `execute if block 9 80 8 minecraft:air` returned `TNT_TARGET_AIR` on both backends. The same target had previously been observed as stone on both.
+
+The fixture uses offline protocol mode, no connected player, and one loaded chunk. This confirms that one TNT explosion's block removal replicated to the peer on this pair. It does not verify player-thrown TNT, explosions crossing chunk ownership boundaries, entity/drop UUID uniqueness, farms, sustained gameplay, or comparison with vanilla Paper. The chunks were un-forceloaded, both backends ran `save-all flush` and stopped normally, the disposable Master was stopped after them, and all fixture listeners were confirmed closed.

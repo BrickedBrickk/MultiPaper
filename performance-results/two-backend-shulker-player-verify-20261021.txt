@@ -1,0 +1,8 @@
+MultiPaper 26.3 two-backend shulker and player replication verifier
+Date: 2026-10-21
+Disposable fixture: Master plus two local Paperclip backends in MultiPaper-26.3-player-inventory-smoke-20261021; offline protocol player InventoryProbe; no Crafty/production access.
+Artifacts: Paperclip SHA-256 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904; Master SHA-256 B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57.
+
+Extended Verify-TwoBackendReplication.ps1 to place a shulker box adjacent to its chest probe, insert seven emeralds, request the chunk on Backend 2, and confirm the same shulker Items NBT on both backends. The updated verifier completed successfully with InventoryProbe connected: cross-backend block markers; chest and shulker contents; 8-diamond and 8-iron hopper transfers with exact counts and backend ownership transfer; piston movement; observer pulse and reset; sticky-piston pullback on both backend owners with no dropped item; online player inventory change replication; player and entity position replication across chunks; entity UUID synchronization; owner and non-owner entity removal; entity Nether transfer/removal; player teleport to Nether and back with equal positions on both backends; and no new duplicate-UUID warnings.
+
+The player was an automated offline protocol client, temporarily put in Creative to avoid anti-floating kicks during RCON teleport probes. Nether movement was caused by RCON teleport commands, not portal entry. This was same-workstation testing and does not verify ordinary player container clicks, crafting, real-account GUI behavior, or two-PC behavior. Fixture worlds were flushed, all server and Master listeners were stopped, and the protocol client was stopped.

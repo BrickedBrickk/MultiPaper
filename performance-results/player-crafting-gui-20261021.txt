@@ -1,0 +1,11 @@
+MultiPaper 26.3 player crafting GUI replication
+Date: 2026-10-21
+Disposable fixture: `%TEMP%\multipaper-26.3-current-artifact-crash-20261021`; world `hopper_crash_20261021_run3`; no production or Crafty access.
+Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904
+Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57
+
+Fresh offline protocol player `CraftFresh4` connected directly to Backend A. The server config was `gamemode=survival`; RCON confirmed playerGameType 0. While online, RCON seeded exactly four spruce planks in hotbar slot 0. `scripts/Run-PlayerCraftingProbe.js` used normal window clicks: pick up the stack, right-click one plank into each 2x2 crafting slot, take the server-reported crafting-table result using the cursor update, and place it in player inventory slot 9. The protocol client observed server confirmations through the complete sequence.
+
+While the player remained online, RCON on both backends showed exactly `[{Slot: 9b, id: "minecraft:crafting_table", count: 1}]` in player inventory and `/list` showed `CraftFresh4` online. RCON also confirmed player game mode 0 (Survival). The client then disconnected cleanly; both backends completed `save-all flush` and stopped. All fixture ports were closed.
+
+This verifies one 2x2 crafting recipe and live player-inventory replication. It does not cover crafting-table GUI recipes, shift-click crafting, drag distribution, simultaneous crafting, disconnect/crash during the cursor-held result, or launcher-based GUI play.

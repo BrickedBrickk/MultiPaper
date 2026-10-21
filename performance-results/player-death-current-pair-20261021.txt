@@ -1,0 +1,11 @@
+Current development pair player death-drop and clean restart verification
+Date: 2026-10-21
+Disposable fixture: MultiPaper-26.3-player-inventory-smoke-20261021 on local ports 58151-58156. No production/Crafty access.
+Paperclip SHA-256: 4C084740269309FCC390A2793130060DC776ADF47F40777557287BD384A5E904
+Master SHA-256: B4A53FF63F4BEF0A1D16E4EDB5452E88BE97C52E3F2190002590AB6546F5A57
+
+An initial incomplete probe used a client that did not handle the 26.3 death_combat_event packet and issued /kill through the non-owner backend; its conflicting inventory/item observations were inconclusive. It is superseded by the owner-side probe below.
+
+DropVerify connected directly to Backend B in Survival. With gamerule keep_inventory=false, RCON gave the player 7 emeralds and issued /kill on the authoritative Backend B. The client received death_combat_event and update_health health=0; it then sent the respawn command after an 8-second observation period. Backend B showed one emerald item entity, count 7, UUID [I; -740558796, 752174497, -1364104936, 3580366]. Backend A initially had not loaded the death chunk. After force-loading that chunk on both backends, both returned the same count and UUID.
+
+Both backends then completed save-all flush and stopped. The Master and both backends restarted from the same disposable directories. After both reloaded the death chunk, each backend again returned emerald count 7 and the same UUID. All processes were stopped after a second save-all flush. This verifies a commanded player death drop and its persistence through a clean backend and Master restart on this build. It does not cover natural combat/fall/fire deaths, crash cuts during entity saving, or GUI-client play.
