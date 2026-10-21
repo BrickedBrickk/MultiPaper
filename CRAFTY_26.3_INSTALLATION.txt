@@ -1,0 +1,131 @@
+Manual Crafty Controller installation — MultiPaper 26.3 RC1
+============================================================
+
+This release runs as three separate Java processes: one MultiPaper Master
+(which also provides the player-facing proxy) and one backend process on each
+PC. Create three separate Crafty server entries and three separate data
+directories. Do not run the Master JAR as a backend or share a backend data
+directory between PCs.
+
+Before starting
+---------------
+
+* Install a Java 25 runtime on both PCs. In Crafty, select the Java 25
+  executable for all three entries; confirm with `java -version` in the
+  server console or host shell.
+* Make a tested backup before importing an existing world. Stop all three
+  processes before copying world data. The shared world files belong in the
+  Master data directory; do not copy a live world independently into each
+  backend directory.
+* Keep the Master coordination port (35353 below) reachable from both
+  backends, but restrict it to the trusted private network. Expose only the
+  Master proxy port (25565) to players. Keep backend game ports private and
+  do not expose RCON. Use a host firewall even if Crafty shows the ports as
+  configured.
+* Review Minecraft's EULA yourself. Set `eula=true` only if you agree.
+
+Create three Crafty entries
+---------------------------
+
+Crafty 4 documents both its Minecraft server creation and ZIP import flows.
+Use the import flow to register each prepared directory as its own Crafty
+server entry. Crafty labels may vary by version; select the directory
+containing that entry's JAR as its root, set its Java executable and memory
+limits, then set the execution command below. Do not let Crafty download a
+vanilla server over either MultiPaper JAR.
+
+Entry 1 — `multipaper-master`
+
+Directory: a dedicated empty Master directory. Put only
+`multipaper-master-3.0.0.jar` and Master-owned data/configuration there.
+
+Execution command:
+
+    java -Xms512M -Xmx1G -jar multipaper-master-3.0.0.jar 35353 25565
+
+Set Crafty's monitored/listening server port to 25565, the player proxy port.
+The first argument after the JAR is the Master coordination port; the second
+is the built-in proxy port. Keep the two ports distinct.
+
+Entry 2 — `multipaper-backend-a` (PC1)
+
+Directory: a dedicated Backend A directory. Put the same Paperclip JAR used
+on Backend B in this directory:
+
+    multipaper-paperclip-26.3-RC1-1-dff41fb.jar
+
+Execution command:
+
+    java -Xms1G -Xmx4G -jar multipaper-paperclip-26.3-RC1-1-dff41fb.jar --nogui
+
+Use a private backend game port such as 25566. Set `master-connection.my-name`
+to `backend-a` and `master-connection.master-address` to the Master PC's
+private address and coordination port, for example `192.168.1.10:35353`.
+
+Entry 3 — `multipaper-backend-b` (PC2)
+
+Use a separate directory and Crafty entry on PC2, with the exact same
+Paperclip JAR and execution command. Use a distinct private game port such as
+25567, set `master-connection.my-name` to `backend-b`, and point
+`master-connection.master-address` at the same reachable Master address and
+port.
+
+Backend configuration
+---------------------
+
+For each backend, start it once to create the configuration files, then stop
+it cleanly from Crafty. Edit `multipaper.yml` and set:
+
+    master-connection:
+      advertise-to-built-in-proxy: true
+      master-address: 192.168.1.10:35353
+      my-name: backend-a
+
+Use the actual Master private address and a unique backend name on each
+machine. Preserve the other generated `multipaper.yml` settings unless you
+have a specific, tested reason to change them.
+
+In each backend's `spigot.yml`, set the existing `settings.bungeecord` value
+to `true` for the built-in Master proxy. Keep backend `server-port` values
+unique. The backend connection must be reachable by the Master proxy and
+trusted peers; bind/firewall it for the private network, not the public
+Internet. The backend is behind the proxy, so leave its generated
+`online-mode=false` setting in place. Do not change proxy forwarding or
+authentication settings without testing the complete login path.
+
+Set `eula=true` in each backend's `eula.txt` only after reviewing and
+accepting the EULA. Keep RCON disabled unless you have a specific
+administrative need; if enabled, bind it to localhost or a trusted private
+interface, use a unique strong password, and firewall it from players.
+
+Start and verify
+----------------
+
+1. Start the Master and wait for its console to report that both proxy and
+   coordination listeners are ready.
+2. Start Backend A and Backend B. Wait for both to report `Done` and for the
+   Master to show each backend connected.
+3. Connect a test account through the Master proxy address and port, not to a
+   backend game port. Confirm `/slist` reports every expected backend before
+   opening the server to players.
+4. Stop backends cleanly before stopping the Master. Back up the complete
+   Master data directory and each backend's configuration/plugin data.
+
+Capacity and release status
+---------------------------
+
+The eight-client persistent-HDD result is a synthetic Creative movement
+baseline, not a measured Survival limit. Keep the eight-player soft cap as
+conservative guidance; it is not a certified safe maximum. This RC does not
+close GUI-client gameplay, broad Survival/farm/redstone coverage, or all
+entity/chunk recovery cases. Review the deployment report before using it for
+a public SMP. Do not describe this release candidate as a stable release.
+
+Crafty references
+-----------------
+
+Crafty Minecraft server creation/import:
+https://docs.craftycontrol.com/pages/user-guide/server-creation/minecraft/
+
+Crafty Minecraft server execution/configuration:
+https://docs.craftycontrol.com/pages/user-guide/server-config/minecraft/
