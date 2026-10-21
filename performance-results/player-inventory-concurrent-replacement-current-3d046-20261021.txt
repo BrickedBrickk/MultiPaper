@@ -1,0 +1,18 @@
+Exact-build concurrent player-inventory replacement regression
+Date: 2026-10-21
+
+Artifacts and fixture
+---------------------
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Paperclip SHA-256 on both backends: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`.
+Runtime: Temurin JRE 25.0.4.1. PC1 (i5-7600) ran the Master and Backend A; PC2 (i5-6600) ran Backend B. The offline protocol-777 player `InvProbe01` was connected through the disposable Master proxy. Both backends used the disposable `capacity_12_moving_20261021` world. No production or Crafty data was accessed.
+
+Reproduction and result
+-----------------------
+The connected player's hotbar slot 0 was seeded with eight diamonds on the authoritative backend; both RCON views then showed exactly the same 8-diamond stack. Two PowerShell thread jobs concurrently submitted conflicting administrator replacements: four emeralds on Backend A and six gold ingots on Backend B. Both RCON commands returned success. After replication settled, both backends reported the exact same full player inventory: only six gold ingots in slot 0. Neither emeralds nor the original diamonds remained in the player's inventory.
+
+Backend B logged that it ignored the stale `8 diamond -> 4 emerald` replacement because its source item was no longer in player-owned inventory, and it re-synced the authoritative slot. No reconcile error was logged. The player remained connected while both inventory views were checked.
+
+This confirms the stale-replacement guard on the exact current JAR pair for an adversarial concurrent admin mutation to mirrored player inventory. It does not model two players clicking simultaneously, cursor movement, crafting result clicks, crash recovery, or a disk failure. The test world was disposable and reused; this result is anti-duplication regression evidence, not a general public capacity or inventory-safety certification.
+
+Both backends completed `save-all flush` and stopped cleanly; chunk I/O and Master flushing completed. The disposable Master exited safely and all local SSH forwards closed.
