@@ -1,0 +1,25 @@
+Player-owned pearl continuity through a backend restart — 2026-10-21
+===================================================================
+
+Result: PASS for entity continuity while Backend B restarted with Backend A and the player connection online. This run does not conclusively prove that B's local entity file alone recovered the pearl, because the owner overlay was not captured immediately before B stopped and ownership had failed over to A by the post-restart sample.
+
+Fixture and artifacts
+---------------------
+The test reused only the isolated `/tmp/multipaper-player-owned-pearl-restart-20261021` fixture on PC1 and PC2. PC1 ran Master and Backend A; PC2 ran Backend B. Temurin JRE 25.0.4.1 was used on both PCs. SSH retained strict saved host-key checking. No production world, process, or Crafty panel was accessed.
+
+Paperclip SHA-256 on both PCs: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`.
+Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+Setup and throw
+---------------
+The Master started first, then B, then A. Before the player test, B's `/mpdebug` overlay showed `pearl-restart-b` in aqua at `(16005,16005)`. The chamber was a soul-sand bubble column in that chunk, capped by a waterlogged top-half oak trapdoor.
+
+An offline protocol-777 player connected directly to A as `PearlOwnerA08` (UUID `aa59b4c0-d616-34c6-a97c-b78cd556569b`) and threw a normal pearl straight up from inside the chamber. The pearl UUID was `2b3ecc72-ebd4-46b4-ab7d-54b5988565fd`. Both backends reported that UUID with Owner int array `[I; -697007636, -1877462115, -1204277103, -1048930214]`, matching the player UUID. It settled near `(16005.118,90.01,16005.415)` with near-zero motion. The player was moved back to A's neighboring chunk and remained connected through B's restart.
+
+Restart and limits
+------------------
+Both backends acknowledged `save-all flush`. B was stopped gracefully and restarted while Master and A remained online. After B rejoined, `/list` on both backends showed `PearlOwnerA08`; both reported the same pearl UUID and Owner int array. Positions were `(16005.1176,90.0195,16005.4151)` on A and `(16005.1176,90.0195,16005.4151)` on B (within 0.001 blocks).
+
+The post-restart `/mpdebug` sample showed `pearl-restart-a` aqua on A and red on B, so A was the owner after B returned. Although B had been confirmed owner before the throw, ownership was not sampled immediately before the stop. Treat this as player-owned pearl continuity across B's restart with the live A replica present, not as proof of recovery from B's local entity file in isolation. Authoritative-owner-only recovery, crash recovery, chunk unload/reload without a force-load ticket, redstone release, and Mojang-client behavior remain unverified.
+
+Both backends were flushed and stopped cleanly, the Master logged `Exiting safely`, and local SSH tunnels were closed.
