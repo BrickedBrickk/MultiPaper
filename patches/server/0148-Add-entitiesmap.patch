@@ -78,6 +78,7 @@ index a21628f28a803ca2329b7f63257dad16829fe7f6..fd646fda87471b37e7a121340563dd14
          DefaultPermissions.registerPermission(PREFIX + "mpdebug", "MPDebug command", PermissionDefault.TRUE, commands);
          DefaultPermissions.registerPermission(PREFIX + "mpmap", "MPMap command", PermissionDefault.TRUE, commands);
 +        DefaultPermissions.registerPermission(PREFIX + "entitiesmap", "Entitiesmap command", PermissionDefault.OP, commands);
++        DefaultPermissions.registerPermission(PREFIX + "slist", "List players by MultiPaper backend", PermissionDefault.TRUE, commands);
  
          commands.recalculatePermissibles();
      }

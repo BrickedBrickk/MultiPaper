@@ -45,7 +45,7 @@ index 0000000000000000000000000000000000000000..2b9d8875353e9353929d85ec528eee31
 +public class SListCommand extends Command {
 +    public SListCommand(String command) {
 +        super(command);
-+        setPermission("minecraft.command.list");
++        setPermission("multipaper.command.slist");
 +    }
 +
 +    @Override

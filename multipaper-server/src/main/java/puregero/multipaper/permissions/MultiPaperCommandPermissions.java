@@ -16,6 +16,7 @@ public class MultiPaperCommandPermissions {
         DefaultPermissions.registerPermission(PREFIX + "mpdebug", "MPDebug command", PermissionDefault.TRUE, commands);
         DefaultPermissions.registerPermission(PREFIX + "mpmap", "MPMap command", PermissionDefault.TRUE, commands);
         DefaultPermissions.registerPermission(PREFIX + "entitiesmap", "Entitiesmap command", PermissionDefault.OP, commands);
+        DefaultPermissions.registerPermission(PREFIX + "slist", "List players by MultiPaper backend", PermissionDefault.TRUE, commands);
 
         commands.recalculatePermissibles();
     }

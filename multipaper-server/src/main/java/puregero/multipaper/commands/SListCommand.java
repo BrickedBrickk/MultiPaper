@@ -13,7 +13,7 @@ import puregero.multipaper.MultiPaper;
 public class SListCommand extends Command {
     public SListCommand(String command) {
         super(command);
-        setPermission("minecraft.command.list");
+        setPermission("multipaper.command.slist");
     }
 
     @Override
