@@ -82,8 +82,8 @@ client.on('packet', (packet, meta) => {
     const response = flatten(packet)
     for (const command of commands) {
       if (command === 'list' && response.includes('There are')) responses.set(command, response)
-      if (command === 'tps' && /TPS/i.test(response)) responses.set(command, response)
-      if (command === 'mspt' && /tick times|MSPT/i.test(response)) responses.set(command, response)
+      if (command === 'tps' && !isUnknownCommand(response) && /TPS from last/i.test(response)) responses.set(command, response)
+      if (command === 'mspt' && !isUnknownCommand(response) && /Server tick times/i.test(response)) responses.set(command, response)
       if (command === 'slist' && (response.includes('smoke-a') || response.includes('smoke-b'))) {
         responses.set(command, `${responses.get(command) || ''} ${response}`)
       }
