@@ -1,0 +1,14 @@
+Current-artifact asymmetric cross-chunk hopper crash cut
+Date: 2026-10-21
+
+Artifacts
+---------
+Paperclip SHA-256: 3161FD4E5E882970C61FE52C3B98060E0E4B250A0E6021C1F937847C15348A30
+Master SHA-256:    BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968
+The harness verified these hashes before starting.
+
+Method and result
+-----------------
+`scripts/Run-DeterministicHopperCrashTest.ps1` created a fresh local disposable world and moved eight diamonds from a source hopper in chunk `(127,3125)` into a destination chest in adjacent chunk `(128,3125)`. A deterministic Master write proxy observed the source chunk region file persist, then withheld the destination chunk write. Backend A was force-stopped at that cut. After restart and pending transaction replay, authoritative chunk-owner reads reported source(A)=0, destination(B)=8, total=8. The harness then flushed and stopped both backends; it confirmed all seven disposable test ports were closed.
+
+This is a real backend process termination between observed region-file writes and verifies item conservation on the exact current artifacts. It does not emulate host power loss, storage-controller cache loss, or every possible crash point during transaction-file replacement.
