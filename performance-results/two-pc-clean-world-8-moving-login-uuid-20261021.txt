@@ -1,0 +1,56 @@
+Two-PC clean-world moving-player and login UUID probe — 2026-10-21
+
+Fixture
+-------
+Paperclip SHA-256: 3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D
+Master SHA-256:    BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968
+Runtime: Temurin JRE 25.0.4.1 on both physical PCs.
+PC1 (100.78.108.117): Master plus Backend A. PC2 (100.107.178.51): Backend B.
+World: newly generated disposable world `clean_login_20261021` under
+/tmp/multipaper-login-uuid-clean-20261021. `/tmp` was tmpfs on both hosts.
+All SSH used the saved known_hosts file with StrictHostKeyChecking=yes.
+
+Login checks
+------------
+Three offline protocol-777 clients logged in, one directly to each backend and
+one through the Master proxy. All reached ready state and received chunks
+(192, 164, and 177 chunks respectively). The short stationary login smoke
+produced no RequestEntityPacket, duplicate-UUID, removal-routing, tick-schedule,
+exception, or error matches in either backend log.
+
+Moving run
+----------
+Eight offline protocol-777 clients connected through the proxy and moved for
+91 seconds. All eight reached ready state and remained connected; clients
+sent 13,212 movement packets total with no protocol disconnect, socket error,
+or client error. Bukkit connection-throttle was set to zero only in these
+disposable test configs after the default 4-second throttle rejected some
+staggered logins. Both backends reported 20 TPS during the run. A one-minute
+MSPT sample during active movement was approximately 7.9/31.4 ms average/max
+on A and 2.9/16.3 ms on B; the initial warm-up sample included chunk-generation
+maxima of 440 ms on A and 536 ms on B. Process CPU/RSS observations are not
+interval-normalized: during the run A showed 127% CPU and 1.39 GiB RSS, B 72%
+and 1.0 GiB. Later samples after the moving window were lower.
+
+One entity warning needs investigation
+--------------------------------------
+During movement Backend B logged one rejected duplicate insertion for UUID
+4ab9d5e2-25ae-4c83-b4ca-32051f215dcc. The two reported Bat positions were
+approximately (190.47, 0.00, 29.02) in chunk [11,1] and (187.57, 0.93, 32.92)
+in adjacent chunk [11,2]. After force-loading both chunks and the current
+chunk, an in-process entity UUID query found exactly one matching entity on B
+and none on A. No further duplicate warning appeared after those chunks loaded.
+This does not establish the cause or rule out a stale persisted entity. It is
+distinct from the missing-UUID RequestEntityPacket warnings reported in earlier
+reused-world moving samples; that warning class did not reproduce in this
+fresh-world run.
+
+Cleanup and limits
+------------------
+Both backends were saved and stopped, the disposable Master was stopped, and
+the test SSH tunnels and listeners were closed. The fixture data remains only
+under /tmp on the test hosts. Because /tmp was tmpfs, this run is not evidence
+of HDD performance or storage capacity. It is an 8-client synthetic movement
+observation, not a player-capacity certification. Keep the conservative
+8-player soft cap and leave entity-sync/release gates open pending root-cause
+analysis and representative gameplay/recovery coverage.
