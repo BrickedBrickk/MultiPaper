@@ -1,0 +1,10 @@
+Final-build player command probe
+Date: 2026-10-21
+
+Artifacts: Paperclip `786DE57B4A80F6E3998978583B24A5256E27BD27C201DB62E0DDA4D21FC729D9`, Master `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`. Disposable local two-backend pair, no production/Crafty access.
+
+An offline player protocol client exercised `/list`, `/tps`, `/mspt`, `/slist`, `/mpdebug`, and `/version` through the built-in proxy. `/list`, `/tps`, `/mspt`, `/mpdebug`, and `/version` returned expected fixture output; `/version` reported the current development build and 26.3 API.
+
+Permission behavior: an ordinary player received `command.unknown.command` for `/slist`, because `SListCommand` uses Paper's `minecraft.command.list` permission, which Paper registers as operator-only. After granting operator status in the disposable fixture, the exact same command printed the online count and both backend rows (`diag-a`: one player; `diag-b`: zero). `/mpdebug` was available to the ordinary player and replied `MultiPaper debug enabled` without an execution error.
+
+This was a protocol probe; it does not visually verify the particle overlay. Both backends and the Master were stopped and the test ports closed afterward.
