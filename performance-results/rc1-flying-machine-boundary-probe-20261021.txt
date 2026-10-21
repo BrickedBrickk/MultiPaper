@@ -48,9 +48,21 @@ An attempted protocol-client `/mpdebug` probe could not decode the 26.3
 client-information packet using the available 26.1 protocol schema. Thus,
 although chunks 9 and 10 were first force-loaded by different backends, their
 final ownership was not independently confirmed. No vanilla launcher GUI
-client was used. The result does not test longer-duration operation, reverse
-travel, obstacles, or other engine designs.
+client was used. The result does not test longer-duration operation, obstacles,
+or other engine designs. Reverse travel remains inconclusive; see the follow-up
+below.
 
 Both backends were save-flushed and stopped cleanly, then the disposable
 Master was stopped. Ports 35795, 27820–27822, and 27831–27832 were confirmed
 closed. The temporary fixture was retained for audit.
+
+Reverse-direction follow-up
+---------------------------
+The saved disposable fixture was restarted with the same exact JARs. With the
+engine at x=169–170, RCON placed stone in the second observer's detection face
+at `(170,102,12001)` for about 150 ms, removed it, and let both backends tick
+for two seconds. Both backends still reported the complete machine at the same
+coordinates. The observer's powered state was not sampled during the pulse,
+so this is an inconclusive trigger attempt, not evidence that reverse travel
+works or fails. The pair was flushed and stopped; all fixture listeners were
+confirmed closed again.
