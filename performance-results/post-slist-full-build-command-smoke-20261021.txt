@@ -1,0 +1,28 @@
+Java 25 full build and exact packaged-pair command smoke
+Date: 2026-10-21
+
+Build
+-----
+Temurin JDK 25.0.3.9; command:
+
+```powershell
+.\gradlew.bat --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar -x :multipaper-server:applyMinecraftResourcePatches
+```
+
+Result: `BUILD SUCCESSFUL` in 6m21s. Paperweight applied 63 Minecraft and 13 Paper patches. The MultiPaper resource-patch task was excluded as in the prior build records; that patch set is empty. Gradle reused current test results where up to date. The recorded current suite totals are Server 10,159 tests (0 failures, 0 errors, 86 skipped), Master 49 (0 failures, 0 errors, 0 skipped), and Master messaging protocol 6 (0 failures, 0 errors, 0 skipped). The server test XML was last written at 10:45 EDT, after the `c520cae` `/slist` permission source commit at 10:16 EDT. In the same work session, both process-level pending-WAL crash tests were rerun and passed; see [master-pending-wal-process-crash-targeted-20261021.txt](master-pending-wal-process-crash-targeted-20261021.txt).
+
+Build artifact hashes:
+
+- Paperclip: `3D046088BE2610B19F3B64A99496BBEB05FA52ED8660D46D7762F47307D61D3D`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+- Bundler: `A32E441D11A3140EDB75EC49006A7910553DD2F339CFADD17AE50730F97940D9`
+
+Exact current Paperclip and Master JARs were copied into new empty local directories and started together under Java 25.0.3.9 with a fresh offline-mode world. Both backends reached `Done`, registered at the Master, and exposed separate RCON listeners. A proxy status request returned Minecraft 26.3, protocol 777. `save-all flush` returned on both backends; both then stopped after RegionFile I/O completed, and the Master exited safely. All fixture listeners were confirmed closed.
+
+Command checks
+--------------
+The first synthetic player was not an operator. `/list`, `/slist` (including both backend rows), `/mpdebug`, and `/version` returned their expected responses. `/tps` and `/mspt` returned Minecraft's unknown-command response for that non-operator, as expected for their operator permission. This exposed a false positive in `scripts/Run-ProxyCommandProbe.js`: it searched for the words “TPS” and “MSPT,” which also appear in the command suggestion for an unknown command. The probe now explicitly rejects `command.unknown.command` and checks the actual TPS/MSPT response headings.
+
+After granting operator status only inside the disposable fixture, the corrected protocol probe passed through the Master proxy. It received real `/tps` values (`20.0` for the four reported windows), the `Server tick times` response for `/mspt`, both `/slist` backend rows, `/mpdebug` enabled, and the MultiPaper `/version` response, along with `/list` and chunk data. This is a protocol-client check, not a licensed GUI client test.
+
+The Windows host logged OSHI/PerfMon registry counter errors during startup, but both servers reached `Done` and handled commands. These host-counter warnings are recorded as environment output, not attributed to MultiPaper. Artifacts still identify as `26.3-DEV-feature/port-26.3@f5abc1a` with a 1970 epoch build date; versioned release metadata and packaging are still required.

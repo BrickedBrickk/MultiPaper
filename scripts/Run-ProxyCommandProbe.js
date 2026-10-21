@@ -1,7 +1,8 @@
 'use strict'
 
 // Protocol-777 smoke for login, player-scoped MultiPaper commands, and status ping.
-// Run against a disposable Master proxy with the probe player opped on the backends.
+// Seed the probe player as an operator on both disposable backends before testing /tps and /mspt.
+// /slist is expected to work without operator status.
 const mc = require('minecraft-protocol')
 
 const [host = '127.0.0.1', portText = '25565', username = 'CommandSmoke', version = '26.3'] = process.argv.slice(2)
@@ -24,6 +25,10 @@ function flatten(value) {
   return Object.values(value).map(flatten).filter(Boolean).join(' ')
 }
 
+function isUnknownCommand(value) {
+  return /command\.unknown\.command/i.test(value || '')
+}
+
 function finish() {
   if (ended) return
   ended = true
@@ -32,12 +37,12 @@ function finish() {
   const slist = responses.get('slist') || ''
   const checks = [
     ['login and chunk delivery', chunks > 0],
-    ['/list', responses.get('list')?.includes('There are')],
-    ['/tps', /TPS/i.test(responses.get('tps') || '')],
-    ['/mspt', /tick times|MSPT/i.test(responses.get('mspt') || '')],
-    ['/slist reports both backends', slist.includes('smoke-a') && slist.includes('smoke-b')],
-    ['/mpdebug', (responses.get('mpdebug') || '').includes('MultiPaper debug enabled')],
-    ['/version', (responses.get('version') || '').includes('This server is running MultiPaper version')]
+    ['/list', responses.get('list')?.includes('There are') && !isUnknownCommand(responses.get('list'))],
+    ['/tps', /TPS from last/i.test(responses.get('tps') || '') && !isUnknownCommand(responses.get('tps'))],
+    ['/mspt', /Server tick times|MSPT/i.test(responses.get('mspt') || '') && !isUnknownCommand(responses.get('mspt'))],
+    ['/slist reports both backends', slist.includes('smoke-a') && slist.includes('smoke-b') && !isUnknownCommand(slist)],
+    ['/mpdebug', (responses.get('mpdebug') || '').includes('MultiPaper debug enabled') && !isUnknownCommand(responses.get('mpdebug'))],
+    ['/version', (responses.get('version') || '').includes('This server is running MultiPaper version') && !isUnknownCommand(responses.get('version'))]
   ]
   const failed = checks.filter(([, pass]) => !pass)
   console.log(`COMMAND_RESPONSES ${JSON.stringify(Object.fromEntries(responses))}`)

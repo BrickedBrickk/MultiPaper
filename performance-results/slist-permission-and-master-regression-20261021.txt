@@ -11,6 +11,10 @@ The new focused server regression suite also passed 2 tests with 0 failures/erro
 
 This does not replace a current-artifact ordinary-player `/slist` probe, the full server regression/build after this command change, or any open gameplay/performance release gates. No Crafty panel or production server/world was accessed.
 
+### Full Java 25 build and proxy-command verification after the permission change
+
+The full root `build` plus Paperclip packaging succeeded after the `/slist` change. Current recorded totals are Server 10,159 tests (0 failures/errors, 86 skipped), Master 49 (0 failures/errors/skips), and protocol 6 (0 failures/errors/skips). The rebuilt exact artifact pair passed clean-directory startup and proxy command checks. A non-operator could run `/slist` and `/mpdebug`; `/tps` and `/mspt` correctly returned unknown-command responses until the disposable probe player was opped, after which both returned actual metrics. This exposed and fixed the probe's false-positive test: it now rejects unknown-command responses before accepting TPS/MSPT output. Full build hashes, method, and limits are in [post-slist-full-build-command-smoke-20261021.txt](post-slist-full-build-command-smoke-20261021.txt).
+
 ### Targeted Master pending-WAL process-crash rerun
 
 On the current Java 25 toolchain, the two process-level Master crash tests were rerun directly: `pendingContainerTransactionSurvivesAbruptMasterRestart` and `pendingEntityInventoryTransactionSurvivesAbruptMasterRestart`. Both passed using the current Master JAR (SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`). The container case replays an acknowledged transaction after abrupt termination, persists both snapshots, applies a second edit after recovery, and repeats the crash/replay/persistence cycle. Full command, boundaries, and remaining power-loss limitation are in [master-pending-wal-process-crash-targeted-20261021.txt](master-pending-wal-process-crash-targeted-20261021.txt).
