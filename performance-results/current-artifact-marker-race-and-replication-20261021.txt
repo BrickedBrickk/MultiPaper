@@ -1,0 +1,21 @@
+MultiPaper 26.3 current artifact build and two-backend replication verification
+Date: 2026-10-21
+Source commit: 8a981d9633841b58cc25e5944004b518893dbaa4 (`feature/port-26.3`)
+Environment: Temurin Java 25.0.3 on one workstation; fresh disposable local Master and two backends. No Crafty panel or production world/server was accessed.
+
+Build: `gradlew --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches` completed successfully. The skipped MultiPaper resource patch task has no MultiPaper resource patches; Paper/Purpur resource tasks were up to date. Results: server 10,163 tests (0 failures, 0 errors, 86 skipped); Master 49 (0 failures/errors/skips); Master messaging protocol 6 (0 failures/errors/skips); API 481 (0 failures/errors, 2 skipped).
+
+Artifact SHA-256:
+- Paperclip `multipaper-paperclip-26.3-RC1.jar`: `9FA8D5B9F002366C5AF8955CAEC61FF22616125514BA2053480079162625D300`
+- Bundler `multipaper-bundler-26.3-RC1.jar`: `20E2C71B55CC60F3A5E12AC2BD154F24AB57EFF9ECF19CDDABC22B6FD644C79B`
+- Master `multipaper-master-3.0.0.jar`: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+A clean disposable Master plus both backends started from the exact Paperclip and Master JARs; both registered with the Master and answered RCON. `scripts/Verify-TwoBackendReplication.ps1` passed cross-backend block reads, chest and shulker contents, two cross-chunk hoppers conserving 8 diamonds and 8 iron ingots, piston extension/retraction, observer pulse/reset, sticky-piston redstone-block pulls on both owners with no dropped item, entity subscription/teleport/removal, dimension transfer, and duplicate-UUID warning checks. Player inventory portion was skipped because no player name was supplied. Both backends save-flushed and stopped; the disposable Master was stopped; all six fixture listeners closed.
+
+Fixture logs and full verifier output are retained under `%TEMP%\MultiPaper-26.3-current-8a981d9-smoke-20261021`. This is one-workstation automated evidence. It does not close the unresolved Ender Pearl owner-restart/unload cases, public-SMP gameplay safety coverage, Mojang GUI-client verification, or two-PC capacity/reliability qualification. Do not treat this as a stable release certification.
+
+Command and proxy smoke on the same exact artifacts
+---------------------------------------------------
+After the replication run, the same disposable Master and backends were restarted from those exact JARs. A protocol-777 offline client joined through the Master proxy, received chunks, and passed `/list`, `/tps`, `/mspt`, `/slist`, `/mpdebug`, and `/version`. `/slist` showed both `smoke-a` and `smoke-b`, with the client on `smoke-b`; metrics returned TPS and MSPT output. The proxy status ping returned `MultiPaper 26.3`, protocol 777, and 0/5 players. The probe operator existed only in these disposable test backend files. Both backends were save-flushed and stopped; all fixture listeners were confirmed closed. Raw client/status output is in `%TEMP%\MultiPaper-26.3-current-8a981d9-smoke-20261021\command-probe-current.out.log` and `status-ping-current.txt`.
+
+The `/version` output identifies this artifact as a development build (`26.3-DEV-feature/port-26.3@8a981d9`, epoch timestamp), not a release build. Release metadata and broader release gates remain open.
