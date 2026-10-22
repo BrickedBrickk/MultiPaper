@@ -1,0 +1,9 @@
+MultiPaper Master process restart persistence regression
+Date: 2026-10-21
+Source: `feature/port-26.3`, commit `390ac81` before this evidence-only commit.
+Command: `gradlew.bat --no-daemon --max-workers=2 :multipaper-master:test --tests puregero.multipaper.server.MasterProcessRestartPersistenceTest` under Eclipse Temurin 25.0.3.
+Result: BUILD SUCCESSFUL; all four process-level test methods passed, zero failures.
+
+The process-level suite verified world/player persistence after graceful and unexpected Master termination; a durable cross-chunk container transaction remained pending across abrupt Master termination, replayed both sides after restart, then accepted a second transaction after recovery and survived another abrupt termination; and an entity-inventory transaction likewise survived an abrupt Master restart. The test asserts journal retention until both chunk snapshots are durably written and validates final state after restart.
+
+This covers Master-process crash/replay and post-recovery edits at the Master protocol/storage boundary. It does not simulate power-loss durability below the filesystem API, a backend JVM crash during a real player hopper interaction, or physical two-PC disk/network failure. No production or Crafty instance was accessed.
