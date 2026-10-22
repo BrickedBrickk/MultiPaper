@@ -1,0 +1,12 @@
+MultiPaper 26.3 player-owned pearl across the sampled owner backend restart
+Date: 2026-10-21
+Artifacts: Paperclip SHA-256 `9FA8D5B9F002366C5AF8955CAEC61FF22616125514BA2053480079162625D300`; Master SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+Environment: fresh disposable `pearl-owner-audit` world on one workstation; Master and two Java 25 backends; no Crafty or production access.
+
+The chamber used a soul-sand bubble column from Y=60 through Y=89 and a waterlogged top trapdoor at Y=90. Backend B loaded and owned the test chunk. An automated protocol client connected to Backend A; Backend B's RCON prepared a player-owned throw from the column base. The client captured `/mpdebug` action-bar packets: `red smoke-b` immediately before Backend B stopped, meaning the player was on A and the test chunk was externally owned by B. The spawned pearl UUID was `bfb115a3-3188-4405-b13a-a4ea996c1690`; its `Owner` NBT matched PearlAudit4's UUID (`[-235103615,155267962,-2078390292,-1023237402]`). It settled near Y=90.01, and both backends reported the same pearl UUID and owner.
+
+Backend B completed `save-all flush` and stopped gracefully while the Master, Backend A, and the A-connected test client remained up. B restarted from the same directory and Paperclip JAR and re-registered with the Master. RCON on both backends then reported the same pearl UUID and owner; positions were Y=90.0285 on A and Y=89.9624 on B. The post-restart `/mpdebug` sample was `aqua smoke-a`, so ownership had transferred to A after B returned. No duplicate entity UUID warnings appeared in A, B before restart, or B after restart. All fixture ports closed after cleanup.
+
+Limits: This is a one-workstation graceful restart, not a two-PC or crash/power-loss test. A already held a live replica, so this does not prove recovery exclusively from B's local entity file. The automated client stayed connected to A while RCON on B teleported it into the remote chunk; A logged 78 `moved too quickly` warnings from that synthetic cross-backend teleport. B logged none. Treat the pearl UUID/owner continuity and explicit pre-stop ownership sample as positive evidence, while treating that client-movement path as a harness limitation rather than a clean normal-movement result. The test did not verify pearl release by redstone or with a Mojang GUI client.
+
+Logs and probes: `%TEMP%\MultiPaper-26.3-current-8a981d9-smoke-20261021\pearl4-client.out.log`, `pearl4-owner-before-restart.out.log`, `pearl3-master.out.log`, and `pearl3-backend-*.out.log`.
