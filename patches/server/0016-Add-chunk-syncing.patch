@@ -1907,7 +1907,7 @@ index 541cb73f572c8f63d39e158e50541469343e3c2c..91871e023e43ae62a4ca0051e9b3271d
 +            if (newChunkHolder != null) {
 +                newChunkHolder.externalSubscribers.remove(server);
 +            } else {
-+                LOGGER.warn("Received RemoveChunkSubscriberMessage for unloaded chunk " + message.world + " " + message.cx + " " + message.cz);
++                LOGGER.debug("Ignoring RemoveChunkSubscriberMessage for unloaded chunk " + message.world + " " + message.cx + " " + message.cz);
 +            }
 +        });
 +    }

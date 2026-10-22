@@ -1,0 +1,16 @@
+Late chunk-unsubscriber log-level adjustment and disposable startup check
+Date: 2026-10-21
+Branch: `feature/port-26.3`; source HEAD before this change: `31df428`
+
+The RC2 death/drop/pickup run emitted hundreds of `RemoveChunkSubscriberMessage for unloaded chunk` warnings during initial chunk churn. The handler already made no subscriber-set mutation when the receiving backend had no local chunk holder; the warning was diagnostic output for that no-op. Updated the tracked runtime source and its corresponding server patch from WARN to DEBUG. No synchronization behavior changed.
+
+Build command: `gradlew.bat --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches`, using Eclipse Temurin 25.0.3.9. Build succeeded in 6m17s. Test reports contain Server 10,163 (0 failures/errors, 86 skipped), Master 49 (0 failures/errors/skips), messaging protocol 6 (0 failures/errors/skips), and API 481 (0 failures/errors, 2 skipped): 10,699 tests total, zero failures/errors, 88 skipped. The empty MultiPaper resource-patch task was excluded; Paperweight applied 63 Minecraft and 13 Paper patches.
+
+The locally built Paperclip reported `26.3-DEV-31df428`; it is a working-tree build and is not the published RC2 artifact. Local SHA-256 values:
+- Paperclip: `D352862F906873B29972754A986D0B50D3DAAA1DA0A80F9FE5C11B9F3A5334B6`
+- Bundler: `1555233A4732091A7720563330C8A06427C9DBC5D642D605BDC552A6E1C9C262`
+- Master: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+For a disposable startup check, the matching locally built Paperclip and Master ran from new temporary directories with two backends, the same `logworld`, offline mode, and isolated ports. Both backends reached `Done`, registered with the Master, accepted `forceload add`, completed `save-all flush`, and stopped cleanly. Their logs had zero `Unknown world` warnings and zero `RemoveChunkSubscriberMessage` entries. Thus the original late-unsubscribe condition did not recur in this run; this is not a forced reproduction proving that the new DEBUG line is emitted. Other unrelated WARN diagnostics appeared. All three processes exited and all six fixture listeners closed. Logs and disposable data are under `%TEMP%\MultiPaper-loglevel-worldmatch-20261021`.
+
+No Crafty, production process, or production world was accessed. RC2 remains the published evaluation pre-release; GUI-client online-mode play, representative Survival/farm/redstone coverage, unresolved entity/chunk recovery cases, and defensible target-PC safe capacity remain open before a stable release.

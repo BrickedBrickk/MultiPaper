@@ -362,7 +362,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
             if (newChunkHolder != null) {
                 newChunkHolder.externalSubscribers.remove(server);
             } else {
-                LOGGER.warn("Received RemoveChunkSubscriberMessage for unloaded chunk " + message.world + " " + message.cx + " " + message.cz);
+                LOGGER.debug("Ignoring RemoveChunkSubscriberMessage for unloaded chunk " + message.world + " " + message.cx + " " + message.cz);
             }
         });
     }
