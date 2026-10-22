@@ -1842,7 +1842,7 @@ index 541cb73f572c8f63d39e158e50541469343e3c2c..91871e023e43ae62a4ca0051e9b3271d
      public Map<String, ExternalServer> getServersMap() {
          return serversMap;
      }
-@@ -183,4 +216,104 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
+@@ -183,4 +216,101 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
              }
          });
      }
@@ -1906,9 +1906,6 @@ index 541cb73f572c8f63d39e158e50541469343e3c2c..91871e023e43ae62a4ca0051e9b3271d
 +            NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(message.world, message.cx, message.cz);
 +            if (newChunkHolder != null) {
 +                newChunkHolder.externalSubscribers.remove(server);
-+            } else {
-+                LOGGER.debug("Ignoring RemoveChunkSubscriberMessage for unloaded chunk " + message.world + " " + message.cx + " " + message.cz);
-+            }
 +        });
 +    }
 +
