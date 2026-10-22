@@ -29,7 +29,7 @@ if ([string]::IsNullOrWhiteSpace($Server1RconPassword) -or [string]::IsNullOrWhi
 }
 
 if ([string]::IsNullOrWhiteSpace($Server1LogPath) -ne [string]::IsNullOrWhiteSpace($Server2LogPath)) {
-    throw 'Pass both -Server1LogPath and -Server2LogPath to check duplicate entity UUID warnings.'
+    throw 'Pass both -Server1LogPath and -Server2LogPath to check entity synchronization warnings.'
 }
 
 foreach ($logPath in @($Server1LogPath, $Server2LogPath)) {
@@ -41,6 +41,11 @@ foreach ($logPath in @($Server1LogPath, $Server2LogPath)) {
 function Get-DuplicateEntityUuidWarningCount([string]$LogPath) {
     if ([string]::IsNullOrWhiteSpace($LogPath)) { return 0 }
     return (Select-String -LiteralPath $LogPath -SimpleMatch -Pattern 'Entity uuid already exists' | Measure-Object).Count
+}
+
+function Get-MissingEntityRequestWarningCount([string]$LogPath) {
+    if ([string]::IsNullOrWhiteSpace($LogPath)) { return 0 }
+    return (Select-String -LiteralPath $LogPath -Pattern 'requested entity .*but that entity doesn''t exist' | Measure-Object).Count
 }
 
 function Assert-NoNewDuplicateEntityUuidWarnings([int[]]$Before) {
@@ -55,9 +60,25 @@ function Assert-NoNewDuplicateEntityUuidWarnings([int[]]$Before) {
     Write-Output 'PASS: no new duplicate entity UUID warnings on either backend.'
 }
 
+function Assert-NoNewMissingEntityRequestWarnings([int[]]$Before) {
+    if ([string]::IsNullOrWhiteSpace($Server1LogPath)) { return }
+    $after = @(
+        (Get-MissingEntityRequestWarningCount $Server1LogPath),
+        (Get-MissingEntityRequestWarningCount $Server2LogPath)
+    )
+    if ($after[0] -gt $Before[0] -or $after[1] -gt $Before[1]) {
+        throw "Missing-entity request warnings increased during the probe: Server 1 $($Before[0]) -> $($after[0]); Server 2 $($Before[1]) -> $($after[1])."
+    }
+    Write-Output 'PASS: no new missing-entity request warnings on either backend.'
+}
+
 $duplicateUuidWarningsBefore = @(
     (Get-DuplicateEntityUuidWarningCount $Server1LogPath),
     (Get-DuplicateEntityUuidWarningCount $Server2LogPath)
+)
+$missingEntityRequestWarningsBefore = @(
+    (Get-MissingEntityRequestWarningCount $Server1LogPath),
+    (Get-MissingEntityRequestWarningCount $Server2LogPath)
 )
 
 function Read-RconPacket([System.IO.Stream]$Stream) {
@@ -841,6 +862,7 @@ try {
     Send-Rcon $Server2RconPort "execute in minecraft:the_nether run forceload remove $dimensionX $dimensionZ" | Out-Null
 
     Assert-NoNewDuplicateEntityUuidWarnings $duplicateUuidWarningsBefore
+    Assert-NoNewMissingEntityRequestWarnings $missingEntityRequestWarningsBefore
 } finally {
     try { Send-Rcon $Server1RconPort "kill @e[tag=$tag]" | Out-Null } catch { }
     try { Send-Rcon $Server1RconPort "kill @e[tag=${tag}_owner_remove]" | Out-Null } catch { }
