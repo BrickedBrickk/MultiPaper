@@ -1,0 +1,44 @@
+MultiPaper 26.3 dd63f8c entity synchronization and crash recovery
+Date: 2026-10-21
+Branch/commit: `feature/port-26.3`, `dd63f8c`
+Runtime: Eclipse Temurin 25.0.3.9; Paperclip reports `26.3-DEV-dd63f8c`.
+Environment: disposable local Master and two backends on one Windows workstation. No Crafty or production files/processes were accessed.
+
+Full Java 25 build
+------------------
+Command: `gradlew.bat --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches`.
+
+Build succeeded in 5m44s. Paperweight applied 63 Minecraft and 13 Paper patches; the MultiPaper resource patch task remains excluded because there are no MultiPaper resource patches. Test reports: Server 10,163 (0 failures/errors, 86 skipped); Master 49 (0 failures/errors/skips); Master messaging protocol 6 (0 failures/errors/skips); API 481 (0 failures/errors, 2 skipped). Total: 10,699 tests, zero failures/errors, 88 skipped.
+
+Artifact SHA-256:
+- Paperclip `multipaper-paperclip-26.3-RC2.jar`: `933F7905CA06B8F0CEFB3D6236C6367E8D2862972B2F3E1D9E7578E3C64E581E`
+- Bundler `multipaper-bundler-26.3-RC2.jar`: `6A0ABAA900C1918368EC7DAAE36F01FA7DF40C1BFF2B546CEB1117E968E6123C`
+- Master `multipaper-master-3.0.0.jar`: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`
+
+These are local development artifacts whose Paperclip runtime identifies as `26.3-DEV-dd63f8c`; they are not the published RC2 assets. Do not replace the published files with these under the RC2 version.
+
+Ownership-aware two-backend replication
+---------------------------------------
+The exact Paperclip/Master pair ran from fresh isolated directories and a shared disposable world. `scripts/Verify-TwoBackendReplication.ps1` passed marker, chest and shulker replication; exact conservation of 8 diamonds and 8 iron ingots across a hopper chunk boundary and ownership transfer; piston extension/retraction, observer pulse/reset, and sticky-piston redstone-block pullback from both owners without item drops; entity subscription and movement; owner-side and non-owner-side entity removal; Nether entity transfer/removal; and no new duplicate-UUID warnings. Its optional connected-player inventory step was skipped.
+
+The verifier printed PASS for every enabled check. The surrounding PowerShell wrapper then reported failure because it tested `$LASTEXITCODE` after invoking a PowerShell script, where that native-command variable was unset; the script itself emitted no assertion error. Full output is `%TEMP%\MultiPaper-dd63f8c-entity-20261021\entity-verifier.log`.
+
+Entity persistence, owner crash, and removal
+--------------------------------------------
+Backend A first force-loaded a disposable chunk; Backend B then subscribed. Backend A spawned one tagged persistent pig. Both RCON consoles observed UUID `[I; -586712015, -1695463928, -2132239864, 1359236121]` at `(18128.5,102,18000.5)`. Both backends acknowledged `save-all flush`; Backend A was force-killed while Backend B stayed up. Backend B still observed that UUID and position. After Backend A restarted from the same directory, both backends again returned the same UUID and position. A per-backend scoreboard count returned exactly one tagged pig on each backend. Backend B then killed it as the non-owner; both RCON consoles returned `No entity was found`. Across this crash/restart/removal run there were zero duplicate-UUID warnings and zero missing-entity request warnings. All processes exited and all six fixture ports closed.
+
+The initially attempted unlimited `data get entity @e[tag=...]` query returned Minecraft's selector-cardinality error, which means the selector syntax permits multiple matches; it was not evidence of duplicate entities. The scoreboard count and UUID queries established one entity per backend.
+
+Automated player login/movement probe and remaining anomaly
+----------------------------------------------------------
+Eight protocol-777 clients reached ready state through the built-in proxy and remained connected for the 61-second scripted run: 8/8 ready, 0 protocol disconnects, 0 unexpected socket ends, 0 client errors, 8,617 sent movement packets. RCON samples during the run saw player positions advance on both backends. This particular run did not capture authoritative positions across the ownership boundary, so it is not a boundary-movement or player-capacity pass. Its initial world was a disposable fixture with a prefilled route; a prior attempt against the same disposable fixture used the template's five-player cap and was discarded before this successful run after increasing the cap to 20.
+
+The successful login window still emitted nine `RequestEntityPacket` warnings (`... requested entity <UUID>, but that entity doesn't exist`): eight during player login/chunk attachment and one during the early movement interval. They did not identify players. No duplicate-UUID, player-request, or “not in subscribed chunk” warnings appeared. All nine UUIDs were queried after the run on both backends and were absent from the currently loaded entity lookups. That does not establish whether they were stale updates for already-removed entities or entities persisted in unloaded chunks; their root cause remains unresolved. Logs, event trace, and fixture data are under `%TEMP%\MultiPaper-dd63f8c-player-entity-20261021`.
+
+Stable-release blockers
+-----------------------
+- Classify and resolve or deterministically rule out the repeated missing-entity requests from player login/movement. Earlier two-PC synthetic runs also reported a rejected duplicate Bat UUID insertion; the exact `dd63f8c` local run did not reproduce it.
+- Repeat authoritative player movement across the ownership boundary on the two target PCs with the exact final JAR pair, then run representative workload/capacity tests. The current local scripted movement and older two-PC measurements are not sufficient to certify a safe maximum.
+- Player-driven inventory/container actions during entity/chunk handoff, Mojang GUI/online-mode use, and remaining Survival/farm/portal/stasis coverage are not established by this RCON-only entity run.
+
+The published GitHub v26.3-RC2 remains an evaluation pre-release. No stable release was published.
