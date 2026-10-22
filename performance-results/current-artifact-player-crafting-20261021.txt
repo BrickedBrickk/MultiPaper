@@ -1,0 +1,11 @@
+MultiPaper 26.3 player crafting probe: passed
+Date: 2026-10-21
+Code: `8a981d9`; disposable local fixture only, fresh `inventory-audit-574a8d6` world, Master plus two Java 25 backends. Paperclip SHA-256: `9FA8D5B9F002366C5AF8955CAEC61FF22616125514BA2053480079162625D300`. Master SHA-256: `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+The tracked automated protocol probe connected a Survival player to backend A. RCON seeded exactly four spruce planks. The client picked up the stack, placed one plank in each cell of the 2x2 inventory crafting grid, took the resulting crafting table, and placed it in inventory slot 9. The probe logged all six click/state transitions and passed: `crafted one crafting table from four spruce planks and placed it into player inventory slot 9` and `player crafting transaction completed`.
+
+After the client exited, RCON showed zero players on both backends, so a post-disconnect player NBT query was not available. Backend logs confirm the client joined and disconnected normally; no duplicate-UUID messages were found. The only startup diagnostics matching `ERROR` were Windows OSHI performance-counter registry errors, unrelated to the crafting transaction. Both backends completed `save-all flush` and stopped gracefully. The disposable Master was force-stopped after both backends exited; all fixture ports are closed.
+
+This verifies ordinary player inventory crafting on one workstation with the current artifact. It does not test crafting across backends, a second PC, or an interactive Mojang client.
+
+Logs: `%TEMP%\MultiPaper-26.3-current-8a981d9-smoke-20261021\inv-backend-a.out.log`, `inv-backend-b.out.log`, and `inv-master.out.log`.
