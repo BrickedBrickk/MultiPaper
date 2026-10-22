@@ -1,0 +1,18 @@
+MultiPaper 26.3 RC2 full build and clean packaged-pair smoke
+Date: 2026-10-21
+Source commit: `70d90ef` on `feature/port-26.3`; the only source change from the preceding verified code was the project metadata bump from RC1 to RC2. Runtime build string: `26.3-2-feature/port-26.3@70d90ef` (API specification 26.3-RC2). Java: Eclipse Temurin 25.0.3.9.
+
+Build command: `gradlew.bat --no-daemon --max-workers=2 build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches`. Build succeeded in 6m19s. Paperweight applied 63 Minecraft and 13 Paper patches. Results: Server 10,163 tests (0 failures/errors, 86 skipped); Master 49 (0 failures/errors/skips); messaging protocol 6 (0 failures/errors/skips); API 481 (0 failures/errors, 2 skipped): 10,699 total, zero failures/errors, 88 skipped. MultiPaper resource patch directory is empty; Paper and Purpur resource tasks were up to date.
+
+Artifacts:
+- Paperclip `multipaper-paperclip-26.3-RC2.jar`, SHA-256 `72ED0594E17EDE540880B041F8212AF64ECAF7A84D5B99DFAF5264D8A48EB452`.
+- Bundler `multipaper-bundler-26.3-RC2.jar`, SHA-256 `3CD64E4A4D56AEEC14AEFF1B7B0B3DA8BEA1E8950DAD8A67C122BE2ECE2F409B`.
+- Master `multipaper-master-3.0.0.jar`, SHA-256 `BD112490769F0B0037D4772CF02C88317B8F38F504579F1A66B1A73049DD6968`.
+
+The paperclip `--version` output identified implementation `26.3-2-70d90ef`. The matching Master and Paperclip were then copied into fresh local directories with a new world, and started together on Java 25. Both backends reached `Done`, registered with the Master, and exposed their private game/RCON listeners. `Probe-ServerStatus.ps1` returned MultiPaper 26.3, protocol 777, 0/5 players. `Run-ProxyCommandProbe.js` passed proxy login, chunk delivery, `/list`, `/tps`, `/mspt`, `/slist` with both `smoke-a` and `smoke-b`, `/mpdebug`, and `/version`. The first probe invocation was attempted before the player had operator state on its assigned backend and therefore did not receive `/tps` or `/mspt`; after granting operator through that backend's local RCON and reconnecting, the complete command probe passed. No gameplay commands were run against production.
+
+During first-time world creation, Backend A emitted two `AddChunkSubscriberMessage for unloaded chunk` warnings for End chunks; the warning was not reproduced in the retained post-restart command-smoke logs and has not been classified. Windows OSHI performance-counter registry diagnostics also appeared during startup. No duplicate-UUID warning was found in the retained backend logs. Both backends completed `save-all flush` and stopped cleanly; the disposable Master was stopped afterward and all six fixture ports closed. Fixture: `%TEMP%\\MultiPaper-26.3-RC2-clean-smoke-20261021`.
+
+A local RC2 staging archive was built and independently checked against every packaged file hash. Paperclip SHA-256 in the package is the hash above; Master hash is unchanged. ZIP `release-staging/MultiPaper-26.3-RC2.zip` SHA-256: `24071046A80AA0E2E0E47582C09018DB6828AE0F8C974A0ED120FEFF43A9D468`. Package includes both JARs, README, Crafty install instructions, GPL license, and SHA256SUMS. The RC2 package is local staging only; it was not uploaded to GitHub.
+
+This is a clean-start and automated protocol-client verification, not certification for a public SMP. GUI-client online-mode play, broad human Survival/farm/redstone coverage, some entity/chunk recovery combinations, and defensible target-PC safe capacity remain open. Keep the eight-player cap as conservative guidance only. Do not publish as a stable release until those gates are addressed.
