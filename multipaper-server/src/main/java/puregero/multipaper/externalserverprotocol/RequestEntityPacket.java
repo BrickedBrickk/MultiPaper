@@ -32,6 +32,16 @@ public class RequestEntityPacket extends ExternalServerPacket {
     private final UUID world;
     private final UUID uuid;
 
+    static boolean shouldAnswerMissingRequestWithRemoval(Entity.RemovalReason removalReason) {
+        // A request can arrive after the owner has unloaded the entity's chunk.
+        // The owner no longer has an entity instance to serialize, but the peer
+        // still needs a state transition so it cannot retain a stale mirror and
+        // retry the same request forever. UNLOADED_WITH_PLAYER is the one case
+        // where the entity is intentionally carried with a player and must stay
+        // available to be restored by the player transfer path.
+        return removalReason != null && removalReason != Entity.RemovalReason.UNLOADED_WITH_PLAYER;
+    }
+
     public static void tick() {
         requestedEntitiesThisTick.clear();
     }
@@ -94,6 +104,14 @@ public class RequestEntityPacket extends ExternalServerPacket {
 
                 EntityUpdateWithDependenciesPacket.sendVehicleAndPassengersPacketsRecursivelyToServers(entity, List.of(connection.externalServer));
             } else {
+                Entity.RemovalReason removalReason = EntityRemovePacket.getRemovalReason(uuid);
+                if (shouldAnswerMissingRequestWithRemoval(removalReason)) {
+                    // The entity was removed after the update was sent but before
+                    // this request reached its owner. Re-send the tombstone so a
+                    // peer that missed the original removal cannot retain a ghost.
+                    connection.send(new EntityRemovePacket(craftWorld.getName(), uuid, false));
+                    return;
+                }
                 LOGGER.warn(connection.externalServer.getName() + " requested entity " + uuid + ", but that entity doesn't exist");
             }
         });
