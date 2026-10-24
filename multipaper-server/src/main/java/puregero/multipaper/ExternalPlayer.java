@@ -92,6 +92,7 @@ public class ExternalPlayer extends ServerPlayer {
         this.playerSyncSessionId = playerSyncSessionId;
         this.playerOwnerName = playerOwnerName;
         this.address = address;
+        this.enderChestHandler.initialize();
         this.isRealPlayer = true;
         this.valid = true;
         this.onGround = true;

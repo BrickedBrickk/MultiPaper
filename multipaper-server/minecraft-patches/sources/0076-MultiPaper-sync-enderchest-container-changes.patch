@@ -1,0 +1,25 @@
+--- a/net/minecraft/world/inventory/PlayerEnderChestContainer.java
++++ b/net/minecraft/world/inventory/PlayerEnderChestContainer.java
+@@ -3,6 +3,7 @@
+ import net.minecraft.world.ItemStackWithSlot;
+ import net.minecraft.world.SimpleContainer;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.world.entity.ContainerUser;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
+@@ -37,6 +37,14 @@
+     public int getContainerSize() {
+         return owner == null || owner.sixRowEnderchestSlotCount < 0 ? super.getContainerSize() : owner.sixRowEnderchestSlotCount;
+     }
+     // Purpur end - Barrels and enderchests 6 rows
++
++    @Override
++    public void setChanged() {
++        super.setChanged();
++        if (this.owner instanceof ServerPlayer serverPlayer && serverPlayer.enderChestHandler != null) {
++            serverPlayer.enderChestHandler.containerChanged();
++        }
++    }
+
+     public void setActiveChest(final EnderChestBlockEntity activeChest) {

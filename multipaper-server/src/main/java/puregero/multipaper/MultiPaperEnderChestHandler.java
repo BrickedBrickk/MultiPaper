@@ -10,6 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import org.bukkit.Bukkit;
 import puregero.multipaper.externalserverprotocol.PlayerInventoryUpdatePacket;
 
+import java.util.Arrays;
+
 public class MultiPaperEnderChestHandler implements ContainerListener {
 
     private static boolean broadcastChanges = true;
@@ -34,12 +36,17 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
     }
 
     private void onContainerChanged() {
+        this.onContainerChanged(false);
+    }
+
+    private void onContainerChanged(boolean forceBroadcast) {
         Container container = this.player.getEnderChestInventory();
         if (container.getContainerSize() != sentItems.length) {
             sentItems = new ItemStack[container.getContainerSize()];
+            Arrays.fill(sentItems, ItemStack.EMPTY);
         }
 
-        if (broadcastChanges && player.level().getServer().getPlayerList().getPlayer(player.getUUID()) != player) {
+        if (broadcastChanges && !forceBroadcast && player.level().getServer().getPlayerList().getPlayer(player.getUUID()) != player) {
             return;
         }
 
@@ -51,9 +58,7 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
                 sentItems[i] = item.copy();
 
                 if (broadcastChanges) {
-                    CompoundTag itemToSend = (CompoundTag) net.minecraft.world.item.ItemStack.CODEC.encodeStart(
-                        org.bukkit.craftbukkit.CraftRegistry.getMinecraftRegistry().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), item
-                    ).getOrThrow();
+                    CompoundTag itemToSend = MultiPaper.itemStackToNBT(item);
                     itemToSend.putInt("Slot", i);
                     items.add(itemToSend);
                 }
@@ -66,14 +71,34 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
         }
     }
 
+    public void containerChanged() {
+        if (MultiPaperInventoryHandler.updatingInventory) {
+            return;
+        }
+        this.onContainerChanged(true);
+    }
+
+    public void initialize() {
+        Container container = this.player.getEnderChestInventory();
+        sentItems = new ItemStack[container.getContainerSize()];
+        for (int i = 0; i < sentItems.length; i++) {
+            sentItems[i] = container.getItem(i).copy();
+        }
+    }
+
+    public void tick() {
+        if (MultiPaperInventoryHandler.updatingInventory) {
+            return;
+        }
+        this.onContainerChanged(true);
+    }
+
     public static void sendFullEnderChestUpdate(ServerPlayer player, ExternalServerConnection... connections) {
         CompoundTag itemsRoot = new CompoundTag();
         ListTag items = new ListTag();
         for (int i = 0; i < player.getEnderChestInventory().getContainerSize(); i++) {
             ItemStack item = player.getEnderChestInventory().getItem(i);
-            CompoundTag itemToSend = (CompoundTag) net.minecraft.world.item.ItemStack.CODEC.encodeStart(
-                org.bukkit.craftbukkit.CraftRegistry.getMinecraftRegistry().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), item
-            ).getOrThrow();
+            CompoundTag itemToSend = MultiPaper.itemStackToNBT(item);
             itemToSend.putInt("Slot", i);
             items.add(itemToSend);
         }
@@ -91,6 +116,9 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
             player.getEnderChestInventory().setItem(slot, item);
         } finally {
             broadcastChanges = previousBroadcastChanges;
+        }
+        if (player.enderChestHandler != null) {
+            player.enderChestHandler.initialize();
         }
     }
 }

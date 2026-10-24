@@ -87,6 +87,9 @@ public class MultiPaper {
         MPDebugCommand.tick();
 
         for (ServerPlayer player : MinecraftServer.getServer().getPlayerList().getPlayers()) {
+            if (player.enderChestHandler != null) {
+                player.enderChestHandler.tick();
+            }
             if (player instanceof ExternalPlayer externalPlayer) {
                 // Copied from Paper start - Configurable container update tick rate
                 if (externalPlayer.containerMenu != externalPlayer.inventoryMenu && --externalPlayer.containerUpdateDelay <= 0) {
@@ -229,6 +232,9 @@ public class MultiPaper {
 
     public static void onPlayerJoin(ServerPlayer player) {
         player.didMultiPaperJoin = true;
+        if (player.enderChestHandler != null) {
+            player.enderChestHandler.initialize();
+        }
         PlayerCreatePacket.sendPlayer(player,
                 getConnection().getServersMap().values().stream()
                         .map(ExternalServer::getConnection)
