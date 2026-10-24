@@ -1,0 +1,8 @@
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -2617,4 +2617,5 @@
+             org.bukkit.Location previousLocation = this.getWorld().getSpawnLocation();
+             this.serverLevelData.setSpawn(respawnData);
++            if (!puregero.multipaper.externalserverprotocol.SpawnUpdatePacket.updatingSpawn) puregero.multipaper.MultiPaper.broadcastPacketToExternalServers(new puregero.multipaper.externalserverprotocol.SpawnUpdatePacket(this)); // MultiPaper - sync shared world spawn to every backend
+             this.server.getPlayerList().broadcastAll(new net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket(respawnData), this.dimension());
+             this.server.updateEffectiveRespawnData();

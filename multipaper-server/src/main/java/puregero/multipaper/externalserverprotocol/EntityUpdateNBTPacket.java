@@ -19,6 +19,10 @@ import puregero.multipaper.MultiPaper;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class EntityUpdateNBTPacket extends ExternalServerPacket {
 
@@ -86,14 +90,23 @@ public class EntityUpdateNBTPacket extends ExternalServerPacket {
 
         if (entity == null) {
             entity = EntityType.loadEntityRecursive(tag, level, new net.minecraft.world.entity.EntitySpawnRequest(net.minecraft.world.entity.EntitySpawnReason.LOAD, false), entity2 -> {
-                if (((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getChunk(entity2.chunkPosition().x(), entity2.chunkPosition().z()) != null) {
-                    ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().addNewEntity(entity2);
-                    return entity2;
-                } else {
-                    EntityRemovePacket.setEntityRemoved(uuid, Entity.RemovalReason.UNLOADED_TO_CHUNK, 20);
-                    LOGGER.warn("Tried to create an entity from nbt, but the entities for that chunk aren't loaded: " + entity2); // Warnings are there for a reason
-                    return null;
+                var entityLookup = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup();
+                Entity registeredEntity = registerEntityOrReportUnavailable(entity2,
+                        entityLookup.getChunk(entity2.chunkPosition().x(), entity2.chunkPosition().z()) != null,
+                        entityLookup::addNewEntity, entityLookup::getRawEntity,
+                        (existing, candidate) -> existing.load(net.minecraft.world.level.storage.TagValueInput.create(
+                                net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess(), saveEntity(candidate))),
+                        unavailableUuid -> {
+                            EntityRemovePacket.setEntityRemoved(unavailableUuid, Entity.RemovalReason.UNLOADED_TO_CHUNK, 20);
+                            LOGGER.warn("Tried to create an entity from nbt, but the entities for that chunk aren't loaded: " + entity2);
+                        });
+                if (registeredEntity != null) {
+                    // Another load path may have won the UUID race. The helper refreshes
+                    // and returns its canonical instance rather than leaking an
+                    // unregistered candidate to passenger loading or other callers.
+                    return registeredEntity;
                 }
+                return null;
             });
         } else if (entity instanceof ServerPlayer player) {
             new Exception("Tried to update the nbt of player " + player.getScoreboardName() + " to " + tag).printStackTrace();
@@ -102,5 +115,31 @@ public class EntityUpdateNBTPacket extends ExternalServerPacket {
         }
 
         return entity;
+    }
+
+    static Entity addEntityOrUpdateExisting(Entity candidate, Predicate<Entity> addEntity, Function<UUID, Entity> findEntity, BiConsumer<Entity, Entity> updateExisting) {
+        if (addEntity.test(candidate)) {
+            return candidate;
+        }
+        Entity existing = findEntity.apply(candidate.getUUID());
+        if (existing != null) {
+            updateExisting.accept(existing, candidate);
+        }
+        return existing;
+    }
+
+    static Entity registerEntityOrReportUnavailable(Entity candidate, boolean chunkLoaded, Predicate<Entity> addEntity, Function<UUID, Entity> findEntity, BiConsumer<Entity, Entity> updateExisting, Consumer<UUID> reportUnavailable) {
+        if (!chunkLoaded) {
+            reportUnavailable.accept(candidate.getUUID());
+            return null;
+        }
+        return addEntityOrUpdateExisting(candidate, addEntity, findEntity, updateExisting);
+    }
+
+    private static CompoundTag saveEntity(Entity entity) {
+        net.minecraft.world.level.storage.TagValueOutput output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+                net.minecraft.util.ProblemReporter.DISCARDING, entity.registryAccess());
+        entity.save(output);
+        return output.buildResult();
     }
 }

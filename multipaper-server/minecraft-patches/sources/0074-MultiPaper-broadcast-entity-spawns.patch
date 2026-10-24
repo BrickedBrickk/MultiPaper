@@ -1,0 +1,12 @@
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -1734,6 +1734,8 @@
+             }
+             // CraftBukkit end
+ 
+-            return this.moonrise$getEntityLookup().addNewEntity(entity); // Paper - rewrite chunk system
++            boolean added = this.moonrise$getEntityLookup().addNewEntity(entity); // Paper - rewrite chunk system
++            if (added) puregero.multipaper.MultiPaperEntitiesHandler.onEntitySpawn(entity); // MultiPaper
++            return added;
+         }
+     }

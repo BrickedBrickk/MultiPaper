@@ -1,0 +1,17 @@
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -206,6 +206,6 @@
+     private final SleepStatus sleepStatus;
+     private int emptyTime;
+     private final PortalForcer portalForcer;
+-    private final LevelTicks<Block> blockTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
+-    private final LevelTicks<Fluid> fluidTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
++    private final LevelTicks<Block> blockTicks = new LevelTicks<>(this, this::isPositionTickingWithEntitiesLoaded); // MultiPaper - durable tick replay guard
++    private final LevelTicks<Fluid> fluidTicks = new LevelTicks<>(this, this::isPositionTickingWithEntitiesLoaded); // MultiPaper - durable tick replay guard
+     private final PathTypeCache pathTypesByPosCache = new PathTypeCache();
+@@ -215,4 +215,5 @@
+     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents = new ObjectLinkedOpenHashSet<>();
+     private final List<BlockEventData> blockEventsToReschedule = new ArrayList<>(64);
+     private boolean handlingTick;
++    public final puregero.multipaper.MultiPaperInactiveTracker inactiveTracker = new puregero.multipaper.MultiPaperInactiveTracker(this); // MultiPaper
+     private final List<CustomSpawner> customSpawners;

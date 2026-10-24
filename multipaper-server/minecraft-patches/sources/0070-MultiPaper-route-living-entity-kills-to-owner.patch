@@ -1,0 +1,7 @@
+--- a/net/minecraft/world/entity/LivingEntity.java
++++ b/net/minecraft/world/entity/LivingEntity.java
+@@ -341,3 +341,4 @@
+     @Override
+     public void kill(final ServerLevel level) {
++        if (puregero.multipaper.MultiPaperEntitiesHandler.requestKillFromNonOwner(this)) return; // MultiPaper - route explicit kills to the entity owner
+         this.hurtServer(level, this.damageSources().genericKill(), Float.MAX_VALUE);

@@ -17,6 +17,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.saveddata.maps.MapIndex;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.SavedDataStorage;
@@ -139,6 +140,8 @@ public class MultiPaper {
         }
 
         RequestEntityPacket.tick();
+
+        SendTickListPacket.tickDeferred();
 
         MultiPaperExternalBlocksHandler.tick();
 
@@ -574,6 +577,22 @@ public class MultiPaper {
         getConnection().send(new WriteDataMessage(SharedDataPath.fromLocalPath(path), buffer.toByteArray()), message -> { /* do nothing */ });
     }
 
+    /** Writes shared transaction data and returns only after the Master confirms its atomic disk write. */
+    public static void writeDataAndAwait(String path, CompoundTag compoundTag) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        NbtIo.writeCompressed(compoundTag, buffer);
+        try {
+            BooleanMessageReply reply = getConnection().sendAndAwaitReply(
+                    new WriteDataMessage(SharedDataPath.fromLocalPath(path), buffer.toByteArray()), BooleanMessageReply.class).get();
+            if (!reply.result) throw new IOException("Master rejected durable data write: " + path);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for durable data write: " + path, e);
+        } catch (ExecutionException e) {
+            throw new IOException("Could not confirm durable data write: " + path, e);
+        }
+    }
+
     private static String getWorld(File path) {
         do {
             path = path.getParentFile();
@@ -588,6 +607,14 @@ public class MultiPaper {
 
     public static void unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
         if (chunkAccess instanceof LevelChunk levelChunk && MultiPaper.isChunkLocal(newChunkHolder)) {
+            if (!MultiPaperExternalBlocksHandler.persistTicksBeforeUnlock(levelChunk)) {
+                // Keep the Master lock until a durable sender recovery copy exists.
+                return;
+            }
+            if (!persistChunkBeforeUnlock(levelChunk)) {
+                // Ownership must not move to a backend that would read an older chunk image.
+                return;
+            }
             if (chunkEntitySlices != null) {
                 java.util.Arrays.stream(chunkEntitySlices.getRawEntities()).forEach(MultiPaperEntitiesHandler::onEntityUnlock);
             }
@@ -618,6 +645,21 @@ public class MultiPaper {
 
     public static void willSaveChunk(ServerLevel level, int x, int z) {
         getConnection().send(new WillSaveChunkLaterMessage(level.getWorld().getName(), x, z));
+    }
+
+    /** Persist the authoritative block and chunk state before Master can hand ownership over. */
+    private static boolean persistChunkBeforeUnlock(LevelChunk chunk) {
+        ServerLevel level = (ServerLevel) chunk.getLevel();
+        try {
+            CompoundTag serialized = SerializableChunkData.copyOf(level, chunk).write();
+            willSaveChunk(level, chunk.getPos().x(), chunk.getPos().z());
+            writeChunk(chunk.getPos(), level, serialized);
+            return true;
+        } catch (Exception failure) {
+            LOGGER.error("Could not persist chunk {} in world {} before releasing ownership; retaining Master lock",
+                    chunk.getPos(), level.getWorld().getName(), failure);
+            return false;
+        }
     }
 
     public static byte[] nbtCompressToBytes(CompoundTag compoundTag) throws IOException {

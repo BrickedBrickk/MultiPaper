@@ -25,7 +25,13 @@
          this.dimensions = type.getDimensions();
          this.maxAirTicks = level == null || this.getDefaultMaxAirSupply() != Entity.TOTAL_AIR_SUPPLY ? this.getDefaultMaxAirSupply() : this.level.purpurConfig.drowningAirTicks; // Purpur - Drowning Settings
          // Purpur start - Add toggle for RNG manipulation
-@@ -1923,6 +1926,11 @@ public abstract class Entity
+@@ -674,4 +677,5 @@
+     public void kill(final ServerLevel level) {
++        if (puregero.multipaper.MultiPaperEntitiesHandler.requestKillFromNonOwner(this)) return; // MultiPaper - route explicit kills to the entity owner
+         this.remove(Entity.RemovalReason.KILLED, org.bukkit.event.entity.EntityRemoveEvent.Cause.DEATH); // CraftBukkit - add Bukkit remove cause
+         this.gameEvent(GameEvent.ENTITY_DIE);
+     }
+@@ -1923,6 +1927,11 @@ public abstract class Entity
                  }
  
                  iterations.set(iteration);
@@ -37,7 +43,7 @@
                  BlockState state = this.level().getBlockState(blockIntersection);
                  if (state.isAir()) {
                      if (debugEntityBlockIntersections) {
-@@ -5097,6 +5105,19 @@ public abstract class Entity
+@@ -5097,6 +5106,19 @@ public abstract class Entity
          return new ClientboundAddEntityPacket(this, serverEntity);
      }
  
@@ -57,7 +63,7 @@
      public EntityDimensions getDimensions(final Pose pose) {
          return this.type.getDimensions();
      }
-@@ -5229,4 +5250,10 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
+@@ -5229,4 +5251,10 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
          if (!checkPosition(this, x, y, z)) {
              return;
          }
@@ -68,7 +74,7 @@
 +            puregero.multipaper.MultiPaperEntitiesHandler.onChunkMove(this, new BlockPos(targetX, targetY, targetZ), this.blockPosition);
 +        }
          // Paper end - Block invalid positions and bounding box
-@@ -5390,3 +5417,4 @@ public final void setRemoved(final Entity.RemovalReason reason, org.bukkit.event.entity.EntityRemoveEvent.@Nullable Cause cause) {
+@@ -5390,3 +5418,4 @@ public final void setRemoved(final Entity.RemovalReason reason, org.bukkit.event.entity.EntityRemoveEvent.@Nullable Cause cause) {
          }
          // Paper end - rewrite chunk system
 +        puregero.multipaper.MultiPaperEntitiesHandler.onEntityRemove(this, reason); // MultiPaper

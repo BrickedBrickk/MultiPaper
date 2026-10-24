@@ -6,12 +6,14 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftWorld;
+import puregero.multipaper.ExternalServer;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 
@@ -50,6 +52,27 @@ public class RequestEntityPacket extends ExternalServerPacket {
         if (!hasAlreadyRequestedThisTick(connection, world, entity)) {
             connection.send(new RequestEntityPacket(world, entity));
         }
+    }
+
+    /**
+     * Route a missing-entity repair to the current chunk owner. Updates queued by
+     * a former owner can arrive after a chunk handoff; asking that former owner
+     * again only produces an expected "not subscribed" warning and cannot repair
+     * the authoritative copy. If this backend owns the loaded chunk, the stale
+     * peer update must not recreate or override its local entity state.
+     */
+    public static void requestEntity(ExternalServerConnection source, ServerLevel level, UUID world, UUID entity, ChunkPos chunkPos) {
+        NewChunkHolder chunkHolder = MultiPaper.getChunkHolder(level, chunkPos.x(), chunkPos.z());
+        ExternalServerConnection requestConnection = resolveRequestConnection(source, chunkHolder == null ? null : chunkHolder.externalOwner);
+        if (requestConnection != null) {
+            requestEntity(requestConnection, world, entity);
+        }
+    }
+
+    static ExternalServerConnection resolveRequestConnection(ExternalServerConnection source, ExternalServer owner) {
+        if (owner == null) return source;
+        if (owner.isMe()) return null;
+        return owner.getConnection() == null ? source : owner.getConnection();
     }
 
     private static boolean hasAlreadyRequestedThisTick(ExternalServerConnection connection, UUID world, UUID entity) {

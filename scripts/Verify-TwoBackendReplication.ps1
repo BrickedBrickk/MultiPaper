@@ -160,6 +160,25 @@ function Get-BlockItemCount([string]$BlockData, [string]$ItemId) {
     return [int]$countMatch.Groups[1].Value
 }
 
+$entityCountObjective = 'mpc' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+function Get-TaggedEntityCount([int]$Port, [string]$Tag, [string]$Dimension = 'minecraft:overworld') {
+    Send-Rcon $Port "scoreboard objectives add $entityCountObjective dummy" | Out-Null
+    Send-Rcon $Port "scoreboard players set #entityCount $entityCountObjective 0" | Out-Null
+    $dimensionPrefix = if ($Dimension -eq 'minecraft:overworld') { 'execute' } else { "execute in $Dimension" }
+    Send-Rcon $Port "$dimensionPrefix as @e[tag=$Tag] run scoreboard players add #entityCount $entityCountObjective 1" | Out-Null
+    $reply = Send-Rcon $Port "scoreboard players get #entityCount $entityCountObjective"
+    $countMatch = [regex]::Match($reply, 'has (\d+) \[')
+    if (-not $countMatch.Success) { throw "Could not count entities tagged '$Tag' on RCON port ${Port}: $reply" }
+    return [int]$countMatch.Groups[1].Value
+}
+
+function Assert-TaggedEntityCount([int]$Port, [string]$Tag, [int]$Expected, [string]$Context, [string]$Dimension = 'minecraft:overworld') {
+    $actual = Get-TaggedEntityCount $Port $Tag $Dimension
+    if ($actual -ne $Expected) {
+        throw "$Context expected $Expected entity/entities tagged '$Tag' on RCON port ${Port}, found $actual."
+    }
+}
+
 function Test-StickyPistonPull([int]$ControllerPort, [int]$ObserverPort, [int]$PistonX, [int]$PowerX, [int]$PayloadX, [int]$DestinationX, [int]$CircuitY, [int]$CircuitZ, [string]$Direction) {
     foreach ($clearX in $PowerX..$DestinationX) {
         Send-Rcon $ControllerPort "setblock $clearX $CircuitY $CircuitZ minecraft:air" | Out-Null
@@ -583,10 +602,36 @@ try {
         Start-Sleep -Seconds 1
     }
 
+    Send-Rcon $Server1RconPort "forceload add $x $z" | Out-Null
+    Send-Rcon $Server2RconPort "forceload add $x $z" | Out-Null
+    $spawnChunkLoadCommand = "execute if loaded $x $y $z run help"
+    $spawnChunkLoadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $spawnChunkLoaded1 = Send-Rcon $Server1RconPort $spawnChunkLoadCommand
+        $spawnChunkLoaded2 = Send-Rcon $Server2RconPort $spawnChunkLoadCommand
+        if ($spawnChunkLoaded1 -match 'Index \(\d+/\d+\)' -and $spawnChunkLoaded2 -match 'Index \(\d+/\d+\)') { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $spawnChunkLoadDeadline)
+    Assert-Contains $spawnChunkLoaded1 'Index (' 'The entity spawn chunk did not load on backend 1.'
+    Assert-Contains $spawnChunkLoaded2 'Index (' 'The entity spawn chunk did not load on backend 2.'
+    Start-Sleep -Seconds 1
     Send-Rcon $Server1RconPort "summon minecraft:pig $($x + 0.5) $y $($z + 0.5) {Tags:[`"$tag`"],NoGravity:1b}" | Out-Null
     $uuidCommand = "data get entity @e[tag=$tag,limit=1] UUID"
-    $uuid1 = Send-Rcon $Server1RconPort $uuidCommand
-    $uuid2 = Send-Rcon $Server2RconPort $uuidCommand
+    $spawnSyncDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $spawnCount1 = Get-TaggedEntityCount $Server1RconPort $tag
+        $spawnCount2 = Get-TaggedEntityCount $Server2RconPort $tag
+        $uuid1 = Send-Rcon $Server1RconPort $uuidCommand
+        $uuid2 = Send-Rcon $Server2RconPort $uuidCommand
+        $uuidMatch1 = [regex]::Match($uuid1, '\[I;[^\]]+\]')
+        $uuidMatch2 = [regex]::Match($uuid2, '\[I;[^\]]+\]')
+        if ($spawnCount1 -eq 1 -and $spawnCount2 -eq 1 -and $uuidMatch1.Success -and
+            $uuidMatch2.Success -and $uuidMatch1.Value -ceq $uuidMatch2.Value) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $spawnSyncDeadline)
+    if ($spawnCount1 -ne 1 -or $spawnCount2 -ne 1) {
+        throw "Spawn replication did not converge to exactly one entity: Server 1 count $spawnCount1, Server 2 count $spawnCount2."
+    }
     $uuidMatch1 = [regex]::Match($uuid1, '\[I;[^\]]+\]')
     $uuidMatch2 = [regex]::Match($uuid2, '\[I;[^\]]+\]')
     if (-not $uuidMatch1.Success) { throw "Server 1 did not report the tagged mob UUID: $uuid1" }
@@ -658,6 +703,8 @@ try {
     if ($positionMatch1.Value -cne $positionMatch2.Value) {
         throw "Entity positions differ: Server 1 '$($positionMatch1.Value)', Server 2 '$($positionMatch2.Value)'."
     }
+    Assert-TaggedEntityCount $Server1RconPort $tag 1 'Entity movement on the owner'
+    Assert-TaggedEntityCount $Server2RconPort $tag 1 'Entity movement on the subscriber'
     Write-Output "PASS: entity teleport position replicated as '$($positionMatch2.Value)'."
 
     # Use a non-living entity for deterministic removal. A living mob can
@@ -710,6 +757,8 @@ try {
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $removalDeadline)
     Assert-Contains $removedEntity 'No entity was found' 'Owner-side entity removal did not reach Backend 2.'
+    Assert-TaggedEntityCount $Server1RconPort $ownerRemovalTag 0 'Owner-side entity removal on the owner'
+    Assert-TaggedEntityCount $Server2RconPort $ownerRemovalTag 0 'Owner-side entity removal on the subscriber'
     Write-Output 'PASS: owner-side entity removal replicated to Backend 2.'
 
     # Exercise a removal issued by a non-owner backend. Give Server 2 the
@@ -768,6 +817,8 @@ try {
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $remoteRemovalDeadline)
     Assert-Contains $remoteRemovalResult 'No entity was found' 'Entity removal from a non-owner backend did not reach the owner.'
+    Assert-TaggedEntityCount $Server1RconPort $remoteRemovalTag 0 'Non-owner entity removal on the requester'
+    Assert-TaggedEntityCount $Server2RconPort $remoteRemovalTag 0 'Non-owner entity removal on the owner'
     Write-Output 'PASS: non-owner entity removal reached Backend 2 and disappeared from its authoritative entity list.'
 
     $dimensionTag = $tag + '_nether'
@@ -799,6 +850,8 @@ try {
     if (-not $dimensionUuid1.Success -or -not $dimensionUuid2.Success -or $dimensionUuid1.Value -cne $dimensionUuid2.Value) {
         throw "Dimension transfer did not replicate: Server 1 '$($dimensionUuid1.Value)', Server 2 '$($dimensionUuid2.Value)'."
     }
+    Assert-TaggedEntityCount $Server1RconPort $dimensionTag 1 'Nether entity transfer on Backend 1' 'minecraft:the_nether'
+    Assert-TaggedEntityCount $Server2RconPort $dimensionTag 1 'Nether entity transfer on Backend 2' 'minecraft:the_nether'
     Write-Output "PASS: entity dimension transfer replicated with UUID $($dimensionUuid1.Value)."
     Send-Rcon $Server1RconPort "execute in minecraft:the_nether as @e[tag=$dimensionTag] run kill @s" | Out-Null
     $dimensionRemovalDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -810,6 +863,8 @@ try {
     if ([regex]::IsMatch($dimensionRemoval, '\[I;[^\]]+\]')) {
         throw "Entity removal in the Nether did not reach Server 2. Remaining UUID response: '$dimensionRemoval'."
     }
+    Assert-TaggedEntityCount $Server1RconPort $dimensionTag 0 'Nether entity removal on Backend 1' 'minecraft:the_nether'
+    Assert-TaggedEntityCount $Server2RconPort $dimensionTag 0 'Nether entity removal on Backend 2' 'minecraft:the_nether'
     Write-Output 'PASS: Nether entity removal replicated to Server 2.'
 
     if (-not [string]::IsNullOrWhiteSpace($PlayerName)) {
@@ -910,6 +965,8 @@ try {
     if ($null -ne $baseCircuitControllerPort) { try { Send-Rcon $baseCircuitControllerPort "forceload remove $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null } catch { } }
     try { Send-Rcon $Server1RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
     try { Send-Rcon $Server2RconPort "forceload remove $entityTargetBlockX $entityTargetBlockZ" | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "forceload remove $x $z" | Out-Null } catch { }
+    try { Send-Rcon $Server2RconPort "forceload remove $x $z" | Out-Null } catch { }
     if ($null -ne $shulkerX) {
         try { Send-Rcon $Server1RconPort "setblock $shulkerX $y $z minecraft:air" | Out-Null } catch { }
         try { Send-Rcon $Server2RconPort "setblock $shulkerX $y $z minecraft:air" | Out-Null } catch { }

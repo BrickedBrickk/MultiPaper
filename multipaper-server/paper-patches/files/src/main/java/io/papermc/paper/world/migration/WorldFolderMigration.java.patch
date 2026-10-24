@@ -1,6 +1,6 @@
 --- a/src/main/java/io/papermc/paper/world/migration/WorldFolderMigration.java
 +++ b/src/main/java/io/papermc/paper/world/migration/WorldFolderMigration.java
-@@ -3,6 +3,7 @@
+@@ -3,6 +_,7 @@
  import com.mojang.logging.LogUtils;
  import io.papermc.paper.world.saveddata.PaperLevelOverrides;
  import io.papermc.paper.world.saveddata.PaperWorldMetadata;
@@ -8,7 +8,8 @@
  import java.io.IOException;
  import java.nio.file.Files;
  import java.nio.file.Path;
-@@ -117,7 +118,15 @@
+@@ -118,8 +_,16 @@
+ 
      static boolean hasCurrentPaperData(final LevelStorageSource.LevelStorageAccess rootAccess, final ResourceKey<Level> dimensionKey) {
          final Path targetDataRoot = rootAccess.getDimensionPath(dimensionKey).resolve(LevelResource.DATA.id());
 -        return Files.isRegularFile(WorldMigrationSupport.savedDataPath(targetDataRoot, PaperWorldMetadata.TYPE))

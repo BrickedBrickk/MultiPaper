@@ -1,0 +1,36 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
+@@ -1775,23 +1775,15 @@ public final class NewChunkHolder {
+                 final CompoundTag save = entities.save();
+-                if (save == null) {
+-                    // we have no entities to add to the existing chunk
+-                    return false;
+-                }
+-                final Completable<CompoundTag> mergeFrom = MoonriseRegionFileIO.loadDataAsync(
+-                    this.world, this.chunkX, this.chunkZ, MoonriseRegionFileIO.RegionFileType.ENTITY_DATA, false, Priority.NORMAL
+-                );
+-
+-                final Completable<CompoundTag> toWrite = mergeFrom.handle((final CompoundTag onDisk, final Throwable thr) -> {
+-                    if (thr != null) {
+-                        LOGGER.error("Cannot merge transient entities for chunk (" + NewChunkHolder.this.chunkX + "," + NewChunkHolder.this.chunkZ + ") in world '" + WorldUtil.getWorldName(NewChunkHolder.this.world) + "', data on disk will be replaced", thr);
+-                        return save;
+-                    } else {
+-                        ChunkEntitySlices.copyEntities(onDisk, save);
+-                        return save;
+-                    }
+-                });
++                // Let a null save reach RegionFileStorage so it deletes an entity chunk
++                // that became empty. Skipping it leaves stale entities in Master storage
++                // and can resurrect them beside their moved copies after reload.
++                if (save != null) {
++                    // The Master owns the entity chunk file. Avoid merging the old local
++                    // snapshot, which can re-add entities after they have moved away.
++                    save.putBoolean("multipaper.transient", true);
++                }
++                final Completable<CompoundTag> toWrite = Completable.completed(save);
+ 
+                 MoonriseRegionFileIO.scheduleSave(
+                     this.world, this.chunkX, this.chunkZ, toWrite, null, MoonriseRegionFileIO.RegionFileType.ENTITY_DATA, Priority.NORMAL
+                 );
+-                this.lastEntitySaveNull = false;
++                this.lastEntitySaveNull = save == null;

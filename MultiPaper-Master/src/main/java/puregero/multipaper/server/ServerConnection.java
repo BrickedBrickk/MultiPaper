@@ -26,8 +26,10 @@ public class ServerConnection extends MasterBoundMessageHandler {
     private final List<Player> players = new ArrayList<>();
     private double tps;
     private int port = -1;
+    private volatile boolean started;
     private String host;
     private UUID uuid;
+    private final Map<String, ServerAnnouncement> announcedServers = new ConcurrentHashMap<>();
 
     /**
      * This connection map may include dead servers! Check if a server is alive
@@ -212,6 +214,22 @@ public class ServerConnection extends MasterBoundMessageHandler {
     public void setPort(int port) {
         this.port = port;
     }
+
+    public boolean hasStarted() {
+        return started;
+    }
+
+    public void setStarted(boolean started) {
+        this.started = started;
+    }
+
+    public boolean markServerAnnounced(ServerConnection server) {
+        String serverName = server.getBungeeCordName();
+        ServerAnnouncement announcement = new ServerAnnouncement(server, server.getHost(), server.getPort());
+        return !announcement.equals(announcedServers.put(serverName, announcement));
+    }
+
+    private record ServerAnnouncement(ServerConnection connection, String host, int port) {}
 
     public String getHost() {
         return host;

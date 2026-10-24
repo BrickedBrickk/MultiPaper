@@ -1,0 +1,46 @@
+MultiPaper 26.3 entity snapshot persistence fix — 2026-10-24
+===========================================================
+
+Root cause and fix
+------------------
+Master transient entity writes inflated and merged the previous on-disk entity list into the current `ChunkEntitySlices` snapshot. Entities absent from the current chunk because they had moved out were consequently retained in the old chunk file. `WriteChunkHandler` now validates, UUID-deduplicates, and persists the current transient snapshot as authoritative entity chunk contents. Write acknowledgements still wait for durable RegionFile persistence; malformed snapshots receive a negative reply and release the entity write lock.
+
+Regression tests and build
+--------------------------
+- `WriteChunkHandlerTest`: transient snapshot UUID deduplication.
+- `MasterIntegrationTest.transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures`: later snapshot removes an entity that moved out; malformed compressed data is rejected; waiting readers are released.
+- Java 25 focused Master integration and handler tests passed.
+- Final Java 25 full build/package passed in 2m20s:
+  `build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:build :multipaper-mastermessagingprotocol:test -x :multipaper-server:applyMinecraftResourcePatches --no-daemon --no-build-cache --max-workers=2 --console=plain`
+  XML summary: 182 suites, 10,736 tests, 0 failures, 0 errors, 88 skipped. Master tests ran; standard server test outputs were up-to-date. `git diff --check` passed with line-ending conversion notices only. The excluded resource task had already completed in isolated output; it applied zero patches and generated content matched the tracked resource tree.
+
+Reproducible release archives
+-----------------------------
+Paperweight writes wall-clock ZIP timestamps. Root `build.gradle.kts` now normalizes Paperclip and bundler entry timestamps to 1980-01-01 after archive creation. Two independent no-build-cache generations matched byte-for-byte. All 589 Paperclip and 722 bundler entry payloads also match the runtime-tested pre-normalization archives exactly:
+- Paperclip: `A5631373DD44AD7D523BA5AF88BC99CDAEAAB61F55666D1ABFF78194D83C86A9`
+- Bundler: `D5F49095CC3FE0219C4465E0DE92583CAE0BFF9057B02F272CB08259E5E54026`
+
+Exact candidate artifact hashes
+-------------------------------
+Paperclip `A5631373DD44AD7D523BA5AF88BC99CDAEAAB61F55666D1ABFF78194D83C86A9`
+Bundler `D5F49095CC3FE0219C4465E0DE92583CAE0BFF9057B02F272CB08259E5E54026`
+Server `0DA99374B672A2FD0BBFD1F8A5E0584726047B093931F025ECC54FF8BEA8A9CF`
+Master `2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186`
+Evaluation ZIP `BB0D897A5EFF99B6E6C0ECEA632EE2BD816712FDB2294AE56295F45191774A2C`
+Package: `release-staging/MultiPaper-26.3-RC2-entity-snapshot-fix-20261024/`
+
+Runtime evidence
+----------------
+- Exact Paperclip/Master pair, clean disposable world `%TEMP%\multipaper-26.3-entity-authoritative-d644829e`: 16 offline protocol clients moved for 61 seconds, 16/16 stayed connected, zero soak movement rejects, duplicate entity warnings, missing/unsubscribed entity requests, or tick overruns. After both backend JVMs exited, the Master MCA scan found 61 entity records / 61 unique UUIDs / 0 duplicates.
+- Exact pair, separate disposable world `%TEMP%\multipaper-26.3-entity-authoritative-crash-f9f73a10`: four ownership transfers, owner hard crash, restart/reload, and non-owner removal all passed with exactly one UUID. The fixture was orderly stopped after the test; data/logs retained.
+- Exact Paperclip/Master pair, localhost disposable fixture `%TEMP%\multipaper-26.3-final-capacity-5b8ccf25`: 20/20 moving offline protocol clients stayed connected for 181 seconds. There were zero disconnects, unexpected socket ends, client errors, movement rejects during the measured soak, duplicate UUID warnings, missing/unsubscribed entity requests, or watchdog/tick-overrun warnings. Initial-login movement corrections totaled 2,190 and are reported separately. Tick samples remained at 20 TPS, with the highest observed P99 below 10 ms. This is localhost synthetic capacity evidence only; it does not certify intended hardware or real-client play. Raw transcript: `capacity-4bc27e8966ad4c08b75a974b120fc55b.out`; samples: `capacity-4bc27e8966ad4c08b75a974b120fc55b-ticks.txt` under the fixture root. The disposable backend and Master processes were stopped afterward.
+- A follow-up RCON-only mechanics probe's piston observation failed because `execute if loaded` can report both backend chunks loaded and does not identify the authoritative owner; its owner state was `none` without a player subscription. This is an invalid harness result, not a demonstrated mechanics regression. Previously completed owner-verified mechanics evidence remains in force; do not reopen it without a fresh owner-verified reproduction.
+- Previously completed entity, scheduled-tick, and vanilla mechanics evidence remains valid unless a new regression appears. Do not repeat those investigations without one.
+
+Remaining release gates and next actions
+----------------------------------------
+1. User-side Minecraft online-mode login plus human Survival, farm/redstone, and portal gameplay. User said they will test later; do not ask again.
+2. Capacity run on isolated intended hardware. Prior remote attempt shared resources with live services and is invalid; do not access production or Crafty.
+3. After those gates pass, refresh final checksums/instructions and publish stable only with no critical defect.
+
+No Gradle client or disposable fixture process is active. Worktree is intentionally dirty with existing user/project changes; preserve it and do not reset/clean tracked files.

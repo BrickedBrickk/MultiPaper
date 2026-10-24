@@ -77,11 +77,160 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,4 @@
+@@ -266,2 +_,153 @@
++val applyMultiPaperChunkHolderBasePatch = tasks.register("applyMultiPaperChunkHolderBasePatch") {
++    dependsOn("applyMinecraftPatches")
++    doLast {
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0004-MultiPaper-modern-port-NewChunkHolder.patch")
++        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val check = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (check.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", patchFile.absolutePath)
++            }
++        } else {
++            val alreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (alreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply MultiPaper NewChunkHolder base patch to regenerated NewChunkHolder.java")
++            }
++        }
++    }
++}
++
++val applyDurableScheduledTickReplayGuardPatch = tasks.register("applyDurableScheduledTickReplayGuardPatch") {
++    dependsOn("applyMinecraftPatches")
++    doLast {
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0072-MultiPaper-wire-level-ticks-durable-replay-guard.patch")
++        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val check = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (check.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", patchFile.absolutePath)
++            }
++        } else {
++            val alreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (alreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply durable scheduled-tick replay guard patch to regenerated ServerLevel.java")
++            }
++        }
++    }
++}
++
++val applyEntitySubscriptionReadinessPatch = tasks.register("applyEntitySubscriptionReadinessPatch") {
++    dependsOn(applyMultiPaperChunkHolderBasePatch)
++    doLast {
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0073-MultiPaper-subscribe-after-entity-load.patch")
++        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val check = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (check.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", patchFile.absolutePath)
++            }
++        } else {
++            val alreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (alreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply entity subscription readiness patch to regenerated NewChunkHolder.java")
++            }
++        }
++    }
++}
++
++val applyTransientEntitySavePatch = tasks.register("applyTransientEntitySavePatch") {
++    dependsOn(applyEntitySubscriptionReadinessPatch)
++    doLast {
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0075-MultiPaper-process-transient-entity-saves-on-Master.patch")
++        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val sourceFile = rootProject.file("$sourceRoot/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java")
++        if (sourceFile.readText().contains("save.putBoolean(\"multipaper.transient\", true);")) {
++            return@doLast
++        }
++        val check = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (check.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", patchFile.absolutePath)
++            }
++        } else {
++            val alreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (alreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply transient entity save patch to regenerated NewChunkHolder.java")
++            }
++        }
++    }
++}
++
++val applyEntitySpawnSynchronizationPatch = tasks.register("applyEntitySpawnSynchronizationPatch") {
++    dependsOn("applyMinecraftPatches")
++    doLast {
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0074-MultiPaper-broadcast-entity-spawns.patch")
++        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val check = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (check.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", patchFile.absolutePath)
++            }
++        } else {
++            val alreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (alreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply entity spawn synchronization patch to regenerated ServerLevel.java")
++            }
++        }
++    }
++}
++
  tasks.withType<JavaCompile>().configureEach {
 +    dependsOn("applyMinecraftPatches")
++    dependsOn(applyDurableScheduledTickReplayGuardPatch)
++    dependsOn(applyEntitySubscriptionReadinessPatch)
++    dependsOn(applyTransientEntitySavePatch)
++    dependsOn(applyEntitySpawnSynchronizationPatch)
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
      options.forkOptions.memoryMaximumSize = "1G"
++    options.debugOptions.debugLevel = "source,lines"
 @@ -269,1 +_,6 @@
  }
 +
@@ -89,3 +238,10 @@
 +    dependsOn("applyMinecraftPatches")
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
 +}
+@@ -51,4 +_,6 @@
+ abstract class Services {
+     @get:Inject
+     abstract val archiveOperations: ArchiveOperations
++    @get:Inject
++    abstract val execOperations: org.gradle.process.ExecOperations
+ }

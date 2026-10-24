@@ -1,6 +1,6 @@
 --- a/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
 +++ b/src/main/java/org/bukkit/craftbukkit/command/CraftCommandMap.java
-@@ -4,13 +_,39 @@
+@@ -4,12 +_,38 @@
  import org.bukkit.Server;
  import org.bukkit.command.Command;
  import org.bukkit.command.SimpleCommandMap;
@@ -39,4 +39,3 @@
  
      public Map<String, Command> getKnownCommands() {
          return this.knownCommands;
-     }

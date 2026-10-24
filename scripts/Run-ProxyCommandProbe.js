@@ -3,12 +3,13 @@
 // Protocol-777 smoke for login, player-scoped MultiPaper commands, and status ping.
 // Seed the probe player as an operator on both disposable backends before testing /tps and /mspt.
 // /slist is expected to work without operator status.
+require('./Minecraft26_3ProtocolSupport')
 const mc = require('minecraft-protocol')
 
-const [host = '127.0.0.1', portText = '25565', username = 'CommandSmoke', version = '26.3'] = process.argv.slice(2)
+const [host = '127.0.0.1', portText = '25565', username = 'CommandSmoke', version = '26.3', expectedBackendA = 'smoke-a', expectedBackendB = 'smoke-b'] = process.argv.slice(2)
 const port = Number(portText)
-if (!Number.isInteger(port) || port < 1 || port > 65535 || username.length > 16) {
-  console.error('Usage: node scripts/Run-ProxyCommandProbe.js [host [port [username [version]]]]')
+if (!Number.isInteger(port) || port < 1 || port > 65535 || username.length > 16 || !expectedBackendA || !expectedBackendB) {
+  console.error('Usage: node scripts/Run-ProxyCommandProbe.js [host [port [username [version [expectedBackendA [expectedBackendB]]]]]]')
   process.exit(2)
 }
 
@@ -40,7 +41,7 @@ function finish() {
     ['/list', responses.get('list')?.includes('There are') && !isUnknownCommand(responses.get('list'))],
     ['/tps', /TPS from last/i.test(responses.get('tps') || '') && !isUnknownCommand(responses.get('tps'))],
     ['/mspt', /Server tick times|MSPT/i.test(responses.get('mspt') || '') && !isUnknownCommand(responses.get('mspt'))],
-    ['/slist reports both backends', slist.includes('smoke-a') && slist.includes('smoke-b') && !isUnknownCommand(slist)],
+    ['/slist reports both backends', slist.includes(expectedBackendA) && slist.includes(expectedBackendB) && !isUnknownCommand(slist)],
     ['/mpdebug', (responses.get('mpdebug') || '').includes('MultiPaper debug enabled') && !isUnknownCommand(responses.get('mpdebug'))],
     ['/version', (responses.get('version') || '').includes('This server is running MultiPaper version') && !isUnknownCommand(responses.get('version'))]
   ]
@@ -84,7 +85,7 @@ client.on('packet', (packet, meta) => {
       if (command === 'list' && response.includes('There are')) responses.set(command, response)
       if (command === 'tps' && !isUnknownCommand(response) && /TPS from last/i.test(response)) responses.set(command, response)
       if (command === 'mspt' && !isUnknownCommand(response) && /Server tick times/i.test(response)) responses.set(command, response)
-      if (command === 'slist' && (response.includes('smoke-a') || response.includes('smoke-b'))) {
+      if (command === 'slist' && (response.includes(expectedBackendA) || response.includes(expectedBackendB))) {
         responses.set(command, `${responses.get(command) || ''} ${response}`)
       }
       if (command === 'mpdebug' && response.includes('MultiPaper debug enabled')) responses.set(command, response)

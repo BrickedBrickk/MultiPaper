@@ -42,16 +42,29 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBo
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerStartedMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetChunkOwnerMessage;
 import puregero.multipaper.server.util.RegionFileCache;
+import se.llbit.nbt.CompoundTag;
+import se.llbit.nbt.IntArrayTag;
+import se.llbit.nbt.ListTag;
+import se.llbit.nbt.SpecificTag;
+import se.llbit.nbt.StringTag;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -133,9 +146,10 @@ class MasterIntegrationTest {
         assertEquals("127.0.0.1", bStarted.host);
         assertEquals(25566, bStarted.port);
 
-        ServerStartedMessage existingA = serverB.serverStartedMessages.poll(10, TimeUnit.SECONDS);
-        assertEquals("127.0.0.1", existingA.host);
-        assertEquals(25565, existingA.port);
+        assertTrue(((BooleanMessageReply) serverB.request(new PingMessage())).result,
+                "Master ping acts as an ordering barrier after server-b's start message");
+        assertNull(serverB.serverStartedMessages.poll(100, TimeUnit.MILLISECONDS),
+                "server-b must not receive server-a's start twice when server-b registers after its port");
     }
 
     @Test
@@ -272,6 +286,13 @@ class MasterIntegrationTest {
         ServerBoundMessage beforeReady = serverB.request(new ReadChunkMessage(WORLD, "entities", 7, 0));
         assertTrue(beforeReady instanceof DataMessageReply, "Expected Master storage before entity readiness, got " + beforeReady.getClass());
         assertArrayEquals(ENTITIES_PAYLOAD, ((DataMessageReply) beforeReady).data);
+
+        ServerBoundMessage emptyWrite = serverA.request(new WriteChunkMessage(WORLD, "entities", 7, 0, new byte[0]));
+        assertTrue(((BooleanMessageReply) emptyWrite).result);
+        ServerBoundMessage emptyRead = serverB.request(new ReadChunkMessage(WORLD, "entities", 7, 0));
+        assertTrue(emptyRead instanceof DataMessageReply, "Expected empty Master entity data, got " + emptyRead.getClass());
+        assertEquals(0, ((DataMessageReply) emptyRead).data.length,
+                "An empty entity save must delete stale entity records from Master storage");
 
         // The backend explicitly subscribes only after its entity data is installed locally.
         serverA.send(new SubscribeEntitiesMessage(WORLD, 7, 0));
@@ -857,5 +878,94 @@ class MasterIntegrationTest {
         } finally {
             uidReader.close();
         }
+    }
+
+    @Test
+    @Order(30)
+    void transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures() throws Exception {
+        int cx = 41;
+        int cz = 37;
+        UUID storedId = UUID.randomUUID();
+        UUID transientId = UUID.randomUUID();
+        CompoundTag stored = entityChunk(entity(storedId, "stored"));
+        CompoundTag transientSave = entityChunk(entity(storedId, "duplicate"), entity(transientId, "new"));
+
+        assertTrue(((BooleanMessageReply) serverB.request(new WriteChunkMessage(WORLD, "entities", cx, cz,
+                compressedNbt(stored), false))).result);
+        assertTrue(((BooleanMessageReply) serverB.request(new WriteChunkMessage(WORLD, "entities", cx, cz,
+                compressedNbt(transientSave), true))).result);
+
+        byte[] persisted = ((DataMessageReply) serverB.request(new ReadChunkMessage(WORLD, "entities", cx, cz))).data;
+        ListTag entities = readCompressedNbt(persisted).get("Entities").asList();
+        assertEquals(2, entities.size(), "Transient merge must retain unique entity UUIDs");
+        assertEquals("duplicate", entities.get(0).asCompound().get("state").stringValue(),
+                "The current transient save must replace an older persisted snapshot for the same UUID");
+        assertEquals("new", entities.get(1).asCompound().get("state").stringValue());
+
+        CompoundTag movedOutSnapshot = entityChunk(entity(transientId, "new"));
+        assertTrue(((BooleanMessageReply) serverB.request(new WriteChunkMessage(WORLD, "entities", cx, cz,
+                compressedNbt(movedOutSnapshot), true))).result);
+        byte[] afterMove = ((DataMessageReply) serverB.request(new ReadChunkMessage(WORLD, "entities", cx, cz))).data;
+        ListTag afterMoveEntities = readCompressedNbt(afterMove).get("Entities").asList();
+        assertEquals(1, afterMoveEntities.size(),
+                "An authoritative transient snapshot must not resurrect entities that moved out of the chunk");
+        assertEquals("new", afterMoveEntities.get(0).asCompound().get("state").stringValue());
+
+        int failedCx = cx + 1;
+        serverB.send(new WillSaveEntitiesLaterMessage(WORLD, failedCx, cz));
+        serverB.request(new PingMessage());
+        TestServerClient waitingReader = TestServerClient.connect(port, "transient-write-failure-reader");
+        try {
+            java.util.concurrent.CompletableFuture<ServerBoundMessage> waitingRead = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try {
+                    return waitingReader.request(new ReadChunkMessage(WORLD, "entities", failedCx, cz));
+                } catch (Exception exception) {
+                    throw new java.util.concurrent.CompletionException(exception);
+                }
+            });
+            Thread.sleep(100);
+            assertFalse(waitingRead.isDone(), "Entity readers must wait for the announced write");
+
+            BooleanMessageReply rejected = (BooleanMessageReply) serverB.request(new WriteChunkMessage(WORLD, "entities", failedCx, cz,
+                    new byte[]{1, 2, 3}, true));
+            assertFalse(rejected.result, "Malformed transient NBT must receive a negative acknowledgment");
+            assertTrue(waitingRead.get(10, TimeUnit.SECONDS) instanceof DataMessageReply,
+                    "A rejected write must release waiting entity readers instead of leaving a permanent lock");
+        } finally {
+            waitingReader.close();
+        }
+    }
+
+    private static byte[] compressedNbt(CompoundTag root) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (DataOutputStream output = new DataOutputStream(new DeflaterOutputStream(bytes))) {
+            output.writeByte(10);
+            output.writeUTF("");
+            root.write(output);
+        }
+        return bytes.toByteArray();
+    }
+
+    private static CompoundTag readCompressedNbt(byte[] bytes) throws IOException {
+        try (DataInputStream input = new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(bytes)))) {
+            assertEquals(10, input.readUnsignedByte());
+            input.readUTF();
+            return CompoundTag.read(input).asCompound();
+        }
+    }
+
+    private static CompoundTag entityChunk(CompoundTag... entities) {
+        CompoundTag chunk = new CompoundTag();
+        chunk.add("Entities", new ListTag((byte) 10, new java.util.ArrayList<>(java.util.List.of(entities))));
+        return chunk;
+    }
+
+    private static CompoundTag entity(UUID id, String state) {
+        long most = id.getMostSignificantBits();
+        long least = id.getLeastSignificantBits();
+        CompoundTag entity = new CompoundTag();
+        entity.add("UUID", new IntArrayTag(new int[]{(int) (most >>> 32), (int) most, (int) (least >>> 32), (int) least}));
+        entity.add("state", new StringTag(state));
+        return entity;
     }
 }

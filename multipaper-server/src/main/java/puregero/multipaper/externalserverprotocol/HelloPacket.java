@@ -33,6 +33,12 @@ public class HelloPacket extends ExternalServerPacket {
     private final long nanoTime;
     private final int supportedCompressionFlags;
 
+    enum ConnectionDecision {
+        ACCEPT,
+        IGNORE_DUPLICATE,
+        REJECT
+    }
+
     public HelloPacket(String bungeecordName, int supportedCompressionFlags) {
         this(bungeecordName, System.nanoTime(), supportedCompressionFlags);
     }
@@ -62,40 +68,52 @@ public class HelloPacket extends ExternalServerPacket {
 
         String localName = MultiPaperConfiguration.get().masterConnection.myName;
         boolean preferred = isPreferredConnection(localName, bungeecordName, connection.isOutgoing());
-        boolean accepted = false;
-        boolean sameNonce = false;
+        ExternalServerConnection replacedConnection = null;
+        ConnectionDecision decision;
         if (preferred) {
             synchronized (connection.externalServer) {
                 ExternalServerConnection previousConnection = connection.externalServer.getConnection();
-                if (previousConnection == null || previousConnection.nanoTime < nanoTime) {
+                decision = decideConnection(true, previousConnection == connection, previousConnection != null,
+                        previousConnection == null ? 0 : previousConnection.nanoTime, nanoTime);
+                if (decision == ConnectionDecision.ACCEPT) {
                     connection.externalServer.setConnection(connection);
-                    accepted = true;
-                } else {
-                    sameNonce = previousConnection.nanoTime == nanoTime;
+                    if (previousConnection != connection) {
+                        replacedConnection = previousConnection;
+                    }
                 }
             }
+        } else {
+            decision = ConnectionDecision.REJECT;
         }
 
-        if (!preferred) {
+        if (decision == ConnectionDecision.REJECT) {
             LOGGER.info("Rejecting non-preferred peer connection to " + bungeecordName);
             connection.getChannel().close();
-        } else if (accepted) {
+        } else if (decision == ConnectionDecision.IGNORE_DUPLICATE) {
+            // The accepted socket echoes the negotiated nonce during setup. Do not
+            // generate a nonce from this JVM: the other endpoint cannot compare clocks.
+        } else {
+            if (replacedConnection != null) {
+                replacedConnection.getChannel().close();
+            }
             LOGGER.info("Connected to external server " + bungeecordName);
             initCompression(connection);
             onConnect(connection);
-        } else if (sameNonce) {
-            // How lucky do you have to be for nano time to be the same?
-            LOGGER.info("A new connection to external server " + bungeecordName + " had the same nano time as a previous connection, resending with a new nano time...");
-            HelloPacket helloPacket = new HelloPacket(MultiPaperConfiguration.get().masterConnection.myName, connection.getSupportedCompressionFlags());
-            if (helloPacket.nanoTime == nanoTime) {
-                // Oh, nano time is broken, that's why
-                throw new RuntimeException("System.nanoTime() does not work. (Returned " + helloPacket.nanoTime + ")");
-            }
-            connection.getChannel().writeAndFlush(helloPacket);
-        } else {
-            LOGGER.info("A new connection to external server " + bungeecordName + " failed as a previous connection had a newer nano time.");
-            connection.getChannel().close();
         }
+    }
+
+    static ConnectionDecision decideConnection(boolean preferred, boolean sameConnection, boolean hasPreviousConnection,
+                                               long previousNanoTime, long candidateNanoTime) {
+        if (!preferred) {
+            return ConnectionDecision.REJECT;
+        }
+        if (!hasPreviousConnection) {
+            return ConnectionDecision.ACCEPT;
+        }
+        if (sameConnection) {
+            return ConnectionDecision.IGNORE_DUPLICATE;
+        }
+        return previousNanoTime < candidateNanoTime ? ConnectionDecision.ACCEPT : ConnectionDecision.REJECT;
     }
 
     static boolean isPreferredConnection(String localName, String peerName, boolean outgoing) {

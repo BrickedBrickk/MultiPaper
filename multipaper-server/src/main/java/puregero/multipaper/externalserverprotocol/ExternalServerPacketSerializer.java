@@ -24,6 +24,7 @@ public class ExternalServerPacketSerializer {
         addPacket(RequestChunkPacket.class, RequestChunkPacket::new);
         addPacket(SendChunkPacket.class, SendChunkPacket::new);
         addPacket(SendTickListPacket.class, SendTickListPacket::new);
+        addPacket(TickListAckPacket.class, TickListAckPacket::new);
         addPacket(BanPlayerPacket.class, BanPlayerPacket::new);
         addPacket(PardonPlayerPacket.class, PardonPlayerPacket::new);
         addPacket(BanIpPacket.class, BanIpPacket::new);
@@ -82,6 +83,7 @@ public class ExternalServerPacketSerializer {
         addPacket(SetPlayerChatStatePacket.class, SetPlayerChatStatePacket::new);
         addPacket(EntityPersistentDataUpdatePacket.class, EntityPersistentDataUpdatePacket::new);
         addPacket(RequestEntityRemovePacket.class, RequestEntityRemovePacket::new);
+        addPacket(RequestEntityKillPacket.class, RequestEntityKillPacket::new);
     }
 
     private static void addPacket(Class<? extends ExternalServerPacket> clazz, Function<FriendlyByteBuf, ExternalServerPacket> deserializer) {

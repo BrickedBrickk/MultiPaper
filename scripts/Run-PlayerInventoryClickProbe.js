@@ -5,6 +5,7 @@
 // then run: node scripts/Run-PlayerInventoryClickProbe.js host port username [version]
 // The client moves that stack to inventory slot 9 and exits after server confirmation.
 
+require('./Minecraft26_3ProtocolSupport')
 const mc = require('minecraft-protocol')
 
 const [host = '127.0.0.1', portText = '25565', username, version = '26.3'] = process.argv.slice(2)

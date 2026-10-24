@@ -89,11 +89,11 @@ public class EntityUpdatePacket extends ExternalServerPacket {
                     if (depth >= 20) {
                         LOGGER.warn("Could not find entity " + uuid + " for " + packet.getClass().getSimpleName() + ", requesting it");
                     }
-                    RequestEntityPacket.requestEntity(connection, world, uuid);
+                    RequestEntityPacket.requestEntity(connection, level, world, uuid, pendingChunk);
                     return;
                 }
 
-                RequestEntityPacket.requestEntity(connection, world, uuid);
+                RequestEntityPacket.requestEntity(connection, level, world, uuid, pendingChunk);
                 return;
             }
 

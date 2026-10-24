@@ -11,6 +11,7 @@ import net.minecraft.world.ticks.LevelChunkTicks;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import puregero.multipaper.externalserverprotocol.SendTickListPacket;
+import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.mastermessagingprotocol.ChunkKey;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RequestChunkOwnershipMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
@@ -19,6 +20,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 
 public class MultiPaperExternalBlocksHandler {
@@ -26,6 +29,9 @@ public class MultiPaperExternalBlocksHandler {
     private static final Logger LOGGER = LogManager.getLogger(MultiPaperExternalBlocksHandler.class.getSimpleName());
     private static final HashSet<NewChunkHolder> scheduledChunks = new HashSet<>();
     private static final List<CompletableFutureWithKey<HashSet<NewChunkHolder>, Boolean>> takingControlOf = new ArrayList<>();
+    private static final Map<String, PendingOutgoing> pendingOutgoing = new ConcurrentHashMap<>();
+    private static final Map<ChunkLocation, SendTickListPacket> preparedOutgoing = new ConcurrentHashMap<>();
+    private static long tickCounter;
 
     public static void onBlockScheduled(ServerLevel level, BlockPos pos) {
         NewChunkHolder newChunkHolder = MultiPaper.getChunkHolder(level, pos);
@@ -36,6 +42,8 @@ public class MultiPaperExternalBlocksHandler {
     }
 
     public static void tick() {
+        tickCounter++;
+        if (tickCounter % 20 == 0) retryPendingTickLists();
         takingControlOf.clear();
 
         while (!scheduledChunks.isEmpty()) {
@@ -91,13 +99,69 @@ public class MultiPaperExternalBlocksHandler {
     private static void sendTickListTo(NewChunkHolder newChunkHolder) {
         if (MultiPaper.isChunkExternal(newChunkHolder)) {
             if (newChunkHolder.getCurrentChunk() instanceof LevelChunk levelChunk) {
-                newChunkHolder.externalOwner.getConnection().send(new SendTickListPacket(levelChunk));
-                ((LevelChunkTicks<Block>) levelChunk.getBlockTicks()).removeIf(schedule -> true);
-                ((LevelChunkTicks<Fluid>) levelChunk.getFluidTicks()).removeIf(schedule -> true);
+                SendTickListPacket packet = new SendTickListPacket(levelChunk, true);
+                if (packet.isEmpty()) return;
+                queueHandoff(packet, newChunkHolder.externalOwner.getConnection(), (ServerLevel) levelChunk.getLevel());
             } else {
                 LOGGER.warn("Tried sending a tick list to a chunk that isn't a level chunk: " + newChunkHolder);
             }
         }
+    }
+
+    public static void handoffTicks(LevelChunk chunk, ExternalServer owner) {
+        ChunkLocation location = new ChunkLocation(((ServerLevel) chunk.getLevel()).getWorld().getName(), chunk.getPos().x(), chunk.getPos().z());
+        SendTickListPacket packet = preparedOutgoing.remove(location);
+        if (packet == null) packet = new SendTickListPacket(chunk, true);
+        if (!packet.isEmpty()) queueHandoff(packet, owner.getConnection(), (ServerLevel) chunk.getLevel());
+    }
+
+    /** Stage a sender recovery record before Master can release this owner's lock. */
+    public static boolean persistTicksBeforeUnlock(LevelChunk chunk) {
+        ServerLevel level = (ServerLevel) chunk.getLevel();
+        ChunkLocation location = new ChunkLocation(level.getWorld().getName(), chunk.getPos().x(), chunk.getPos().z());
+        SendTickListPacket packet = new SendTickListPacket(chunk, true);
+        if (packet.isEmpty()) return true;
+        try {
+            packet.persistForOutgoing();
+            packet.removeInFlightFromSource(level);
+            pendingOutgoing.putIfAbsent(packet.transferId(), new PendingOutgoing(packet));
+            preparedOutgoing.put(location, packet);
+            return true;
+        } catch (Exception e) {
+            LOGGER.error("Could not persist scheduled ticks before releasing chunk " + location + "; retaining ownership", e);
+            return false;
+        }
+    }
+
+    private static void queueHandoff(SendTickListPacket packet, ExternalServerConnection connection, ServerLevel level) {
+        try {
+            packet.persistForOutgoing();
+            packet.removeInFlightFromSource(level);
+            pendingOutgoing.putIfAbsent(packet.transferId(), new PendingOutgoing(packet));
+            packet.sendTo(connection);
+        } catch (Exception e) {
+            LOGGER.error("Could not durably stage outgoing scheduled ticks for " + packet.world() + "," + packet.cx() + "," + packet.cz(), e);
+        }
+    }
+
+    private static void retryPendingTickLists() {
+        for (PendingOutgoing pending : new ArrayList<>(pendingOutgoing.values())) {
+            SendTickListPacket packet = pending.packet;
+            NewChunkHolder holder = MultiPaper.getChunkHolder(packet.world(), packet.cx(), packet.cz());
+            if (holder != null && MultiPaper.isChunkExternal(holder) && holder.externalOwner != null && holder.externalOwner.getConnection() != null) {
+                packet.sendTo(holder.externalOwner.getConnection());
+            }
+        }
+    }
+
+    public static void acknowledgeTickList(String world, int cx, int cz, String transferId) {
+        MultiPaper.runSync(() -> {
+            PendingOutgoing pending = pendingOutgoing.remove(transferId);
+            if (pending == null) return;
+            preparedOutgoing.remove(new ChunkLocation(world, cx, cz), pending.packet);
+            NewChunkHolder holder = MultiPaper.getChunkHolder(world, cx, cz);
+            if (holder != null && holder.getCurrentChunk() instanceof LevelChunk levelChunk) pending.packet.removeFrom(levelChunk);
+        });
     }
 
     private static void fillTickingNeighbours(NewChunkHolder newChunkHolder, HashSet<NewChunkHolder> neighbours) {
@@ -147,5 +211,8 @@ public class MultiPaperExternalBlocksHandler {
             return key;
         }
     }
+
+    private record PendingOutgoing(SendTickListPacket packet) { }
+    private record ChunkLocation(String world, int cx, int cz) { }
 
 }

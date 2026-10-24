@@ -18,14 +18,14 @@
      private final ServicesManager servicesManager = new SimpleServicesManager();
      private final CraftScheduler scheduler = new CraftScheduler();
      private final CraftCommandMap commandMap; // Paper - Move down
-@@ -389,6 +_,7 @@
-         // Paper start
-         this.commandMap = new CraftCommandMap(this);
+@@ -391,6 +_,7 @@
          this.pluginManager = new SimplePluginManager(this, commandMap);
          this.paperPluginManager = new io.papermc.paper.plugin.manager.PaperPluginManagerImpl(this, this.commandMap, pluginManager);
          this.pluginManager.paperPluginManager = this.paperPluginManager;
 +        this.commandMap.registerMultiPaperCommands(); // MultiPaper - command timings require the initialized plugin manager
           // Paper end
+         // Purpur start - Language API
+         org.purpurmc.purpur.language.Language.setLanguage(new org.purpurmc.purpur.language.Language() {
 @@ -592,6 +_,7 @@
              // Spigot end
              DefaultPermissions.registerCorePermissions();

@@ -4,6 +4,7 @@
 // packet, then move its stack by normal clicks or shift-click and require
 // server slot confirmations. Seed the chest with RCON before connecting.
 
+require('./Minecraft26_3ProtocolSupport')
 const mc = require('minecraft-protocol')
 
 const [host = '127.0.0.1', portText = '25565', username, xText = '5', yText = '65', zText = '5', version = '26.3', holdText = '12', clickMode = 'normal'] = process.argv.slice(2)
@@ -93,6 +94,9 @@ client.on('packet', (packet, meta) => {
 
   if (meta.name === 'window_items' && packet.windowId === windowId) {
     stateId = packet.stateId
+    if (process.env.MULTIPAPER_CONTAINER_TRACE === '1') {
+      console.log(`WINDOW_ITEMS window=${packet.windowId} stateId=${stateId} items=${JSON.stringify(packet.items.map((item, slot) => item?.itemCount ? { slot, itemId: item.itemId, itemCount: item.itemCount } : null).filter(Boolean))}`)
+    }
     const chestSlot = packet.items[0]
     const playerSlot = packet.items[27]
     const destinationSlot = clickMode === 'shift'
@@ -119,6 +123,9 @@ client.on('packet', (packet, meta) => {
   }
 
   if (meta.name === 'set_slot') {
+    if (process.env.MULTIPAPER_CONTAINER_TRACE === '1') {
+      console.log(`SET_SLOT window=${packet.windowId} slot=${packet.slot} stateId=${packet.stateId} item=${JSON.stringify(packet.item)}`)
+    }
     if (packet.windowId === windowId) stateId = packet.stateId
     if (clickMode === 'shift' && stage === 4) console.log(`SHIFT_SET_SLOT window=${packet.windowId} slot=${packet.slot} item=${JSON.stringify(packet.item)} stateId=${packet.stateId}`)
     if (clickMode === 'shift' && stage === 4 && packet.windowId === windowId) {

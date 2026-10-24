@@ -1,6 +1,8 @@
 --- a/src/main/java/org/purpurmc/purpur/PurpurVersionFetcher.java
 +++ b/src/main/java/org/purpurmc/purpur/PurpurVersionFetcher.java
-@@ -73,2 +73,8 @@
+@@ -71,6 +_,12 @@
+     }
+ 
      private static Component getUpdateStatusMessage() {
 +        if (BUILD_INFO.asString(VERSION_SIMPLE).contains("-DEV-")) {
 +            final String branch = BUILD_INFO.gitBranch().orElse("unknown branch");
@@ -9,3 +11,5 @@
 +        }
 +
          final OptionalInt buildNumber = BUILD_INFO.buildNumber();
+         if (buildNumber.isPresent()) {
+             distance = fetchDistanceFromSiteApi(buildNumber.getAsInt());

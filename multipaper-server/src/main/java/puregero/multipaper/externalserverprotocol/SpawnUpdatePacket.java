@@ -16,18 +16,21 @@ public class SpawnUpdatePacket extends ExternalServerPacket {
     private final String world;
     private final BlockPos pos;
     private final float angle;
+    private final float pitch;
 
     public SpawnUpdatePacket(ServerLevel level) {
         this.world = level.getWorld().getName();
         net.minecraft.world.level.storage.LevelData.RespawnData spawn = level.serverLevelData.getRespawnData();
         this.pos = spawn.globalPos().pos();
         this.angle = spawn.yaw();
+        this.pitch = spawn.pitch();
     }
 
     public SpawnUpdatePacket(FriendlyByteBuf in) {
         world = in.readUtf();
         pos = BlockPos.of(in.readLong());
         angle = in.readFloat();
+        pitch = in.readFloat();
     }
 
     @Override
@@ -35,6 +38,7 @@ public class SpawnUpdatePacket extends ExternalServerPacket {
         out.writeUtf(world);
         out.writeLong(pos.asLong());
         out.writeFloat(angle);
+        out.writeFloat(pitch);
     }
 
     @Override
@@ -43,10 +47,13 @@ public class SpawnUpdatePacket extends ExternalServerPacket {
             World bukkitWorld = Bukkit.getWorld(world);
             if (bukkitWorld instanceof CraftWorld craftWorld) {
                 updatingSpawn = true;
-            craftWorld.getHandle().serverLevelData.setSpawn(new net.minecraft.world.level.storage.LevelData.RespawnData(
-                net.minecraft.core.GlobalPos.of(craftWorld.getHandle().dimension(), pos), angle, 0.0F
-            ));
-                updatingSpawn = false;
+                try {
+                    craftWorld.getHandle().setRespawnData(new net.minecraft.world.level.storage.LevelData.RespawnData(
+                        net.minecraft.core.GlobalPos.of(craftWorld.getHandle().dimension(), pos), angle, pitch
+                    ));
+                } finally {
+                    updatingSpawn = false;
+                }
             }
         });
     }

@@ -1,0 +1,11 @@
+name: ScheduledTickLockProbe
+version: 1.0
+main: probe.ScheduledTickLockProbe
+api-version: '1.21'
+commands:
+  ticklockprobe:
+    description: Disposable test helper to request or release a MultiPaper chunk lock
+    permission: multipaper.test.ticklockprobe
+permissions:
+  multipaper.test.ticklockprobe:
+    default: op

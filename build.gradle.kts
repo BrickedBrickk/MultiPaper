@@ -1,5 +1,9 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import java.time.LocalDateTime
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 plugins {
     id("io.papermc.paperweight.patcher") version "2.0.0-beta.24"
@@ -137,5 +141,42 @@ gradle.projectsEvaluated {
     val serverProject = project(":multipaper-server")
     serverProject.tasks.configureEach {
         dependsOn(checkoutPurpur)
+    }
+
+    // Paperweight's ZIP filesystem writes the current wall-clock time into every
+    // output entry. Normalize these two release artifacts after creation so clean
+    // builds with identical contents have identical archive hashes.
+    listOf("createPaperclipJar", "createBundlerJar").forEach { taskName ->
+        serverProject.tasks.named(taskName).configure {
+            doLast {
+                val outputProperty = javaClass.methods.firstOrNull {
+                    it.name == "getOutputZip" && it.parameterCount == 0
+                }?.invoke(this) as? org.gradle.api.file.RegularFileProperty
+                    ?: throw GradleException("$taskName does not expose its output ZIP")
+                val archive = outputProperty.get().asFile.toPath()
+                val normalized = archive.resolveSibling(archive.fileName.toString() + ".normalized")
+                ZipFile(archive.toFile()).use { input ->
+                    ZipOutputStream(java.nio.file.Files.newOutputStream(normalized)).use { output ->
+                        output.setLevel(9)
+                        val entries = input.entries()
+                        while (entries.hasMoreElements()) {
+                            val source = entries.nextElement()
+                            val target = ZipEntry(source.name)
+                            target.setTimeLocal(LocalDateTime.of(1980, 1, 1, 0, 0))
+                            output.putNextEntry(target)
+                            if (!source.isDirectory) {
+                                input.getInputStream(source).use { it.copyTo(output) }
+                            }
+                            output.closeEntry()
+                        }
+                    }
+                }
+                java.nio.file.Files.move(
+                    normalized,
+                    archive,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+        }
     }
 }

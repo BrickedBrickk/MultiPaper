@@ -4,6 +4,7 @@
 // The caller should prepare the stasis chamber and give the player an ender
 // pearl before throwDelayMs expires. This script does not grant items or teleport.
 const mc = require('minecraft-protocol')
+require('./Minecraft26_3ProtocolSupport')
 
 const [host = '127.0.0.1', portText = '25565', username = 'PearlPersist01', throwDelayText = '12000', holdDurationText = '180000', version = '26.3', yawText = '0', pitchText = '0'] = process.argv.slice(2)
 const port = Number(portText)

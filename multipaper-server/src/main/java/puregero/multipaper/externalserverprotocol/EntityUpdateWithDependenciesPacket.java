@@ -82,6 +82,7 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
 
         if (bukkitWorld instanceof CraftWorld craftWorld) {
             ServerLevel level = craftWorld.getHandle();
+            ChunkPos pendingChunk = ChunkPos.unpack(this.chunkPos);
             Entity entity = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getRawEntity(uuid);
             if (entity == null) {
                 if (EntityRemovePacket.hasRemovalMarker(uuid)) {
@@ -92,18 +93,17 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
                 // the spawn entity packet is probably coming later
 
                 // first we check if we really need to request the entity by checking if entity's chunk is loaded
-                ChunkPos pendingChunk = ChunkPos.unpack(this.chunkPos);
                 if (((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) level).moonrise$getEntityLookup().getChunk(pendingChunk.x(), pendingChunk.z()) == null) {
                     return;
                 }
 
                 if (depth > 5) {
                     LOGGER.warn("Could not find entity " + uuid + " for " + packet.getClass().getSimpleName() + ", requesting it");
-                    RequestEntityPacket.requestEntity(connection, world, uuid);
+                    RequestEntityPacket.requestEntity(connection, level, world, uuid, pendingChunk);
                     return;
                 }
 
-                RequestEntityPacket.requestEntity(connection, world, uuid);
+                RequestEntityPacket.requestEntity(connection, level, world, uuid, pendingChunk);
                 return;
             }
 
@@ -119,11 +119,11 @@ public class EntityUpdateWithDependenciesPacket extends ExternalServerPacket {
 
                     if (depth > 5) {
                         LOGGER.warn("Could not find dependent entity " + uuids[i] + " for " + packet.getClass().getSimpleName() + ", requesting it");
-                        RequestEntityPacket.requestEntity(connection, world, uuids[i]);
+                        RequestEntityPacket.requestEntity(connection, level, world, uuids[i], pendingChunk);
                         return;
                     }
 
-                    RequestEntityPacket.requestEntity(connection, world, uuids[i]);
+                    RequestEntityPacket.requestEntity(connection, level, world, uuids[i], pendingChunk);
                     return;
                 }
             }

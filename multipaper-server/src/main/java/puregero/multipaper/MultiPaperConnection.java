@@ -66,6 +66,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     private long lastPingReceived;
     private final Set<MasterBoundMessage> unhandledRequests = ConcurrentHashMap.newKeySet();
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
+    private final PeerServerStartTracker peerServerStartTracker = new PeerServerStartTracker();
     private final ServerStartMessageTracker serverStartMessageTracker = new ServerStartMessageTracker();
     public String secret;
     public Map<String, byte[]> dataCache = Maps.newHashMap();
@@ -272,9 +273,28 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
     @Override
     public void handle(ServerStartedMessage message) {
-        if (MinecraftServer.getServer() == null) {
+        if (peerServerStartTracker.enqueue(message)) {
+            connectToPeerWhenServerReady(message, System.nanoTime() + TimeUnit.SECONDS.toNanos(120));
+        }
+    }
+
+    private void connectToPeerWhenServerReady(ServerStartedMessage message, long deadlineNanos) {
+        if (!peerServerStartTracker.isPending(message)) {
             return;
         }
+        if (MinecraftServer.getServer() == null) {
+            if (System.nanoTime() >= deadlineNanos) {
+                peerServerStartTracker.discard(message);
+                LOGGER.error("Discarding peer connection to {}:{} because the Minecraft server did not finish starting within 120 seconds", message.host, message.port);
+                return;
+            }
+            CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(() -> connectToPeerWhenServerReady(message, deadlineNanos));
+            return;
+        }
+        peerServerStartTracker.dispatchIfReady(message, true, this::connectToPeer);
+    }
+
+    private void connectToPeer(ServerStartedMessage message) {
 
         LOGGER.info("Connecting to external server " + message.host + ":" + message.port + "...");
 
@@ -310,7 +330,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
             if (newChunkHolder.externalOwner != null && newChunkHolder.externalOwner.isMe() && server != null && !server.isMe()) {
                 if (newChunkHolder.getCurrentChunk() instanceof LevelChunk levelChunk) {
                     server.getConnection().send(new SendEntitiesPacket(levelChunk));
-                    server.getConnection().send(new SendTickListPacket(levelChunk));
+                    MultiPaperExternalBlocksHandler.handoffTicks(levelChunk, server);
                 } else {
                     LOGGER.warn("Chunk " + message.cx + ", " + message.cz + " in world " + message.world + " is not a level chunk, but we own it and want to send tick list to " + server.getName());
                 }
@@ -319,14 +339,12 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
                 // Wait a bit for extra data to arrive before ticking the chunk
                 newChunkHolder.externalOwner = null;
                 MultiPaper.runSync(() -> newChunkHolder.externalOwner = server);
+                SendTickListPacket.recoverChunk(message.world, message.cx, message.cz);
             } else if (server != null) {
                 newChunkHolder.externalOwner = server;
-                MultiPaper.runSync(() -> {
-                    if (newChunkHolder.getCurrentChunk() instanceof LevelChunk levelChunk) {
-                        levelChunk.blockTicks.removeIf(tick -> true);
-                        levelChunk.fluidTicks.removeIf(tick -> true);
-                    }
-                });
+                // Keep local scheduled ticks until the receiver acknowledges their
+                // idempotent application. This is the sender's recovery copy when
+                // the receiver unloads or restarts before replay.
             } else {
                 newChunkHolder.externalOwner = null;
             }

@@ -100,6 +100,11 @@ function Read-PearlY([int]$Port, [string]$Command, [string]$Label) {
 }
 
 $zTop = 90
+$chamberRadius = 2
+$minX = $X - $chamberRadius
+$maxX = $X + $chamberRadius
+$minZ = $Z - $chamberRadius
+$maxZ = $Z + $chamberRadius
 $tag = 'stasis_chunk_reload_' + [Guid]::NewGuid().ToString('N')
 $uuidCommand = "data get entity @e[type=minecraft:ender_pearl,tag=$tag,limit=1] UUID"
 $posCommand = "data get entity @e[type=minecraft:ender_pearl,tag=$tag,limit=1] Pos"
@@ -113,11 +118,11 @@ try {
     Wait-Loaded $Server2RconPort 'Backend 2' $true | Out-Null
     Wait-Loaded $Server1RconPort 'Backend 1' $true | Out-Null
 
-    Send-Rcon $Server2RconPort "setblock $X 59 $Z minecraft:soul_sand" | Out-Null
-    Send-Rcon $Server2RconPort "fill $X 60 $Z $X 89 $Z minecraft:water" | Out-Null
-    Send-Rcon $Server2RconPort "setblock $X 60 $Z minecraft:kelp" | Out-Null
-    Send-Rcon $Server2RconPort "setblock $X 60 $Z minecraft:water" | Out-Null
-    Send-Rcon $Server2RconPort "setblock $X $zTop $Z minecraft:oak_trapdoor[half=top,waterlogged=true]" | Out-Null
+    Send-Rcon $Server2RconPort "fill $minX 59 $minZ $maxX 59 $maxZ minecraft:soul_sand" | Out-Null
+    Send-Rcon $Server2RconPort "fill $minX 60 $minZ $maxX 89 $maxZ minecraft:water" | Out-Null
+    Send-Rcon $Server2RconPort "fill $minX 60 $minZ $maxX 60 $maxZ minecraft:kelp" | Out-Null
+    Send-Rcon $Server2RconPort "fill $minX 60 $minZ $maxX 60 $maxZ minecraft:water" | Out-Null
+    Send-Rcon $Server2RconPort "fill $minX $zTop $minZ $maxX $zTop $maxZ minecraft:oak_trapdoor[half=top,waterlogged=true]" | Out-Null
     $bubbleCommand = "execute if block $X 80 $Z minecraft:bubble_column run help"
     $bubbleDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
@@ -208,6 +213,6 @@ try {
         try { Send-Rcon $Server1RconPort "forceload remove $X $Z" | Out-Null } catch { }
         try { Send-Rcon $Server2RconPort "forceload remove $X $Z" | Out-Null } catch { }
     }
-    try { Send-Rcon $Server2RconPort "fill $X 59 $Z $X $zTop $Z minecraft:air" | Out-Null } catch { }
-    try { Send-Rcon $Server1RconPort "fill $X 59 $Z $X $zTop $Z minecraft:air" | Out-Null } catch { }
+    try { Send-Rcon $Server2RconPort "fill $minX 59 $minZ $maxX $zTop $maxZ minecraft:air" | Out-Null } catch { }
+    try { Send-Rcon $Server1RconPort "fill $minX 59 $minZ $maxX $zTop $maxZ minecraft:air" | Out-Null } catch { }
 }

@@ -4,6 +4,7 @@
 // planks in the player's 2x2 inventory grid using normal window clicks.
 // Seed exactly four planks into hotbar slot 0 with RCON while the player is online.
 
+require('./Minecraft26_3ProtocolSupport')
 const mc = require('minecraft-protocol')
 
 const [host = '127.0.0.1', portText = '25565', username, version = '26.3', holdText = '12'] = process.argv.slice(2)

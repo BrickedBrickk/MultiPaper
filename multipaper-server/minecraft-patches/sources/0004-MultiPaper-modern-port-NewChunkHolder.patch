@@ -22,18 +22,7 @@
      // load/unload state
  
      // chunk data state
-@@ -124,6 +139,9 @@ ChunkEntitySlices loadInEntityChunk(final boolean transientChunk) {
-                 ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup().addEntityChunkEntities(entities, pos);
-             }
-         }
- 
-+        if (!transientChunk) {
-+            this.multiPaperEntitiesReady = true;
-+            puregero.multipaper.MultiPaper.getConnection().send(new puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeEntitiesMessage(this.world.getWorld().getName(), this.chunkX, this.chunkZ)); // MultiPaper - subscribe for live entity synchronization
-+        }
-         return ret;
-     }
-@@ -451,6 +469,24 @@ public final class NewChunkHolder {
+@@ -451,6 +466,24 @@ public final class NewChunkHolder {
  
      private ChunkAccess currentChunk;
  
@@ -58,7 +47,7 @@
      // generation status state
  
      /**
-@@ -866,13 +902,14 @@ public final class NewChunkHolder {
+@@ -866,13 +899,14 @@ public final class NewChunkHolder {
          return this.unloadState = (chunk != null || entityChunk != null || poiChunk != null) ? new UnloadState(this, chunk, entityChunk, poiChunk) : null;
      }
  
@@ -75,7 +64,7 @@
  
          // unload chunk data
          if (chunk != null) {
-@@ -891,12 +928,17 @@ public final class NewChunkHolder {
+@@ -891,12 +925,17 @@ public final class NewChunkHolder {
              }
  
              this.asyncCompleteUnloadTask(MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, chunkWrite[0]);
@@ -94,7 +83,7 @@
  
              if (entityChunk.unload()) {
                  final ReentrantAreaLock.Node schedulingLock = this.scheduler.schedulingLockArea.lock(this.chunkX, this.chunkZ);
-@@ -1169,6 +1211,7 @@ public final class NewChunkHolder {
+@@ -1169,6 +1208,7 @@ public final class NewChunkHolder {
                  for (int dx = -NEIGHBOUR_RADIUS; dx <= NEIGHBOUR_RADIUS; ++dx) {
                      final NewChunkHolder holder = (dx | dz) == 0 ? this : this.scheduler.chunkHolderManager.getChunkHolder(dx + this.chunkX, dz + this.chunkZ);
                      if (loaded) {
@@ -102,7 +91,7 @@
                          if (holder.setNeighbourFullLoaded(-dx, -dz)) {
                              changedFullStatus.add(holder);
                          }
-@@ -1226,3 +1269,9 @@ public final class NewChunkHolder {
+@@ -1226,3 +1266,9 @@ public final class NewChunkHolder {
      private void changeEntityChunkStatus(final FullChunkStatus toStatus) {
 -        ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup().chunkStatusChange(this.chunkX, this.chunkZ, toStatus);
 +        final var entityLookup = ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup();
@@ -113,7 +102,7 @@
 +            entityChunk.updateStatus(toStatus, entityLookup);
 +        }
      }
-@@ -1465,6 +1514,8 @@ public final class NewChunkHolder {
+@@ -1465,6 +1511,8 @@ public final class NewChunkHolder {
          CHUNK_COMPLETION_ARRAY_HANDLE.setVolatile(this.chunkCompletions, newStatus.getIndex(), completion);
          this.lastChunkCompletion = completion;
  
@@ -122,7 +111,7 @@
          final ChunkStatus requestedGenStatus = this.requestedGenStatus;
  
          List<NewChunkHolder> needsScheduling = null;
-@@ -1542,6 +1593,8 @@ public final class NewChunkHolder {
+@@ -1542,6 +1590,8 @@ public final class NewChunkHolder {
  
              this.scheduleNeighbours(needsScheduling, scheduleList);
          }
@@ -131,10 +120,10 @@
      }
  
      private void scheduleNeighbours(final List<NewChunkHolder> needsScheduling, final List<ChunkProgressionTask> scheduleList) {
-@@ -1789,1 +1842,2 @@ private boolean saveEntities(final ChunkEntitySlices entities, final boolean unloading, final Completable<CompoundTag>[] entitySave) {
+@@ -1789,1 +1839,2 @@ private boolean saveEntities(final ChunkEntitySlices entities, final boolean unloading, final Completable<CompoundTag>[] entitySave) {
 +                puregero.multipaper.MultiPaperEntitiesHandler.willWriteEntities(this); // MultiPaper
                  MoonriseRegionFileIO.scheduleSave(
-@@ -1850,5 +1904,6 @@ private boolean saveEntities(final ChunkEntitySlices entities, final boolean unloading, final Completable<CompoundTag>[] entitySave) {
+@@ -1850,5 +1901,6 @@ private boolean saveEntities(final ChunkEntitySlices entities, final boolean unloading, final Completable<CompoundTag>[] entitySave) {
              if (save == null && this.lastEntitySaveNull) {
                  return false;
              }

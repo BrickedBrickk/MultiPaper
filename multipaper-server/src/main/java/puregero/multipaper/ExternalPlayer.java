@@ -56,6 +56,10 @@ public class ExternalPlayer extends ServerPlayer {
                 && !(packet instanceof ClientboundSetChunkCacheRadiusPacket);
     }
 
+    static boolean shouldBroadcastSyncedData(@Nullable GameProfile gameProfile, boolean updatingData) {
+        return !updatingData && gameProfile != null;
+    }
+
     public static ExternalPlayer create(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, String advancements, String stats, int entityId, UUID playerSyncSessionId, String playerOwnerName) {
         loadedAdvancements.put(gameProfile.id(), advancements);
         loadedStats.put(gameProfile.id(), stats);
@@ -64,9 +68,18 @@ public class ExternalPlayer extends ServerPlayer {
 
     public ExternalPlayer(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, int entityId, UUID playerSyncSessionId, String playerOwnerName) {
         super(((CraftServer) Bukkit.getServer()).getServer(), ((CraftWorld) Bukkit.getWorld(world)).getHandle(), gameProfile, net.minecraft.server.level.ClientInformation.createDefault());
-        MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> this.load(
-            net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, this.level().registryAccess(), saveData)
-        ));
+        // The initial NBT load can invoke synced-data callbacks before this mirror
+        // has been registered or moved to its authoritative position. The initial
+        // PlayerCreatePacket already carries this state; echoing those callbacks
+        // can send stale updates for chunk 0,0 back across the peer connection.
+        this.updatingData = true;
+        try {
+            MultiPaperInventoryHandler.runWithInventoryUpdatesSuppressed(() -> this.load(
+                net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, this.level().registryAccess(), saveData)
+            ));
+        } finally {
+            this.updatingData = false;
+        }
 
         if (MultiPaperConfiguration.get().syncSettings.syncEntityIds) {
             setId(entityId);
@@ -160,7 +173,9 @@ public class ExternalPlayer extends ServerPlayer {
 
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> data) {
-        if (!updatingData) {
+        // ServerPlayer can invoke this override during super construction,
+        // before the ExternalPlayer has a profile or can be replicated.
+        if (shouldBroadcastSyncedData(getGameProfile(), updatingData)) {
             MultiPaper.broadcastPacketToExternalServers(new EntityUpdatePacket(this,
                     new ClientboundSetEntityDataPacket(getId(), Collections.singletonList(getEntityData().getItem(data).value()))));
         }

@@ -33,6 +33,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSave
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public class MultiPaperEntitiesHandler {
 
@@ -402,13 +403,47 @@ public class MultiPaperEntitiesHandler {
                 MultiPaper.broadcastPacketToExternalServers(new EntityRemovePacket(entity, unloadedWithPlayer));
             } else {
                 ExternalServer owner = newChunkHolder.externalOwner;
-                if (owner == null || owner.isMe() || owner.getConnection() == null || !owner.getConnection().send(new RequestEntityRemovePacket(entity, unloadedWithPlayer))) {
-                    LOGGER.warn("Could not route removal of entity " + entity.getUUID() + " from non-owner backend to its chunk owner");
-                }
+                routeRemovalToOwnerOrFallback(owner,
+                        () -> owner.getConnection().send(new RequestEntityRemovePacket(entity, unloadedWithPlayer)),
+                        () -> {
+                            LOGGER.warn("Could not route removal of entity " + entity.getUUID() + " from non-owner backend to its chunk owner; broadcasting removal as fallback");
+                            if (!unloadedWithPlayer) {
+                                EntityRemovePacket.setEntityRemoved(entity.getUUID(), reason);
+                            }
+                            MultiPaper.broadcastPacketToExternalServers(new EntityRemovePacket(entity, unloadedWithPlayer));
+                        });
             }
         } else {
             LOGGER.warn(entity + " removed in an unloaded chunk");
         }
+    }
+
+    /**
+     * Route explicit kill operations on entity mirrors to their authoritative backend.
+     * LivingEntity.kill applies damage and only reaches the normal removal hook when
+     * the entity is ticked; a non-owner mirror is deliberately not ticked.
+     */
+    public static boolean requestKillFromNonOwner(Entity entity) {
+        if (entity instanceof ServerPlayer || !(entity.level() instanceof ServerLevel level)) return false;
+        NewChunkHolder holder = MultiPaper.getChunkHolder(level, entity.chunkPosition().x(), entity.chunkPosition().z());
+        if (MultiPaper.isChunkLocal(holder)) return false;
+        ExternalServer owner = holder == null ? null : holder.externalOwner;
+        if (owner != null && !owner.isMe() && owner.getConnection() != null
+                && owner.getConnection().send(new RequestEntityKillPacket(entity))) {
+            return true;
+        }
+        LOGGER.warn("Could not route explicit kill of entity {} from non-owner backend to its chunk owner", entity.getUUID());
+        // Never apply the operation to a stale mirror. It is safer to leave it
+        // visible for retry than to create a local-only removal or duplicate drops.
+        return true;
+    }
+
+    static boolean routeRemovalToOwnerOrFallback(ExternalServer owner, BooleanSupplier sendRequest, Runnable broadcastFallback) {
+        if (owner != null && !owner.isMe() && owner.getConnection() != null && sendRequest.getAsBoolean()) {
+            return true;
+        }
+        broadcastFallback.run();
+        return false;
     }
 
     public static void onEntityUpdate(Entity entity, Packet<?> packet, NewChunkHolder newChunkHolder) {

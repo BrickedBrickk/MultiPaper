@@ -1,0 +1,107 @@
+--- a/net/minecraft/world/ticks/LevelTicks.java
++++ b/net/minecraft/world/ticks/LevelTicks.java
+@@ -23,10 +23,13 @@ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.SectionPos;
+ import net.minecraft.core.Vec3i;
+ import net.minecraft.util.Util;
++import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.util.profiling.Profiler;
+ import net.minecraft.util.profiling.ProfilerFiller;
+ import net.minecraft.world.level.ChunkPos;
+ import net.minecraft.world.level.levelgen.structure.BoundingBox;
++import puregero.multipaper.MultiPaper;
++import puregero.multipaper.externalserverprotocol.SendTickListPacket;
+ 
+ public class LevelTicks<T> implements LevelTickAccess<T> {
+     private static final Comparator<LevelChunkTicks<?>> CONTAINER_DRAIN_ORDER = (o1, o2) -> ScheduledTick.INTRA_TICK_DRAIN_ORDER.compare(o1.peek(), o2.peek());
+@@ -47,6 +50,41 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
+         this.tickCheck = tickCheck;
+     }
+ 
++    public ServerLevel level; // MultiPaper - add level
++
++    public LevelTicks(final ServerLevel level, final LongPredicate tickingFutureReadyPredicate) {
++        this(level, tickingFutureReadyPredicate, () -> null);
++    }
++
++    public LevelTicks(ServerLevel level, LongPredicate tickingFutureReadyPredicate, java.util.function.Supplier<ProfilerFiller> profilerGetter) {
++        this(tickingFutureReadyPredicate);
++        this.level = level;
++    }
++
++    // MultiPaper start - expose the unexecuted queue during durable ownership handoff
++    public List<SavedTick<T>> snapshotInFlightTicksInChunk(final ChunkPos pos, final long currentTick) {
++        final long chunkKey = pos.pack();
++        return this.toRunThisTick.stream()
++            .filter(tick -> ChunkPos.pack(tick.pos()) == chunkKey)
++            .sorted(ScheduledTick.DRAIN_ORDER)
++            .map(tick -> tick.toSavedTick(currentTick))
++            .toList();
++    }
++
++    public void removeInFlightTicksInChunk(final ChunkPos pos, final List<SavedTick<T>> ticks, final long currentTick) {
++        if (ticks.isEmpty()) return;
++        final long chunkKey = pos.pack();
++        java.util.function.Predicate<ScheduledTick<T>> matches = scheduled -> ChunkPos.pack(scheduled.pos()) == chunkKey
++            && ticks.stream().anyMatch(saved -> saved.pos().equals(scheduled.pos()) && saved.type() == scheduled.type()
++                && saved.priority() == scheduled.priority() && currentTick + saved.delay() == scheduled.triggerTick());
++        this.toRunThisTick.removeIf(scheduled -> {
++            if (!matches.test(scheduled)) return false;
++            this.toRunThisTickSet.remove(scheduled);
++            return true;
++        });
++    }
++    // MultiPaper end
++
+     public void addContainer(final ChunkPos pos, final LevelChunkTicks<T> container) {
+         long posKey = pos.pack();
+         this.allContainers.put(posKey, container);
+@@ -114,6 +152,13 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
+                         it.remove();
+                     } else if (scheduledTick.triggerTick() > currentTick) {
+                         entry.setValue(scheduledTick.triggerTick());
++                    } else if (level != null && candidateContainer.count() > 0 && SendTickListPacket.shouldHoldTickExecution(
++                            MultiPaper.isChunkLocal(((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)(Object)level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(chunkPos)),
++                            SendTickListPacket.isAwaitingDurableApply(level.getWorld().getName(), ChunkPos.getX(chunkPos), ChunkPos.getZ(chunkPos)))) {
++                        // MultiPaper start - Don't tick chunks that aren't owned by us
++                        candidateContainer.getAll().forEach(tick -> tick.triggerTick++);
++                        entry.setValue(candidateContainer.peek().triggerTick());
++                        // MultiPaper end - Don't tick chunks that aren't owned by us
+                     } else if (this.tickCheck.test(chunkPos)) {
+                         it.remove();
+                         this.containersToTick.add(candidateContainer);
+@@ -227,6 +272,26 @@
+     private void runCollectedTicks(final BiConsumer<BlockPos, T> output) {
+         while (!this.toRunThisTick.isEmpty()) {
+             ScheduledTick<T> entry = this.toRunThisTick.poll();
+             if (!this.toRunThisTickSet.isEmpty()) {
+                 this.toRunThisTickSet.remove(entry);
+             }
++
++            // Ownership can change after collectTicks drains a chunk container but before
++            // the callback runs. Re-check here and return the tick to its chunk queue;
++            // otherwise the old owner can consume it after ownership has transferred.
++            if (this.level != null && SendTickListPacket.shouldHoldTickExecution(
++                    MultiPaper.isChunkLocal(((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)(Object)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.getChunkHolder(ChunkPos.pack(entry.pos()))),
++                    SendTickListPacket.isAwaitingDurableApply(this.level.getWorld().getName(), entry.pos().getX() >> 4, entry.pos().getZ() >> 4))) {
++                LevelChunkTicks<T> container = this.allContainers.get(ChunkPos.pack(entry.pos()));
++                if (container != null) {
++                    container.schedule(SendTickListPacket.deferCollectedTick(entry, this.level.getGameTime()));
++                    puregero.multipaper.MultiPaperExternalBlocksHandler.onBlockScheduled(this.level, entry.pos());
++                } else {
++                    // A chunk can disappear while its collected queue is in flight. Keep
++                    // the tick in this scheduler until the chunk container is available.
++                    this.toRunThisTick.add(entry);
++                    this.toRunThisTickSet.add(entry);
++                    break;
++                }
++                continue;
++            }
+@@ -239,6 +304,5 @@
+     private void cleanupAfterTick() {
+-        this.toRunThisTick.clear();
++        if (this.toRunThisTick.isEmpty()) this.toRunThisTickSet.clear();
+         this.containersToTick.clear();
+         this.alreadyRunThisTick.clear();
+-        this.toRunThisTickSet.clear();
+     }

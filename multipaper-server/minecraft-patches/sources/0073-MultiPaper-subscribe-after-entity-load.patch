@@ -1,0 +1,25 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
+@@ -133,12 +133,22 @@
+         if (!transientChunk) {
+             if (entityChunk != null) {
+                 final ChunkPos pos = new ChunkPos(this.chunkX, this.chunkZ);
+ 
+                 final List<Entity> entities = ChunkEntitySlices.readEntities(this.world, pos, entityChunk);
+ 
+                 ((ChunkSystemServerLevel)this.world).moonrise$getEntityLookup().addEntityChunkEntities(entities, pos);
+             }
++            // MultiPaper start - subscribe only after Moonrise has installed this entity chunk, including empty chunks
++            if (!this.multiPaperEntitiesReady) {
++                this.multiPaperEntitiesReady = true;
++                puregero.multipaper.MultiPaper.getConnection().send(
++                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeEntitiesMessage(
++                        this.world.getWorld().getName(), this.chunkX, this.chunkZ
++                    )
++                );
++            }
++            // MultiPaper end
+         }
+ 
+         return ret;
+     }
