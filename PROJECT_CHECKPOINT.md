@@ -4,16 +4,13 @@ This section supersedes older conflicting status notes below. Preserve the dirty
 
 ## Current candidate
 
-- Current checkout: `c3ba0e41eedcd7ec96d59a6f8cd2c858aa3214cc`. The worktree contains intentional existing changes; preserve them.
-- Root fix: Master transient entity writes now persist the deduplicated current chunk snapshot as authoritative state. This prevents disk-only entities moved to other chunks from being resurrected by merge. Regression: `MasterIntegrationTest.transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures` and `WriteChunkHandlerTest` pass.
-- Exact hashes: Paperclip `A5631373DD44AD7D523BA5AF88BC99CDAEAAB61F55666D1ABFF78194D83C86A9`; bundler `D5F49095CC3FE0219C4465E0DE92583CAE0BFF9057B02F272CB08259E5E54026`; server `0DA99374B672A2FD0BBFD1F8A5E0584726047B093931F025ECC54FF8BEA8A9CF`; Master `2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186`.
-- Java 25 full build/package passed; 182 suites, 10,736 tests, 0 failures/errors, 88 skipped. Focused Master integration/handler tests passed after the fix. `git diff --check` passed with line-ending notices.
-- Root Gradle config normalizes release archive timestamps. Two independent no-build-cache archive generations matched exact SHA-256 hashes; all normalized entry payloads match the runtime-tested pair, and the reproducibility gate is closed.
-- Fresh exact-pair 16-client/61-second disposable soak passed: 16/16 connected, zero runtime entity warnings or soak movement rejects; orderly post-exit MCA scan: 61 records, 61 unique, 0 duplicates.
-- Fresh exact-pair localhost synthetic capacity run passed: 20/20 offline protocol clients moved for 181 seconds with zero disconnects, runtime movement rejects, entity warnings, or watchdog/tick overruns. Tick samples remained at 20 TPS; observed P99 tick time stayed below 10 ms. Initial-login movement corrections totaled 2,190. This is localhost load evidence, not intended-hardware capacity certification. Transcript and samples: `%TEMP%\multipaper-26.3-final-capacity-5b8ccf25\capacity-4bc27e8966ad4c08b75a974b120fc55b.{out,ticks.txt}`.
-- Exact-pair entity recovery passed: 4 ownership transfers, owner hard crash, restart/reload, and non-owner removal, always one UUID.
-- Evaluation package: `release-staging/MultiPaper-26.3-RC2-entity-snapshot-fix-20261024/`; ZIP SHA-256 `BB0D897A5EFF99B6E6C0ECEA632EE2BD816712FDB2294AE56295F45191774A2C`. Do not treat it as stable.
-- Detailed evidence: `performance-results/current-candidate-entity-snapshot-fix-20261024.txt`.
+- Published GitHub pre-release: [MultiPaper 26.3 RC3](https://github.com/BrickedBrickk/MultiPaper/releases/tag/v26.3-RC3). Tag `v26.3-RC3` points to source commit `73095500f51c5bc95db1b0946f45bc8637c19169`; that commit is pushed on `feature/port-26.3`. This is an evaluation pre-release, not stable.
+- Root entity fix: Master transient entity writes persist the UUID-deduplicated current chunk snapshot as authoritative state, so disk-only entities moved out are not resurrected. Regression coverage: `MasterIntegrationTest.transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures` and `WriteChunkHandlerTest`.
+- Final artifacts were built with Java 25 and numeric `BUILD_NUMBER=3`. Paperclip SHA-256 `22B1EE9737A98BA85A52AE09B6B9C6EB890331F9B7A9443BBD3CDEA9357C6460`; bundler `307525C4AF58DF6FB62AB6D3E0FEE4D32D38CEA2BDBC1765E1DFDD51CBF311A4`; server `9D9DD7AF89D862CC283EA89A3ECECCE03CFCBB132CB16EF4339372643A30AB3B`; Master `2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186`.
+- Full Java 25 Gradle build/package passed from the tagged source: 182 suites, 10,736 tests, 0 failures, 0 errors, 88 skipped. The known resource-reset task `:multipaper-server:applyMinecraftResourcePatches` was excluded; isolated resource generation had already produced identical tracked content.
+- Exact tagged Paperclip and Master JARs passed a fresh disposable two-backend installation. Both backends registered. Through the Master proxy, the protocol smoke passed `/list`, `/tps`, `/mspt`, `/slist`, `/mpdebug`, and `/version`; version reported `26.3-3` and API `26.3-RC3`. Cross-backend block-marker reads and 8-diamond/8-iron hopper conservation across ownership handoff passed, with no new duplicate-entity or missing-entity warnings. Fixture data/logs: `%TEMP%\multipaper-26.3-rc3-final-runtime-20261024`.
+- Package directory: `release-staging/MultiPaper-26.3-RC3-20261024/`; ZIP SHA-256 `0F806AE2662BDFB66CEB2881DECBFCB8095F047185BC84C1AF4790151E3B4BCC`. The JAR hashes in `SHA256SUMS.txt` match the packaged files, and every ZIP payload hash was checked against its staged source. GitHub reports all nine release assets uploaded.
+- Prior exact-source entity and scheduled-tick ownership/recovery results remain valid; do not repeat them absent a new regression. Detailed entity evidence: `performance-results/current-candidate-entity-snapshot-fix-20261024.txt`.
 
 ## Completed work to reuse
 
@@ -21,11 +18,11 @@ Scheduled-tick handoff/replay and entity synchronization/crash recovery were pre
 
 ## Remaining gates
 
-1. User-side real Minecraft online-mode login and human Survival/farm/redstone/portal play; user said they will test later. Do not ask again.
-2. Intended-hardware capacity run on isolated resources. The 20-client localhost run above does not establish the intended-hardware limit; the previous remote attempt shared resources with live services and is invalid. No production or Crafty access.
-3. Stable release only after both gates pass; otherwise keep the candidate staged and report the precise blocker.
+1. Real authenticated Minecraft online-mode login and human Survival/farm/redstone/portal play are unverified. The user said they will test later; do not ask again.
+2. Capacity on the two target PCs remains unverified for RC3. The 20-client localhost run is synthetic and is not a supported player limit; the previous target-host attempt competed with existing services and is invalid. Do not access production or Crafty.
+3. Keep RC3 as a pre-release. A stable public SMP release requires those two gates to pass; do not infer a player limit from the available synthetic runs.
 
-No Gradle client or MultiPaper server process is active. The localhost capacity fixture was stopped after the run. I also found the older `%TEMP%\multipaper-26.3-scheduled-replay-fixed-20261022-224033` disposable fixture still running with zero players; both backends were sent `stop`, exited, and their world data and logs were retained. The idle fixture Master was then stopped. The worktree remains intentionally dirty; preserve all existing changes.
+No Gradle client or MultiPaper server process is active. The final RC3 fixture was save-stopped and its data/logs retained. The earlier idle scheduled-tick fixture was also stopped with its data/logs retained. Preserve all unrelated/untracked user work in the worktree.
 
 ---
 
