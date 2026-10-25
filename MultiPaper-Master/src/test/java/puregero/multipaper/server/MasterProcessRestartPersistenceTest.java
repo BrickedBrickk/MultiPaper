@@ -450,7 +450,8 @@ class MasterProcessRestartPersistenceTest {
     private static Process startMaster(Path workingDirectory, int masterPort, int proxyPort) throws IOException {
         Path jar = Path.of(System.getProperty("user.dir"), "..", "libs", "multipaper-master-3.0.0.jar").normalize().toAbsolutePath();
         assertTrue(jar.toFile().isFile(), "Master JAR not found: " + jar);
-        String java = Path.of(System.getProperty("java.home"), "bin", "java.exe").toString();
+        String javaExecutable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
+        String java = Path.of(System.getProperty("java.home"), "bin", javaExecutable).toString();
         return new ProcessBuilder(java, "-Dlogging.enabled=false", "-jar", jar.toString(), "127.0.0.1:" + masterPort, Integer.toString(proxyPort))
                 .directory(workingDirectory.toFile())
                 .redirectErrorStream(true)
