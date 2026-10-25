@@ -19,6 +19,7 @@
 2. Real Bedrock/Floodgate authentication, identity, and reconnect remain unverified; Geyser only started on a loopback disposable fixture.
 3. Legitimate-client GrimAC checks and older-client/ViaBackwards compatibility remain open. GrimAC warns that this combination has unsupported older-client vehicle behavior.
 4. Intended-hardware two-PC capacity remains open: authoritative movement and controlled 5/10/20-client comparisons with and without plugins are needed. Do not claim a player cap.
+   The exact-RC4 local harness probe was invalid: synthetic position streams triggered GrimAC Simulation, stationary bots timed out, and an older Mineflayer bot was rejected as invalid movement. Evidence: performance-results/rc4-local-capacity-harness-investigation-20261024.md. The experiment was localhost-only; no actual capacity measurements resulted.
 5. Exact RC4 builds were byte-identical with Gradle build cache disabled, but normal dependency cache present. Empty-cache reproducibility is not certified.
 6. Keep RC4 local as an evaluation package. Do not publish stable while critical gates remain open. Do not access Crafty or production. Reuse completed scheduled-tick/entity evidence and do not repeat those investigations absent a fresh regression.
 
