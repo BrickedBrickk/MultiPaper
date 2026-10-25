@@ -77,7 +77,7 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,153 @@
+@@ -266,2 +_,154 @@
 +val applyMultiPaperChunkHolderBasePatch = tasks.register("applyMultiPaperChunkHolderBasePatch") {
 +    dependsOn("applyMinecraftPatches")
 +    doLast {
@@ -229,14 +229,16 @@
 +    dependsOn(applyTransientEntitySavePatch)
 +    dependsOn(applyEntitySpawnSynchronizationPatch)
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
++    dependsOn("applyPurpurServerPatches")
      options.forkOptions.memoryMaximumSize = "1G"
 +    options.debugOptions.debugLevel = "source,lines"
-@@ -269,1 +_,6 @@
+@@ -269,1 +_,7 @@
  }
 +
 +tasks.withType<ProcessResources>().configureEach {
 +    dependsOn("applyMinecraftPatches")
 +    dependsOn("applyPaperServerFilePatches", "applyPaperServerFeaturePatches")
++    dependsOn("applyPurpurServerPatches")
 +}
 @@ -51,4 +_,6 @@
  abstract class Services {

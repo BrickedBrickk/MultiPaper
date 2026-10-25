@@ -63,6 +63,14 @@ public class HelloPacket {
         buffer.put(lengthPosition, (byte) packetLength);
     }
 
+    static String appendForwardingAddressIfMissing(String host, String address) {
+        if (host.indexOf(0) >= 0) {
+            // Preserve existing NUL-delimited proxy data (including Floodgate's encrypted login data).
+            return host;
+        }
+        return host + "\00" + address;
+    }
+
     private static int readVarInt(ByteBuffer buffer) {
         int value = 0;
         int length = 0;
