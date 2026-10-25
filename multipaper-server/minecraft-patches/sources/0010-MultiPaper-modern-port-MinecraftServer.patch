@@ -13,7 +13,7 @@
              levelStem.generator(),
              this.registryAccess(),
 -            loading.data().uuid()
-+            MultiPaper.getWorldUid(loading.data().bukkitName(), loading.data().uuid()) // MultiPaper - share the world's uuid between all backends
++            MultiPaper.getWorldUid(loading.data().bukkitName()) // MultiPaper - share the world's uuid between all backends
          );
          if (biomeProvider == null && chunkGenerator != null) {
              biomeProvider = chunkGenerator.getDefaultBiomeProvider(worldInfo);

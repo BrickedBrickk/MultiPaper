@@ -7,6 +7,7 @@ param(
     [string]$RconPassword = $env:MULTIPAPER_RCON_PASSWORD,
     [string]$Server1RconPassword,
     [string]$Server2RconPassword,
+    [string]$WorldName = 'world',
     [string]$PlayerName,
     [switch]$SkipContainerCheck,
     [switch]$SkipRedstoneAndPistonCheck,
@@ -139,6 +140,30 @@ function Send-Rcon([int]$Port, [string]$Command) {
     } finally {
         $client.Dispose()
     }
+}
+
+function Get-AuthoritativeChunkOwner([int]$ChunkX, [int]$ChunkZ) {
+    $command = "ticklockprobe state $WorldName $ChunkX $ChunkZ"
+    $state1 = Send-Rcon $Server1RconPort $command
+    $state2 = Send-Rcon $Server2RconPort $command
+    $ownerMe1 = [regex]::Match($state1, 'ownerIsMe=(true|false)')
+    $ownerMe2 = [regex]::Match($state2, 'ownerIsMe=(true|false)')
+    $ownerName1 = [regex]::Match($state1, 'owner=([^ ]+)')
+    $ownerName2 = [regex]::Match($state2, 'owner=([^ ]+)')
+    if (-not $ownerMe1.Success -or -not $ownerMe2.Success -or -not $ownerName1.Success -or -not $ownerName2.Success) {
+        throw "Could not read authoritative ownership for chunk $ChunkX,$ChunkZ. Backend 1: '$state1'; Backend 2: '$state2'. Ensure ScheduledTickLockProbe is installed on both disposable backends."
+    }
+    if ($ownerName1.Groups[1].Value -ne $ownerName2.Groups[1].Value) {
+        throw "Backends disagree on authoritative owner for chunk $ChunkX,$ChunkZ. Backend 1: '$state1'; Backend 2: '$state2'."
+    }
+    if ($ownerName1.Groups[1].Value -eq 'none') { return $null }
+    if ($ownerMe1.Groups[1].Value -eq $ownerMe2.Groups[1].Value) {
+        throw "Chunk $ChunkX,$ChunkZ must have exactly one backend reporting ownerIsMe=true. Backend 1: '$state1'; Backend 2: '$state2'."
+    }
+    if ($ownerMe1.Groups[1].Value -eq 'true') {
+        return [pscustomobject]@{ ControllerPort = $Server1RconPort; ObserverPort = $Server2RconPort; State1 = $state1; State2 = $state2; OwnerName = $ownerName1.Groups[1].Value }
+    }
+    return [pscustomobject]@{ ControllerPort = $Server2RconPort; ObserverPort = $Server1RconPort; State1 = $state1; State2 = $state2; OwnerName = $ownerName1.Groups[1].Value }
 }
 
 function Assert-Contains([string]$Actual, [string]$Expected, [string]$Message) {
@@ -457,20 +482,25 @@ try {
         $baseCircuitLoadedCommand = "execute if loaded $pistonX $circuitY $circuitZ run help"
         $baseCircuitLoaded1 = Send-Rcon $Server1RconPort $baseCircuitLoadedCommand
         $baseCircuitLoaded2 = Send-Rcon $Server2RconPort $baseCircuitLoadedCommand
-        if ($baseCircuitLoaded1 -match 'Index \(\d+/\d+\)') {
-            $baseCircuitControllerPort = $Server1RconPort
-            $baseCircuitObserverPort = $Server2RconPort
-            $baseCircuitControllerName = 'Backend 1'
-            $baseCircuitObserverName = 'Backend 2'
-        } elseif ($baseCircuitLoaded2 -match 'Index \(\d+/\d+\)') {
-            $baseCircuitControllerPort = $Server2RconPort
-            $baseCircuitObserverPort = $Server1RconPort
-            $baseCircuitControllerName = 'Backend 2'
-            $baseCircuitObserverName = 'Backend 1'
-        } else {
-            throw 'Neither backend locally owns the base piston test chunk.'
+        if ($baseCircuitLoaded1 -notmatch 'Index \(\d+/\d+\)' -or $baseCircuitLoaded2 -notmatch 'Index \(\d+/\d+\)') {
+            throw 'Both backends must have the base piston test chunk loaded before checking ownership.'
         }
-        Write-Output "PASS: $baseCircuitControllerName owns the base redstone test chunk."
+        Send-Rcon $Server1RconPort "ticklockprobe lock $WorldName $($pistonX -shr 4) $($pistonZ -shr 4)" | Out-Null
+        $ownershipDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $baseChunkOwner = Get-AuthoritativeChunkOwner ($pistonX -shr 4) ($pistonZ -shr 4)
+            if ($null -ne $baseChunkOwner -and $baseChunkOwner.ControllerPort -eq $Server1RconPort) { break }
+            Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $ownershipDeadline)
+        if ($null -eq $baseChunkOwner -or $baseChunkOwner.ControllerPort -ne $Server1RconPort) {
+            $actualOwner = if ($null -eq $baseChunkOwner) { 'none' } else { $baseChunkOwner.OwnerName }
+            throw "Backend 1 did not acquire authoritative ownership for the base piston chunk; current owner is '$actualOwner'."
+        }
+        $baseCircuitControllerPort = $baseChunkOwner.ControllerPort
+        $baseCircuitObserverPort = $baseChunkOwner.ObserverPort
+        $baseCircuitControllerName = if ($baseCircuitControllerPort -eq $Server1RconPort) { 'Backend 1' } else { 'Backend 2' }
+        $baseCircuitObserverName = if ($baseCircuitObserverPort -eq $Server1RconPort) { 'Backend 1' } else { 'Backend 2' }
+        Write-Output "PASS: $baseCircuitControllerName is authoritative owner '$($baseChunkOwner.OwnerName)' for the base redstone test chunk."
         $pistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=true] run help"
         $retractedPistonCommand = "execute if block $pistonX $circuitY $circuitZ minecraft:piston[facing=east,extended=false] run help"
         $movedBlockCommand = "execute if block $destinationX $circuitY $circuitZ minecraft:stone run help"
@@ -567,6 +597,7 @@ try {
 
         Test-StickyPistonPull -ControllerPort $baseCircuitControllerPort -ObserverPort $baseCircuitObserverPort -PistonX $stickyPistonX -PowerX $stickyPowerX -PayloadX $stickyPayloadX -DestinationX $stickyDestinationX -CircuitY $circuitY -CircuitZ $stickyCircuitZ -Direction $baseCircuitControllerName
         Send-Rcon $baseCircuitObserverPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
+        Send-Rcon $baseCircuitControllerPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
         $reverseLoadCommand = "execute if loaded $reverseStickyCircuitX $reverseStickyCircuitY $reverseStickyCircuitZ run help"
         $reverseLoadDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         do {
@@ -574,9 +605,22 @@ try {
             if ($reverseChunkLoaded -match 'Index \(\d+/\d+\)') { break }
             Start-Sleep -Milliseconds 200
         } while ([DateTime]::UtcNow -lt $reverseLoadDeadline)
-        Assert-Contains $reverseChunkLoaded 'Index (' "$baseCircuitObserverName sticky-piston test chunk did not become locally loaded."
-        Write-Output "PASS: $baseCircuitObserverName sticky-piston circuit runs in a locally owned chunk."
-        Send-Rcon $baseCircuitControllerPort "forceload add $reverseStickyCircuitX $reverseStickyCircuitZ" | Out-Null
+        Assert-Contains $reverseChunkLoaded 'Index (' "$baseCircuitObserverName sticky-piston test chunk did not load."
+        $reverseChunkOwner = Get-AuthoritativeChunkOwner ($reverseStickyPistonX -shr 4) ($reverseStickyCircuitZ -shr 4)
+        if ($null -eq $reverseChunkOwner -or $reverseChunkOwner.ControllerPort -ne $baseCircuitObserverPort) {
+            Send-Rcon $baseCircuitObserverPort "ticklockprobe lock $WorldName $($reverseStickyPistonX -shr 4) $($reverseStickyCircuitZ -shr 4)" | Out-Null
+            $ownershipDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            do {
+                $reverseChunkOwner = Get-AuthoritativeChunkOwner ($reverseStickyPistonX -shr 4) ($reverseStickyCircuitZ -shr 4)
+                if ($null -ne $reverseChunkOwner -and $reverseChunkOwner.ControllerPort -eq $baseCircuitObserverPort) { break }
+                Start-Sleep -Milliseconds 100
+            } while ([DateTime]::UtcNow -lt $ownershipDeadline)
+        }
+        if ($null -eq $reverseChunkOwner -or $reverseChunkOwner.ControllerPort -ne $baseCircuitObserverPort) {
+            $actualOwner = if ($null -eq $reverseChunkOwner) { 'none' } else { $reverseChunkOwner.OwnerName }
+            throw "$baseCircuitObserverName did not become authoritative owner for the second sticky-piston test chunk. Owner was '$actualOwner'."
+        }
+        Write-Output "PASS: $baseCircuitObserverName is authoritative owner '$($reverseChunkOwner.OwnerName)' for the second sticky-piston chunk."
         Test-StickyPistonPull -ControllerPort $baseCircuitObserverPort -ObserverPort $baseCircuitControllerPort -PistonX $reverseStickyPistonX -PowerX $reverseStickyPowerX -PayloadX $reverseStickyPayloadX -DestinationX $reverseStickyDestinationX -CircuitY $reverseStickyCircuitY -CircuitZ $reverseStickyCircuitZ -Direction 'peer backend'
     }
 

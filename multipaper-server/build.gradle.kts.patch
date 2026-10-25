@@ -77,7 +77,7 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,154 @@
+@@ -266,2 +_,174 @@
 +val applyMultiPaperChunkHolderBasePatch = tasks.register("applyMultiPaperChunkHolderBasePatch") {
 +    dependsOn("applyMinecraftPatches")
 +    doLast {
@@ -109,8 +109,30 @@
 +val applyDurableScheduledTickReplayGuardPatch = tasks.register("applyDurableScheduledTickReplayGuardPatch") {
 +    dependsOn("applyMinecraftPatches")
 +    doLast {
-+        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0072-MultiPaper-wire-level-ticks-durable-replay-guard.patch")
++        val worldUuidPatch = rootProject.file("multipaper-server/minecraft-patches/sources/0077-MultiPaper-share-world-uuid.patch")
 +        val sourceRoot = "multipaper-server/src/minecraft/java"
++        val worldUuidCheck = services.execOperations.exec {
++            workingDir(rootProject.projectDir)
++            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", worldUuidPatch.absolutePath)
++            isIgnoreExitValue = true
++        }
++        if (worldUuidCheck.exitValue == 0) {
++            services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", worldUuidPatch.absolutePath)
++            }
++        } else {
++            val worldUuidAlreadyApplied = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", worldUuidPatch.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (worldUuidAlreadyApplied.exitValue != 0) {
++                throw GradleException("Could not apply shared world UUID patch to regenerated ServerLevel.java")
++            }
++        }
++
++        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0072-MultiPaper-wire-level-ticks-durable-replay-guard.patch")
 +        val check = services.execOperations.exec {
 +            workingDir(rootProject.projectDir)
 +            commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", patchFile.absolutePath)
@@ -195,7 +217,7 @@
 +}
 +
 +val applyEntitySpawnSynchronizationPatch = tasks.register("applyEntitySpawnSynchronizationPatch") {
-+    dependsOn("applyMinecraftPatches")
++    dependsOn(applyDurableScheduledTickReplayGuardPatch)
 +    doLast {
 +        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0074-MultiPaper-broadcast-entity-spawns.patch")
 +        val sourceRoot = "multipaper-server/src/minecraft/java"

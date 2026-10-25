@@ -24,7 +24,7 @@
          // CraftBukkit start
          final io.papermc.paper.world.saveddata.PaperLevelOverrides levelData = loadedWorldData.levelOverrides();
 +        // MultiPaper start - all backends must share one uuid per world, otherwise cross-server packets cannot be routed
-+        final java.util.UUID worldUuid = puregero.multipaper.MultiPaper.getWorldUid(loadedWorldData.bukkitName(), loadedWorldData.uuid());
++        final java.util.UUID worldUuid = puregero.multipaper.MultiPaper.getWorldUid(loadedWorldData.bukkitName());
 +        // MultiPaper end - all backends must share one uuid per world
          savedDataStorage.set(io.papermc.paper.world.saveddata.PaperLevelOverrides.TYPE, levelData);
 -        savedDataStorage.set(io.papermc.paper.world.saveddata.PaperWorldMetadata.TYPE, new io.papermc.paper.world.saveddata.PaperWorldMetadata(loadedWorldData.uuid()));

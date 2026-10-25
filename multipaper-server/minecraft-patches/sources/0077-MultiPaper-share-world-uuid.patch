@@ -1,0 +1,22 @@
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -633,6 +633,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+     ) {
+         // CraftBukkit start
+         final io.papermc.paper.world.saveddata.PaperLevelOverrides levelData = loadedWorldData.levelOverrides();
++        // MultiPaper start - all backends must share one UUID per world for external packet routing
++        final java.util.UUID worldUuid = puregero.multipaper.MultiPaper.getWorldUid(loadedWorldData.bukkitName());
++        // MultiPaper end
+         savedDataStorage.set(io.papermc.paper.world.saveddata.PaperLevelOverrides.TYPE, levelData);
+-        savedDataStorage.set(io.papermc.paper.world.saveddata.PaperWorldMetadata.TYPE, new io.papermc.paper.world.saveddata.PaperWorldMetadata(loadedWorldData.uuid()));
++        savedDataStorage.set(io.papermc.paper.world.saveddata.PaperWorldMetadata.TYPE, new io.papermc.paper.world.saveddata.PaperWorldMetadata(worldUuid));
+         savedDataStorage.set(io.papermc.paper.world.saveddata.PaperWorldPDC.TYPE, loadedWorldData.pdc() == null ? io.papermc.paper.world.saveddata.PaperWorldPDC.TYPE.constructor().get() : loadedWorldData.pdc());
+@@ -646,7 +649,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+         this.weatherData.setLevel(this);
+         this.typeKey = typeKey;
+         this.bukkitName = loadedWorldData.bukkitName();
+-        this.uuid = loadedWorldData.uuid();
++        this.uuid = worldUuid;
+         this.levelLoadListener = new net.minecraft.server.level.progress.LoggingLevelLoadListener(false, this);
+         this.worldGenSettings = worldGenSettings;
+         this.scheduledEvents = savedDataStorage.computeIfAbsent(net.minecraft.world.level.timers.TimerQueue.TYPE);

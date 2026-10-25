@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadUidMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
@@ -96,6 +97,65 @@ class MasterProcessRestartPersistenceTest {
         } finally {
             closeClient(secondClient);
             stopIfRunning(secondMaster);
+        }
+    }
+
+    @Test
+    @Timeout(90)
+    void worldUidSurvivesGracefulAndCrashMasterRestarts() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("world-uid-restart-master");
+        Files.createDirectories(masterDirectory);
+        String world = "world-uid-restart";
+
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient firstClient = null;
+        byte[] initialUid;
+        try {
+            awaitListening(firstMaster, masterPort);
+            firstClient = TestServerClient.connect(masterPort, "uid-first-reader");
+            initialUid = readWorldUid(firstClient, world, "First Master");
+            firstClient.close();
+            firstClient = null;
+            requestGracefulExit(firstMaster);
+            assertTrue(firstMaster.waitFor(15, TimeUnit.SECONDS), "First Master did not stop after exit");
+            assertEquals(0, firstMaster.exitValue(), "First Master process should exit successfully");
+        } finally {
+            closeClient(firstClient);
+            stopIfRunning(firstMaster);
+        }
+
+        Process secondMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient secondClient = null;
+        try {
+            awaitListening(secondMaster, masterPort);
+            secondClient = TestServerClient.connect(masterPort, "uid-graceful-restart-reader");
+            assertArrayEquals(initialUid, readWorldUid(secondClient, world, "Gracefully restarted Master"));
+            secondClient.close();
+            secondClient = null;
+            secondMaster.destroyForcibly();
+            assertTrue(secondMaster.waitFor(10, TimeUnit.SECONDS), "Master process did not terminate forcibly");
+        } finally {
+            closeClient(secondClient);
+            stopIfRunning(secondMaster);
+        }
+
+        Process recoveredMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient recoveredClient = null;
+        try {
+            awaitListening(recoveredMaster, masterPort);
+            recoveredClient = TestServerClient.connect(masterPort, "uid-crash-recovery-reader");
+            assertArrayEquals(initialUid, readWorldUid(recoveredClient, world, "Crash-recovered Master"));
+            recoveredClient.close();
+            recoveredClient = null;
+            requestGracefulExit(recoveredMaster);
+            assertTrue(recoveredMaster.waitFor(15, TimeUnit.SECONDS), "Recovered Master did not stop after exit");
+            assertEquals(0, recoveredMaster.exitValue(), "Recovered Master process should exit successfully");
+        } finally {
+            closeClient(recoveredClient);
+            stopIfRunning(recoveredMaster);
         }
     }
 
@@ -333,6 +393,14 @@ class MasterProcessRestartPersistenceTest {
         assertAcknowledged(client.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, CHUNK_DATA)), "chunk data");
         assertAcknowledged(client.request(new WriteLevelMessage(WORLD, LEVEL_DATA)), "level data");
         assertAcknowledged(client.request(new WritePlayerMessage(WORLD, PLAYER_UUID, PLAYER_DATA)), "player data");
+    }
+
+    private static byte[] readWorldUid(TestServerClient client, String world, String masterDescription) throws Exception {
+        ServerBoundMessage reply = client.request(new ReadUidMessage(world));
+        assertTrue(reply instanceof DataMessageReply, masterDescription + " should return the world UUID");
+        byte[] uid = ((DataMessageReply) reply).data;
+        assertEquals(16, uid.length, masterDescription + " should return a complete UUID");
+        return uid;
     }
 
     private static void assertPersistentData(TestServerClient client, String masterDescription) throws Exception {

@@ -542,20 +542,19 @@ public class MultiPaper {
     // MultiPaper start - every backend must agree on a world's UUID, or packets that address worlds by UUID cannot be routed
     private static final Map<String, UUID> worldUids = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public static UUID getWorldUid(String world, UUID fallback) {
-        return worldUids.computeIfAbsent(world, key -> resolveWorldUid(key, fallback));
+    public static UUID getWorldUid(String world) {
+        return worldUids.computeIfAbsent(world, MultiPaper::resolveWorldUid);
     }
 
-    private static UUID resolveWorldUid(String world, UUID fallback) {
+    private static UUID resolveWorldUid(String world) {
         try (DataInputStream in = readUid(world)) {
             if (in.available() >= 16) {
-                UUID uuid = new UUID(in.readLong(), in.readLong());
-                return uuid;
+                return new UUID(in.readLong(), in.readLong());
             }
-        } catch (Throwable t) {
-            LOGGER.warn("Failed to read the shared uid of world '" + world + "', falling back to " + fallback, t);
+            throw new IllegalStateException("Master returned an invalid shared uid for world '" + world + "' (" + in.available() + " bytes)");
+        } catch (IOException | RuntimeException e) {
+            throw new IllegalStateException("Failed to read the shared uid of world '" + world + "' from Master; refusing to start with a backend-local UUID", e);
         }
-        return fallback;
     }
     // MultiPaper end - every backend must agree on a world's UUID
 
