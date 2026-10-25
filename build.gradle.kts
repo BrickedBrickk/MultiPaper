@@ -146,8 +146,10 @@ gradle.projectsEvaluated {
     // Paperweight's ZIP filesystem writes the current wall-clock time into every
     // output entry. Normalize these two release artifacts after creation so clean
     // builds with identical contents have identical archive hashes.
-    listOf("createPaperclipJar", "createBundlerJar").forEach { taskName ->
-        serverProject.tasks.named(taskName).configure {
+    val normalizedArchiveTasks = setOf("createPaperclipJar", "createBundlerJar")
+    serverProject.tasks.configureEach {
+        if (name in normalizedArchiveTasks) {
+            val taskName = name
             doLast {
                 val outputProperty = javaClass.methods.firstOrNull {
                     it.name == "getOutputZip" && it.parameterCount == 0
