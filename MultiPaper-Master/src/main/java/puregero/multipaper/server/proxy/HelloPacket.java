@@ -44,6 +44,27 @@ public class HelloPacket {
         return null;
     }
 
+    /**
+     * Returns whether the initial packet is complete enough to inspect. The proxy must retain an
+     * incomplete handshake until the rest of its frame arrives; otherwise the forwarded hostname
+     * is sent without MultiPaper's address suffix and the backend rejects the connection when
+     * Bungee forwarding is enabled.
+     */
+    static boolean isComplete(ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            return false;
+        }
+
+        int packetLength = buffer.get(buffer.position()) & 0xFF;
+        if (packetLength == 0xFE || packetLength > 127) {
+            // Legacy ping, or a multi-byte VarInt frame length. The existing proxy deliberately
+            // passes these through without rewriting the handshake.
+            return true;
+        }
+
+        return buffer.remaining() >= packetLength + 1;
+    }
+
     public void write(ByteBuffer buffer) {
         int lengthPosition = buffer.position();
         buffer.position(lengthPosition + 1);

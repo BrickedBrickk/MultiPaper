@@ -14,6 +14,7 @@ public class ProxiedConnection {
     private final ByteBuffer readBuffer = ByteBuffer.allocate(ProxyServer.BUFFER_SIZE);
     private ByteBuffer writeBuffer;
     public boolean helloPacket = true;
+    private boolean bufferingHelloPacket;
 
     public ProxiedConnection(SocketChannel socketChannel, SocketChannel destinationChannel) {
         this.socketChannel = socketChannel;
@@ -55,31 +56,61 @@ public class ProxiedConnection {
     }
 
     public void read(SelectionKey key) {
-        if (!readBuffer.hasRemaining()) {
-            readBuffer.position(0);
-            readBuffer.limit(readBuffer.capacity());
-
+        if (bufferingHelloPacket) {
+            // readBuffer is in write mode after compacting the incomplete handshake. Keep reading
+            // from the client until its complete frame is available for address forwarding.
             try {
                 if (socketChannel.read(readBuffer) == -1) {
                     close();
+                    return;
                 }
             } catch (IOException e) {
                 close();
                 return;
             }
 
-            readBuffer.limit(readBuffer.position());
-            readBuffer.position(0);
-
-            // Notify the other connection that the buffer has been filled
-            if (readBuffer.hasRemaining()) {
-                if (helloPacket) {
-                    rewriteHelloPacket(readBuffer);
-                }
-
-                SelectionKey destinationKey = destinationChannel.keyFor(key.selector());
-                ((ProxiedConnection) destinationKey.attachment()).write(destinationKey);
+            readBuffer.flip();
+            if (!HelloPacket.isComplete(readBuffer)) {
+                readBuffer.compact();
+                return;
             }
+            bufferingHelloPacket = false;
+        } else if (!readBuffer.hasRemaining()) {
+            readBuffer.clear();
+            try {
+                if (socketChannel.read(readBuffer) == -1) {
+                    close();
+                    return;
+                }
+            } catch (IOException e) {
+                close();
+                return;
+            }
+
+            readBuffer.flip();
+            if (!readBuffer.hasRemaining()) {
+                readBuffer.limit(0);
+                return;
+            }
+
+            if (helloPacket && !HelloPacket.isComplete(readBuffer)) {
+                bufferingHelloPacket = true;
+                readBuffer.compact();
+                return;
+            }
+        } else {
+            // The peer has not consumed this connection's previous read yet.
+            return;
+        }
+
+        if (helloPacket) {
+            rewriteHelloPacket(readBuffer);
+        }
+
+        // Notify the other connection that the buffer has been filled
+        if (readBuffer.hasRemaining()) {
+            SelectionKey destinationKey = destinationChannel.keyFor(key.selector());
+            ((ProxiedConnection) destinationKey.attachment()).write(destinationKey);
         }
     }
 
