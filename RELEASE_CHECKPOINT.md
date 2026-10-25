@@ -4,10 +4,10 @@ This file is the concise continuation source of truth. Historical notes in `PROJ
 
 ## Current candidate
 
-- Branch `feature/port-26.3`, source `2fd01b3`, version RC4. Published RC3 tag and assets remain unchanged. No stable release is published.
+- Branch `feature/port-26.3`, artifact source `2fd01b3`, current HEAD `e629bb3` (checkpoint/evidence docs only), version RC4. Published RC3 tag and assets remain unchanged. No stable release is published.
 - Java 25.0.3 / Gradle 9.8 current source (`2fd01b3`) passed two clean-output build/test/package runs from a fresh isolated Gradle dependency cache. Each: 183 suites, 10,737 tests, 0 failures/errors, 88 skipped; all four artifacts byte-identical. See `performance-results/clean-build-cold-cache-reproducibility-20261025.md`.
 - Current post-fix local candidate: Paperclip `F6466A12BE9BAF2B0071902D4B0AA764AC82698B551A00D633353D1D5517D694`; Master `2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186`; bundler `377E84A966CCEE05659633B7B50981206B4CB590B1B52B8E6F0B612D06178AF7`; server `C2B376671FEAE18BAF1A7A07AAD35CD138B5F73D5E92946D3C1810AD5D1CAD65`. The earlier Paperclip/bundler/server hashes are superseded.
-- The older local archive `release-staging/MultiPaper-26.3-RC4-20261024.zip` (SHA-256 `070529BF09A5587A5D3DCB715C51D81DA1BD90BECE74A67B5851943DF40C3982`) and the earlier permission-fix archive are stale. Current clean/reproducible local evaluation archive: `release-staging/MultiPaper-26.3-RC4-clean-reproducible-20261025.zip`, SHA-256 `961D7372D0769BEB5F25BB1B67E898BE79A169BE35BAAC9246B7A383B4A6698C`. It contains the two install JARs, license, checksums, compatibility report, RC4 candidate report, and Crafty/plugin-stack instructions; it contains no Floodgate key or RCON secret. This remains local evaluation material, not a published release.
+- The older local archive `release-staging/MultiPaper-26.3-RC4-20261024.zip` (SHA-256 `070529BF09A5587A5D3DCB715C51D81DA1BD90BECE74A67B5851943DF40C3982`) and the earlier permission-fix archive are stale. Current clean/reproducible local evaluation archive: `release-staging/MultiPaper-26.3-RC4-clean-reproducible-final-20261025.zip`, SHA-256 `339E4089E551FD582A30DED6AAD4DB8B07DC5ED8FB6EFB19FCEA38D8A9CBEC26`. It contains the two install JARs, license, checksums, compatibility report, RC4 candidate report, and Crafty/plugin-stack instructions; it contains no Floodgate key or RCON secret. This remains local evaluation material, not a published release.
 
 ## Completed verification — do not repeat without a new regression
 
