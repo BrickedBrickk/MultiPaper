@@ -57,3 +57,7 @@ Both backends were then save-flushed/stopped, Master was stopped after them, and
 - No new duplicate-entity UUID or missing-entity request warnings occurred during this mechanics run. This is only a warning counter for this run, not a new entity integrity audit.
 
 Both backends were save-flushed/stopped; Master was then stopped and fixture listeners closed. Raw logs: `%TEMP%\multipaper-26.3-rc4-plugin-runtime-f891db1\mechanics-*.stdout.log`.
+
+## Exact Geyser Bedrock listener status ping — 2026-10-24
+
+Geyser Standalone 2.12.0-b1270 ran separately from the two Paper backends, configured for Floodgate auth and a loopback disposable Bedrock listener. A raw RakNet unconnected ping to UDP 31841 received a valid `MCPE` status pong advertising `Geyser`, Bedrock protocol/version `26.52`, max players 100, and the configured port. This validates listener reachability and Bedrock server-list status only. No Bedrock account authenticated, no Floodgate identity was created, and NetherNet/remote reachability is not validated by this loopback probe. Geyser was stopped after the check; UDP 31841 is closed.
