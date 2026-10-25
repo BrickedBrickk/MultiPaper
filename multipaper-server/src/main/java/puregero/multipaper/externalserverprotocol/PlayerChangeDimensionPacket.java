@@ -1,12 +1,16 @@
 package puregero.multipaper.externalserverprotocol;
 
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import org.bukkit.Bukkit;
-import org.bukkit.craftbukkit.CraftWorld;
+import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import puregero.multipaper.ExternalServerConnection;
 import puregero.multipaper.MultiPaper;
 
@@ -14,8 +18,10 @@ import java.util.UUID;
 
 public class PlayerChangeDimensionPacket extends ExternalServerPacket {
 
+    private static final Logger LOGGER = LogManager.getLogger(PlayerChangeDimensionPacket.class.getSimpleName());
+
     private final UUID uuid;
-    private final UUID world;
+    private final ResourceKey<Level> dimension;
     private final double x;
     private final double y;
     private final double z;
@@ -23,7 +29,7 @@ public class PlayerChangeDimensionPacket extends ExternalServerPacket {
 
     public PlayerChangeDimensionPacket(ServerPlayer player, boolean reset) {
         this.uuid = player.getUUID();
-        this.world = player.level().getWorld().getUID();
+        this.dimension = player.level().dimension();
         this.x = player.getX();
         this.y = player.getY();
         this.z = player.getZ();
@@ -32,7 +38,7 @@ public class PlayerChangeDimensionPacket extends ExternalServerPacket {
 
     public PlayerChangeDimensionPacket(FriendlyByteBuf in) {
         uuid = in.readUUID();
-        world = in.readUUID();
+        dimension = readDimension(in);
         x = in.readDouble();
         y = in.readDouble();
         z = in.readDouble();
@@ -42,7 +48,7 @@ public class PlayerChangeDimensionPacket extends ExternalServerPacket {
     @Override
     public void write(FriendlyByteBuf out) {
         out.writeUUID(uuid);
-        out.writeUUID(world);
+        out.writeUtf(dimension.identifier().toString());
         out.writeDouble(x);
         out.writeDouble(y);
         out.writeDouble(z);
@@ -52,8 +58,17 @@ public class PlayerChangeDimensionPacket extends ExternalServerPacket {
     @Override
     public void handle(ExternalServerConnection connection) {
         MultiPaper.runSync(() -> {
-            ServerLevel level = ((CraftWorld) Bukkit.getWorld(world)).getHandle();
-            ServerPlayer player = MinecraftServer.getServer().getPlayerList().getPlayer(uuid);
+            MinecraftServer server = MinecraftServer.getServer();
+            ServerLevel level = server.getLevel(dimension);
+            if (level == null) {
+                LOGGER.error("Could not change remote player {} to unloaded dimension {}", uuid, dimension.identifier());
+                return;
+            }
+            ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+            if (player == null) {
+                LOGGER.warn("Could not change dimension for missing remote player {} to {}", uuid, dimension.identifier());
+                return;
+            }
 
             // Remove from old world
             ((ServerLevel) player.level()).removePlayerImmediately(player, Entity.RemovalReason.DISCARDED);
@@ -76,4 +91,9 @@ public class PlayerChangeDimensionPacket extends ExternalServerPacket {
             level.addRespawnedPlayer(player);
         });
     }
+
+    static ResourceKey<Level> readDimension(FriendlyByteBuf in) {
+        return ResourceKey.create(Registries.DIMENSION, Identifier.parse(in.readUtf()));
+    }
+
 }
