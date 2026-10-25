@@ -1,0 +1,143 @@
+Manual Crafty Controller installation — MultiPaper 26.3 RC4 candidate
+====================================================================
+
+This is an evaluation candidate, not a public SMP release. The online-mode
+Java probe established rejection of unauthenticated/forged protocol clients,
+but a real Java account login has not been verified. No Bedrock/Floodgate
+identity or legitimate-client GrimAC join has been verified either. Keep the
+candidate on a disposable, private test network until those checks pass.
+
+Files and versions
+------------------
+
+The release package contains one Master JAR and one Paperclip JAR. Copy the
+identical Paperclip file to both backend directories. Do not install Bukkit
+plugins in the Master directory. The tested five-plugin backend stack and
+separate Geyser Standalone versions, SHA-256 values, and official download
+pages are in `COMPATIBILITY-REPORT.md`; download those plugin JARs directly
+from the official project pages. No Floodgate private key is included in the
+package.
+
+Hosts and Crafty entries
+------------------------
+
+Use three separate Crafty entries and three separate data directories:
+
+* `multipaper-master`: one process, preferably on PC1.
+* `multipaper-backend-a`: one backend process on PC1.
+* `multipaper-backend-b`: one backend process on PC2.
+
+Use Java 25 for all three processes. Keep the Master world storage in its own
+directory. Each backend must have its own local directory; never point both
+backends at a shared Crafty directory. Back up the Master data and both
+backend configuration/plugin directories before importing any world. Only
+copy world data while all three processes are stopped.
+
+Review the Minecraft EULA yourself and set `eula=true` only if you accept it.
+In Crafty, select each directory as a custom Java server root and set its Java
+executable and memory limits. Do not let Crafty replace either MultiPaper JAR
+with a vanilla server download.
+
+Master entry
+------------
+
+Copy `multipaper-master-3.0.0.jar` into the Master directory. Set its
+execution command to:
+
+    java -Xms512M -Xmx1G -jar multipaper-master-3.0.0.jar 35353 25565
+
+Port `35353` is the backend coordination listener. Port `25565` is the
+player-facing TCP proxy. Restrict `35353` to the two trusted backend hosts.
+Do not expose backend game ports or RCON to players or the public Internet.
+
+Backend entries
+---------------
+
+Copy the same `multipaper-paperclip-26.3-RC4.jar` into each backend
+directory. A typical starting command for each is:
+
+    java -Xms1G -Xmx4G -jar multipaper-paperclip-26.3-RC4.jar --nogui
+
+Use unique private game ports, for example `25566` for Backend A and `25567`
+for Backend B. Start each backend once to generate configuration, then stop
+it cleanly before editing.
+
+In Backend A's `multipaper.yml`, set the Master's reachable private address
+and a unique name:
+
+    master-connection:
+      master-address: <PC1-private-address>:35353
+      my-name: backend-a
+
+Use the same Master address in Backend B, with `my-name: backend-b`. Preserve
+other generated MultiPaper values.
+
+Install Floodgate-Spigot, ViaVersion, ViaBackwards, InvSee++, and GrimAC in
+`plugins/` on both backend directories. Use the same tested versions and
+matching configurations on both. ViaBackwards requires ViaVersion. GrimAC's
+tested release includes its PacketEvents support; do not add a second
+PacketEvents JAR unless that release's own instructions require it.
+
+Authentication and forwarding status
+-------------------------------------
+
+The disposable boundary probe used `online-mode=true` and
+`settings.bungeecord: true` on both backends. Plain unauthenticated clients
+and clients with forged Bungee-style forwarding fields were rejected by
+session verification. This did not verify a successful Microsoft account
+login, Floodgate's encrypted identity handoff, or a legitimate Bedrock login.
+Do not change `online-mode`, proxy forwarding, or backend firewall settings
+to make a test client connect. Keep backend ports private and do not open the
+candidate to players until the real authentication path is verified.
+
+Geyser Standalone and Floodgate
+-------------------------------
+
+Geyser Standalone is a separate Java process, not a Paper plugin. Create a
+fourth Crafty entry or run it as a separate service in its own directory.
+Configure Geyser's Java remote address and port to the Master proxy's
+reachable address and `25565`; set `auth-type: floodgate`. Bind Geyser's
+Bedrock listener to the intended reachable interface and allow its configured
+Bedrock UDP port (normally `19132/udp`) through the host firewall. A
+loopback-only listener is not reachable by remote players.
+
+Start Floodgate-Spigot once on one backend to generate `plugins/floodgate/key.pem`.
+Stop it, then transfer that exact private key securely to Floodgate's config
+directory on the other backend and to Geyser Standalone's directory. Keep all
+copies byte-identical and private. Never put `key.pem` in this package, source
+control, logs, screenshots, or chat. The Floodgate key contents are not part
+of any checksum manifest.
+
+The tested local Geyser process used a loopback bind and had no Bedrock client
+join. The custom MultiPaper proxy forwarded the Java TCP stream, but the
+Floodgate identity path is not certified end to end. Do not expose the
+Bedrock listener until a real disposable Bedrock login confirms Floodgate
+identity, reconnect, permissions, and ownership transfer on both backends.
+
+Startup and shutdown
+--------------------
+
+1. Start the Master and confirm the coordination and player proxy listeners
+   are ready.
+2. Start Backend A and Backend B. Confirm both reach `Done` and register with
+   unique names in Master logs.
+3. Start Geyser Standalone after the Master and backends are listening.
+4. Keep the firewall limited to trusted backend traffic, the Java proxy, and
+   the test Bedrock listener. RCON should remain disabled or loopback-only.
+5. Stop Geyser first, then stop both backends cleanly and wait for saves, and
+   stop the Master last.
+
+Release and capacity limitations
+--------------------------------
+
+RC3 remains the published pre-release and is unchanged. RC4 is a candidate
+because verified source fixes are not present in the RC3 assets. This package
+does not claim public-beta readiness. Real Java/Bedrock client behavior,
+Floodgate identity, legitimate-client GrimAC compatibility, and target-PC
+5/10/20-client capacity remain unverified. Existing localhost/protocol-bot
+measurements are not a supported player-count result; do not advertise a
+capacity limit from them.
+
+Verify both JARs against `SHA256SUMS.txt` before use. Keep the test isolated
+from production worlds and services. The companion package's
+`COMPATIBILITY-REPORT.md` lists tested versions, evidence, and unresolved gates.
