@@ -1,0 +1,48 @@
+MultiPaper current-candidate clean-output build certification — 2026-10-24
+========================================================================
+
+Source: pushed commit 0e15bd86ec0b63685721dd1c5c7086a9b7178dc2 on
+feature/port-26.3. This is a post-RC3 source candidate; the public v26.3-RC3
+tag and assets were not changed.
+
+The build ran in a detached temporary worktree at
+%TEMP%\multipaper-rc4-clean-cert-0e15bd8. The main worktree's dirty files
+were preserved. A new worktree lacks Paperweight's ignored generated
+multipaper-server/build.gradle.kts, so an initial Gradle configuration cannot
+register createPaperclipJar. To bootstrap safely, a temporary conditional
+guard was applied only to the temporary root build.gradle.kts, applyAllPatches
+was run, and the root script was restored byte-for-byte before either build.
+The patch task generated the server build script and applied all source/file/
+feature patches. applyMinecraftResourcePatches completed with 0 MultiPaper
+resource patches. No tracked file in the primary worktree was reset or edited.
+
+Both full build/test/package runs used Temurin Java 25.0.3, Gradle 9.8,
+--offline, and --no-build-cache, with BUILD_NUMBER=3 and fixed server manifest
+Build-Time 2026-10-24T20:01:55.854680300Z. The normal Gradle dependency cache
+was available; this certifies fresh project outputs with the build cache
+disabled, not an empty dependency cache.
+
+Pass 1: build + Paperclip + bundler + Master shadow JAR; BUILD SUCCESSFUL in
+6m08s (88 actionable tasks: 55 executed, 33 up-to-date).
+Pass 2: clean + the same build/package tasks; BUILD SUCCESSFUL in 5m54s
+(93 actionable tasks: 58 executed, 35 up-to-date).
+
+The test-result XML after each pass contained 186 suites and 10,740 tests,
+with 0 failures, 0 errors, and 88 skipped.
+
+Both passes produced byte-identical candidate archives:
+
+- Paperclip multipaper-paperclip-26.3-RC3.jar: D74CC2FBE38456C8073942A942FD45BAC29B4C1ABD1E6F50ADB1613D2D4731F1
+- Bundler multipaper-bundler-26.3-RC3.jar: 206635DE0BE140F90BCA1BF2858351512941A2F562BF9B84EC203626E58B4E85
+- Server multipaper-server-26.3-RC3.jar: D47D082FF3BF68123AC910D8D2CEDB2F478126E1688F1DFDBBB2BDD5B55203E2
+- Master multipaper-master-3.0.0.jar: 2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186
+
+These artifacts embed source commit 0e15bd8 and remain local test outputs;
+they must not replace the immutable public RC3 assets. The branch still needs
+an RC4 version/package staging pass after the outstanding player, Bedrock,
+GrimAC, and intended-hardware certification gates are resolved.
+
+Detailed logs are retained locally at:
+%TEMP%\multipaper-rc4-clean-cert-build1.log
+%TEMP%\multipaper-rc4-clean-cert-build2.log
+%TEMP%\multipaper-rc4-clean-cert-bootstrap-all.log
