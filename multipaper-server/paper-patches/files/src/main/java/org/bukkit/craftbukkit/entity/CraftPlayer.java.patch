@@ -9,7 +9,7 @@
      private static final org.slf4j.Logger LOGGER = LogUtils.getClassLogger();
      private static final PointersSupplier<Player> POINTERS_SUPPLIER = PointersSupplier.<Player>builder()
          .parent(CraftEntity.POINTERS_SUPPLIER)
-@@ -543,6 +_,50 @@
+@@ -543,6 +545,62 @@
          getHandle().connection.send(new ClientboundClearTitlesPacket(false));
      }
      // Paper end
@@ -34,6 +34,18 @@
 +    @Override
 +    public boolean isLocalPlayer() {
 +        return puregero.multipaper.MultiPaper.isRealPlayer(this);
++    }
++
++    @Override
++    public boolean hasPermission(String name) {
++        String syncedPermission = getData("permission." + name);
++        return super.hasPermission(name) || (syncedPermission != null && Boolean.parseBoolean(syncedPermission));
++    }
++
++    @Override
++    public boolean hasPermission(org.bukkit.permissions.Permission perm) {
++        String syncedPermission = getData("permission." + perm.getName());
++        return super.hasPermission(perm) || (syncedPermission != null && Boolean.parseBoolean(syncedPermission));
 +    }
 +
 +    @Override
