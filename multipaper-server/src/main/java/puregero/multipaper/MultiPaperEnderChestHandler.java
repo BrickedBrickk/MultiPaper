@@ -54,7 +54,7 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
         ListTag items = new ListTag();
         for (int i = 0; i < sentItems.length; i++) {
             ItemStack item = container.getItem(i);
-            if (!item.equals(sentItems[i])) {
+            if (!ItemStack.matches(item, sentItems[i])) {
                 sentItems[i] = item.copy();
 
                 if (broadcastChanges) {

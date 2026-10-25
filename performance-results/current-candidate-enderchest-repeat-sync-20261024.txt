@@ -1,0 +1,62 @@
+MultiPaper Ender Chest repeated-edit synchronization regression — 2026-10-24
+============================================================================
+
+Current exact candidate
+-----------------------
+Paperclip SHA-256: AE6E12DA0BBA5DA0010D2715860A597C82810555952C693E54C7CC4C70E6087F
+Bundler SHA-256:   3419222147D22C094DCFF30F6FB558F9F3A4C3BBC4AA320F51623D514537F7B4
+Server JAR SHA-256: FF28B745E5AC374D585E70207382C8B991F367BE0EDD85D70260E47640700824
+Master SHA-256:    2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186
+Java:              Temurin 25.0.3.9
+Fixture:           %LOCALAPPDATA%\Temp\multipaper-26.3-ender-current-20261024
+Master/backend game ports: 31321 / 31323, 31324
+ViaProxy routes:          31333 -> 31323; 31334 -> 31324
+Loopback RCON:             31331 / 31332
+
+Reproduction and root cause
+---------------------------
+With the five required Bukkit plugins enabled on both backends, a Mineflayer
+operator opened another backend's Ender Chest through InvSee++. The sequence
+deposited six emeralds, withdrew them remotely, redeposited them, then withdrew
+them a second time. Before the fix, the second withdrawal left six emeralds in
+the operator inventory while six remained in both Ender Chest views. Repeated
+runs also exposed the stale-state condition on the first withdrawal.
+
+Diagnostic slot tracing showed unchanged stacks were being emitted on every
+tick and echoed between backends. `MultiPaperEnderChestHandler` compared a
+snapshot copy using `ItemStack.equals`; ItemStack has no value-based `equals`
+override, so distinct copies never compared equal. Replaced the comparison with
+Minecraft's value-aware `ItemStack.matches`, which checks count and components.
+Temporary diagnostic logging was removed. The regression runner now includes
+the last authoritative backend state in failure output.
+
+Exact-candidate verification
+----------------------------
+On the exact Paperclip hash above, with Floodgate, GrimAC, InvSee++, ViaBackwards,
+and ViaVersion enabled on both backends, the runner asserted these states on
+both servers after each operation:
+
+1. Target deposit: owner chest 6, remote mirror 6, operator inventory 0.
+2. Remote withdrawal: owner chest 0, remote mirror 0, operator inventory 6.
+3. Remote redeposit: owner chest 6, remote mirror 6, operator inventory 0.
+4. Second remote withdrawal: owner chest 0, remote mirror 0, operator inventory 6.
+
+Every state conserved exactly six emeralds. Runner output ended with `PASS`.
+`node --check scripts/Verify-InvSeeEnderChestCrossBackend.js` passed. All
+disposable backend, Master, and ViaProxy listeners were stopped afterward.
+This was an offline synthetic Java client test; it does not certify online-mode
+login, Bedrock/Floodgate identity, or legitimate-client GrimAC behavior.
+
+Build and test verification
+---------------------------
+Full Java 25 command:
+`gradlew.bat build :multipaper-server:createPaperclipJar :multipaper-server:createBundlerJar :multipaper-master:shadowJar -x checkoutPurpurRepo -x :multipaper-server:applyMinecraftResourcePatches --offline --no-daemon`
+
+Result: `BUILD SUCCESSFUL` in 7m24s; 87 actionable tasks, 18 executed, 69
+up-to-date. XML totals: 186 suites, 10,740 tests, 0 failures, 0 errors, 88
+skipped. The resource-reset task remained excluded because its implementation
+can run `git reset --hard upstream/main`; no tracked changes were reset.
+
+The published RC3 tag/assets were not changed. These are local candidate
+artifacts, not published RC4 assets. See `PROJECT_CHECKPOINT.md` for remaining
+release gates.

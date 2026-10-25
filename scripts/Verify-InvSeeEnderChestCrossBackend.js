@@ -186,6 +186,7 @@ async function main() {
   let admin
   let target
   let adminWindow = null
+  let lastObservedState = null
 
   async function state() {
     const [ownerChest, adminMirrorChest, adminInventory, targetInventory] = await Promise.all([
@@ -194,25 +195,30 @@ async function main() {
       adminRcon(`data get entity ${adminName} Inventory`),
       targetRcon(`data get entity ${targetName} Inventory`)
     ])
-    return {
+    lastObservedState = {
       ownerChest: itemCount(ownerChest, emeraldId),
       adminMirrorChest: itemCount(adminMirrorChest, emeraldId),
       adminInventory: itemCount(adminInventory, emeraldId),
       targetInventory: itemCount(targetInventory, emeraldId)
     }
+    return lastObservedState
   }
 
   async function assertState(label, expected) {
-    return waitUntil(label, async () => {
-      const actual = await state()
-      const matches = Object.keys(expected).every(key => actual[key] === expected[key])
-      const total = actual.ownerChest + actual.adminInventory + actual.targetInventory
-      if (matches && total === count) {
-        console.log(`STATE ${label} ${JSON.stringify(actual)} total=${total}`)
-        return actual
-      }
-      return false
-    })
+    try {
+      return await waitUntil(label, async () => {
+        const actual = await state()
+        const matches = Object.keys(expected).every(key => actual[key] === expected[key])
+        const total = actual.ownerChest + actual.adminInventory + actual.targetInventory
+        if (matches && total === count) {
+          console.log(`STATE ${label} ${JSON.stringify(actual)} total=${total}`)
+          return actual
+        }
+        return false
+      })
+    } catch (error) {
+      throw new Error(`${error.message}; last authoritative state=${JSON.stringify(lastObservedState)}`)
+    }
   }
 
   try {

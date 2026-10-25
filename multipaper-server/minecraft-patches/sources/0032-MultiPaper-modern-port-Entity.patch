@@ -63,18 +63,22 @@
      public EntityDimensions getDimensions(final Pose pose) {
          return this.type.getDimensions();
      }
-@@ -5229,4 +5251,10 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
+@@ -5229,4 +5251,12 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
          if (!checkPosition(this, x, y, z)) {
              return;
          }
 +        int targetX = Mth.floor(x);
 +        int targetY = Mth.floor(y);
 +        int targetZ = Mth.floor(z);
-+        if ((targetX >> 4) != this.chunkPosition.x() || (targetZ >> 4) != this.chunkPosition.z()) {
-+            puregero.multipaper.MultiPaperEntitiesHandler.onChunkMove(this, new BlockPos(targetX, targetY, targetZ), this.blockPosition);
-+        }
++        BlockPos multiPaperPreviousBlockPosition = this.blockPosition;
++        boolean multiPaperChunkMove = (targetX >> 4) != this.chunkPosition.x() || (targetZ >> 4) != this.chunkPosition.z();
          // Paper end - Block invalid positions and bounding box
-@@ -5390,3 +5418,4 @@ public final void setRemoved(final Entity.RemovalReason reason, org.bukkit.event.entity.EntityRemoveEvent.@Nullable Cause cause) {
+@@ -5359,1 +5389,4 @@ public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
+             this.levelCallback.onMove();
++            if (multiPaperChunkMove) {
++                puregero.multipaper.MultiPaperEntitiesHandler.onChunkMove(this, new BlockPos(targetX, targetY, targetZ), multiPaperPreviousBlockPosition);
++            }
+@@ -5390,3 +5423,4 @@ public final void setRemoved(final Entity.RemovalReason reason, org.bukkit.event.entity.EntityRemoveEvent.@Nullable Cause cause) {
          }
          // Paper end - rewrite chunk system
 +        puregero.multipaper.MultiPaperEntitiesHandler.onEntityRemove(this, reason); // MultiPaper

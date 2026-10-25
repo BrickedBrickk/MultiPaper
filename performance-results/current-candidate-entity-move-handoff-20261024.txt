@@ -1,0 +1,43 @@
+Disposable entity move / ownership handoff validation — 2026-10-24
+================================================================
+
+Candidate
+---------
+Paperclip SHA-256: 380E9D566CBBFF5256B7F45687871D8108F2172056B3175A87E88A741DEE1592
+Master SHA-256:    2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186
+Java:              25.0.3
+Fixture:           %LOCALAPPDATA%\Temp\multipaper-26.3-entitymove-patched-d98ebd5e
+World:             peerStartRace
+Ports:             Master 31121; backends 31123/31124; RCON 31131/31132
+
+Change under test
+-----------------
+Persistent source patch `multipaper-server/minecraft-patches/sources/0032-MultiPaper-modern-port-Entity.patch`
+now invokes `MultiPaperEntitiesHandler.onChunkMove` after raw entity position,
+block/chunk position, and entity lookup updates. Previously the callback could
+serialize the entity using stale source-chunk state during a cross-chunk move.
+
+Results
+-------
+- Both backends reported one tagged probe pig with UUID
+  `[495770851, -1711521740, -1686392458, 604132409]` at destination
+  `(136.5, 100, 8.5)` after a cross-chunk teleport.
+- Clean save/stop of both backends followed by Master shutdown: entity-region
+  scan found 5 records, 5 unique UUIDs, 0 duplicate UUIDs. Raw scan:
+  `entity-integrity-scan-after-move.json` in the retained fixture.
+- Restarted Master and both backends. Both RCON probes found the same UUID at
+  `(136.5, 100, 8.5)`.
+- Moved the entity back and forth across the two chunks, transferring chunk
+  ownership three times. Both backends ended with the same UUID at destination.
+- Second clean save/stop and Master shutdown: scan found 6 records, 6 unique
+  UUIDs, 0 duplicate UUIDs. Raw scan:
+  `entity-integrity-scan-after-handoff-restart.json` in the retained fixture.
+- Fixture listeners were verified closed after the second scan. No production
+  or Crafty systems were accessed.
+
+Scope
+-----
+This validates the known deterministic move/ownership/restart reproduction on
+the local candidate. It does not certify broad entity integrity, intended-PC
+capacity, real online-mode client gameplay, or the remaining release gates in
+`PROJECT_CHECKPOINT.md`.
