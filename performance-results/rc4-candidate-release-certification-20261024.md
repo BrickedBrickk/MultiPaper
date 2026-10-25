@@ -23,3 +23,15 @@ Logs and disposable world data are retained under `%TEMP%\multipaper-26.3-rc4-pl
 ## Release disposition
 
 Keep this package local for controlled evaluation. Do not publish stable while the open player/authentication, Bedrock, GrimAC compatibility, intended-hardware capacity, and later human gameplay gates remain unresolved. Do not access Crafty or production for this candidate.
+
+## RC4 Master command and InvSee++ permission smoke — 2026-10-24
+
+A second run used the exact RC4 Paperclip on both disposable backends and the exact Master JAR. Two synthetic clients connected through the Master proxy with the full five-plugin stack enabled.
+
+- `/mpdebug` returned `MultiPaper debug enabled` to the operator client.
+- `/slist` returned `There are 1 out of 20 players online`, followed by entries for both `backend-a` and `backend-b`.
+- The client completed login and received 117 map chunks.
+- `scripts/Verify-InvSeePermission.js` passed through the Master proxy: a non-operator issuing `/invsee` received no inventory GUI.
+- Both backends were save-flushed and stopped; Master and ViaProxy fixture processes were stopped; ports 31821–31834 are closed.
+
+This confirms these command routes and the checked permission boundary on the RC4 local candidate. It remains synthetic offline-mode evidence, not authenticated human-gameplay or anti-cheat validation. Logs: `%TEMP%\multipaper-26.3-rc4-plugin-runtime-f891db1\command-*.stdout.log`.
