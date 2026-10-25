@@ -78,3 +78,10 @@ The last process check found no active Gradle client or disposable MultiPaper ru
 - The staged RC4 `INSTALL-PLUGIN-STACK.md` had two stale `REPORT.md` references; the package contains `COMPATIBILITY-REPORT.md` and `RC4-CANDIDATE-REPORT.md`. Corrected both to the included report names and clarified which report contains plugin hashes versus exact candidate artifacts/gates.
 - Repacked the same 8-entry local evaluation ZIP as `release-staging/MultiPaper-26.3-RC4-clean-reproducible-runtime-docfix-20261025.zip`; SHA-256 `F01BDFB7841EC87D8312F3143240368A1B0FFDC51E88D1F2D3C33DD43F7FCA73`. Verified 8 entries, no Floodgate key, JAR checksums still match `SHA256SUMS.txt`. The prior archives were preserved.
 - This is a documentation/package correction only. Human online-mode gameplay, real Bedrock/Floodgate identity, legitimate GrimAC/ViaBackwards behavior, and intended-hardware capacity remain open; no stable publication.
+
+## Consolidated RC4 six-component evaluation report — 2026-10-25
+
+- Added `RC4-COMPATIBILITY-REPORT.md` to the local evaluation package. It consolidates the exact six component versions and hashes, install sources, RC3/RC4 test scope, online-mode/Floodgate limits, InvSee++ behavior, GrimAC/ViaBackwards caveats, and performance/beta decision. It explicitly says RC3 remains unchanged and RC4 is not ready for public beta.
+- Updated `INSTALL-PLUGIN-STACK.md` to point to included report names and regenerated `release-staging/MultiPaper-26.3-RC4-evaluation-20261025.zip`; SHA-256 `03E7A267D500658C57FB71DF9B66533EA1AEFDAEC4927E7C8963C2D0C31390C0`.
+- Verified 9 ZIP entries, exact Paperclip/Master hashes against `SHA256SUMS.txt`, all six component names present, no broken `REPORT.md` link, no Floodgate key, and no credential file. Package JAR hashes remain Paperclip `F6466A12BE9BAF2B0071902D4B0AA764AC82698B551A00D633353D1D5517D694`, Master `2FF5C0BECABAB90BAACA2EEFC0F074044B0C1BECA65C8A456BDFA53D81F69186`.
+- This only improves the local release handoff. Real authenticated Java/Bedrock gameplay, legitimate-client GrimAC behavior, and target-hardware capacity remain open; no release was published.
