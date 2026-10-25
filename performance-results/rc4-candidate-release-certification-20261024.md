@@ -44,3 +44,16 @@ For this isolated check only, both disposable backends used `online-mode=true` a
 - A client injecting forged Bungee-style hostname/address/UUID fields was rejected with the same session-verification reason.
 
 Both backends were then save-flushed/stopped, Master was stopped after them, and the temporary fixture settings were restored to their prior offline-mode values. This verifies rejection of these unauthenticated probes; it does not prove successful Microsoft/Mojang online login, session-service availability, or Floodgate authentication.
+
+## Exact-RC4 two-backend vanilla mechanics and replication — 2026-10-24
+
+`Verify-TwoBackendReplication.ps1` ran against this exact RC4 Master and two identical RC4 backends with all five backend plugins plus the disposable `ScheduledTickLockProbe` installed. The probe ran at isolated test coordinates in the retained disposable world; player/entity/dimension checks were explicitly skipped.
+
+- Cross-backend emerald/diamond marker reads passed; chest and shulker item contents replicated.
+- Two cross-chunk hopper lines transferred exactly 8 diamonds and 8 iron ingots, and conservation remained exact after ownership handoff to Backend 2.
+- Normal piston extension and retraction replicated to both backends; stone remained at its destination.
+- Observer pulse/reset replicated (32 ms rise, 123 ms reset in this run).
+- Sticky-piston redstone-block pullback passed with Backend 1 as owner and again with Backend 2 as owner; both replicas retained the block with no item drop.
+- No new duplicate-entity UUID or missing-entity request warnings occurred during this mechanics run. This is only a warning counter for this run, not a new entity integrity audit.
+
+Both backends were save-flushed/stopped; Master was then stopped and fixture listeners closed. Raw logs: `%TEMP%\multipaper-26.3-rc4-plugin-runtime-f891db1\mechanics-*.stdout.log`.
