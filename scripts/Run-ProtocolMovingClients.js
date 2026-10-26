@@ -11,6 +11,7 @@ const durationSeconds = Number(durationText)
 const startupDelaySeconds = Number(startupDelayText)
 const onGround = process.env.MULTIPAPER_BOT_ON_GROUND !== 'false'
 const stationary = process.env.MULTIPAPER_BOT_STATIONARY === '1'
+const vanillaForwardInput = process.env.MULTIPAPER_BOT_VANILLA_FORWARD === '1'
 const traceClientWrites = process.env.MULTIPAPER_TRACE_CLIENT_WRITES === '1'
 const traceClientPackets = process.env.MULTIPAPER_TRACE_CLIENT_PACKETS === '1'
 const skipInitialPosition = process.env.MULTIPAPER_BOT_SKIP_INITIAL_POSITION === '1'
@@ -21,11 +22,11 @@ const loginTimeoutMs = Number(process.env.MULTIPAPER_BOT_LOGIN_TIMEOUT_MS || '15
 const initialChunkQuietMs = Number(process.env.MULTIPAPER_BOT_CHUNK_QUIET_MS || '250')
 const movementMinX = Number(process.env.MULTIPAPER_BOT_MIN_X || '96')
 const movementMaxX = Number(process.env.MULTIPAPER_BOT_MAX_X || '224')
-const version = '26.3'
+const version = process.env.MULTIPAPER_BOT_VERSION || '26.3'
 const dataDir = process.env.MULTIPAPER_MC_DATA_26_3
 
 if (!dataDir || !Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(count) || count < 1 || count > 20 || !Number.isFinite(durationSeconds) || durationSeconds < 10 || durationSeconds > 1800 || !Number.isFinite(startupDelaySeconds) || startupDelaySeconds < 0 || startupDelaySeconds > 60 || !Number.isFinite(movementStep) || movementStep <= 0 || !Number.isFinite(initialPositionDelayMs) || initialPositionDelayMs < 0 || initialPositionDelayMs > 5000 || !Number.isFinite(connectIntervalMs) || connectIntervalMs < 100 || connectIntervalMs > 30000 || !Number.isFinite(loginTimeoutMs) || loginTimeoutMs < 5000 || loginTimeoutMs > 90000 || !Number.isFinite(initialChunkQuietMs) || initialChunkQuietMs < 50 || initialChunkQuietMs > 5000 || !Number.isFinite(movementMinX) || !Number.isFinite(movementMaxX) || movementMinX >= movementMaxX || !/^[A-Za-z0-9_]{1,10}$/.test(prefix)) {
-  console.error('Usage: MULTIPAPER_MC_DATA_26_3=<minecraft-data/26.3> node scripts/Run-ProtocolMovingClients.js host port [count [duration-seconds [username-prefix [startup-delay-seconds]]]]')
+  console.error('Usage: MULTIPAPER_MC_DATA_26_3=<minecraft-data/26.3> [MULTIPAPER_BOT_VERSION=26.3] node scripts/Run-ProtocolMovingClients.js host port [count [duration-seconds [username-prefix [startup-delay-seconds]]]]')
   process.exit(2)
 }
 
@@ -80,7 +81,11 @@ function validateEntityDeltaCodec() {
   }
 }
 
-validateEntityDeltaCodec()
+if (version === '26.3') {
+  validateEntityDeltaCodec()
+} else if (process.env.MULTIPAPER_PROTOCOL_PREFLIGHT_ONLY === '1') {
+  throw new Error('The custom entity-delta codec preflight applies only to protocol 26.3.')
+}
 if (process.env.MULTIPAPER_PROTOCOL_PREFLIGHT_ONLY === '1') {
   process.stdout.write('PASS: 26.3 linear and stepped entity-move packets decode correctly.\n')
   process.exit(0)
@@ -106,10 +111,32 @@ function startMovement() {
   movementStartedAt = performance.now()
   process.stdout.write(`${JSON.stringify({ event: stationary ? 'stationary_load_started' : 'movement_started', elapsedMs: elapsed(), ready: records.filter(record => record.ready).length, onGround })}\n`)
   if (stationary) {
+    for (const record of records) {
+      record.movementTimer = setInterval(() => {
+        if (ending || !record.ready || record.endedAt !== null) return
+        // A vanilla 26.3 client sends input and ends each client tick even
+        // while standing still. Keep this separate from movementPackets so
+        // stationary load is not reported as a movement workload.
+        record.client.write('player_input', { inputs: {} })
+        record.client.write('tick_end', {})
+        record.idleTickPackets++
+      }, 50)
+    }
     finishTimer = setTimeout(finish, durationSeconds * 1000)
     return
   }
   for (const record of records) {
+    if (vanillaForwardInput) {
+      // Keep the packet inputs consistent with the coordinate stream. In 26.3
+      // GrimAC simulates player movement from the PlayerInput packet; sending
+      // coordinate changes with an empty input set is not a valid walking client.
+      record.yaw = record.direction > 0 ? 270 : 90
+      record.client.write('look', {
+        yaw: record.yaw,
+        pitch: 0,
+        flags: { onGround, hasHorizontalCollision: false }
+      })
+    }
     record.movementTimer = setInterval(() => {
       if (ending || !record.ready || !record.position || record.endedAt !== null) return
       // The defaults walk at 4.2 blocks/second on the probe's platform from
@@ -117,6 +144,9 @@ function startMovement() {
       record.position.x += record.direction * movementStep
       if (record.position.x >= movementMaxX) record.direction = -1
       if (record.position.x <= movementMinX) record.direction = 1
+      if (vanillaForwardInput) {
+        record.client.write('player_input', { inputs: { forward: true } })
+      }
       record.client.write('position', {
         x: record.position.x,
         y: record.position.y,
@@ -152,6 +182,7 @@ function finish() {
       errors: records.flatMap(record => record.errors.map(error => ({ username: record.username, error }))),
       movementPackets: records.reduce((total, record) => total + record.movementPackets, 0),
       durationSeconds: movementStartedAt === null ? 0 : Math.round((performance.now() - movementStartedAt) / 1000),
+      idleTickPackets: records.reduce((total, record) => total + record.idleTickPackets, 0),
       clients: records.map(record => ({
         username: record.username,
         connected: record.connected,
@@ -224,6 +255,7 @@ function connect(index) {
     initialPositionReceived: false,
     initialChunkBatchFinished: false,
     movementPackets: 0,
+    idleTickPackets: 0,
     position: null,
     serverPosition: null,
     endedAt: null,

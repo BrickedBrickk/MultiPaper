@@ -1,0 +1,11 @@
+{
+  "poll_seconds": 10,
+  "output_dir": "./monitor-data",
+  "retention": { "max_bytes_per_file": 8388608, "keep_rotated": 4, "days": 14 },
+  "thresholds": { "tps_warn": 18, "mspt_warn": 50, "cpu_percent_warn": 90, "memory_percent_warn": 92, "disk_percent_warn": 90 },
+  "servers": [
+    { "id": "master-pc1", "role": "master", "process_dir": "C:/MultiPaper/Master", "logs": ["C:/MultiPaper/Master/logs/latest.log"], "data_paths": ["C:/MultiPaper/Master"] },
+    { "id": "backend1-pc1", "role": "backend", "process_dir": "C:/MultiPaper/Backend1", "logs": ["C:/MultiPaper/Backend1/logs/latest.log"], "data_paths": ["C:/MultiPaper/Backend1"], "rcon": { "host": "127.0.0.1", "port": 25575, "password_env": "MULTIPAPER_BACKEND1_RCON_PASSWORD" } },
+    { "id": "geyser-pc1", "role": "geyser", "process_dir": "C:/MultiPaper/Geyser", "logs": ["C:/MultiPaper/Geyser/logs/latest.log"], "data_paths": ["C:/MultiPaper/Geyser"] }
+  ]
+}

@@ -6,6 +6,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
+const { createRequire } = require('node:module')
 
 const version = '26.3'
 const dataDir = process.env.MULTIPAPER_MC_DATA_26_3
@@ -13,7 +14,9 @@ if (!dataDir) {
   throw new Error('Set MULTIPAPER_MC_DATA_26_3 to the Minecraft 26.3 protocol data directory.')
 }
 
-const mcDataEntry = require.resolve('minecraft-data')
+const protocolEntry = require.resolve('minecraft-protocol')
+const protocolRequire = createRequire(protocolEntry)
+const mcDataEntry = protocolRequire.resolve('minecraft-data')
 const mcDataRoot = path.dirname(mcDataEntry)
 const dataPaths = require(path.join(mcDataRoot, 'data.js'))
 const protocolVersionsPath = path.join(mcDataRoot, 'minecraft-data', 'data', 'pc', 'common', 'protocolVersions.json')
@@ -46,11 +49,10 @@ Object.defineProperty(mapped, 'version', {
 })
 dataPaths.pc[version] = mapped
 
-const protocolEntry = require.resolve('minecraft-protocol')
 const compilerTypesPath = path.join(path.dirname(protocolEntry), 'datatypes', 'compiler-minecraft.js')
 const compilerTypes = require(compilerTypesPath)
-const [readVarInt, writeVarInt, sizeOfVarInt] = require('protodef').types.varint
-const PartialReadError = require('protodef').utils.PartialReadError
+const [readVarInt, writeVarInt, sizeOfVarInt] = protocolRequire('protodef').types.varint
+const PartialReadError = protocolRequire('protodef').utils.PartialReadError
 
 compilerTypes.Read.entityDelta = ['native', (buffer, offset) => {
   const header = readVarInt(buffer, offset)

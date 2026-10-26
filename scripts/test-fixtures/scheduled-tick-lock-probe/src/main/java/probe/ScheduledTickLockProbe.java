@@ -32,14 +32,15 @@ public final class ScheduledTickLockProbe extends JavaPlugin implements Listener
         boolean schedule = args.length == 6 && (args[0].equalsIgnoreCase("schedule") || args[0].equalsIgnoreCase("scheduletorch"));
         boolean inspectTick = args.length == 5 && args[0].equalsIgnoreCase("count");
         boolean inspectSpawn = args.length == 2 && args[0].equalsIgnoreCase("spawn");
+        boolean inspectTopology = args.length == 4 && args[0].equalsIgnoreCase("topology");
         boolean inspectEntities = args.length == 4 && args[0].equalsIgnoreCase("entitydebug");
         boolean inspectPiston = args.length == 6 && args[0].equalsIgnoreCase("pistonwatch")
                 && (args[1].equalsIgnoreCase("reset") || args[1].equalsIgnoreCase("count"));
         boolean broadcast = args.length == 5 && args[0].equalsIgnoreCase("broadcast");
         boolean sendBlock = args.length == 5 && args[0].equalsIgnoreCase("sendblock");
         boolean lockAction = args.length == 4 && (args[0].equalsIgnoreCase("lock") || args[0].equalsIgnoreCase("unlock") || args[0].equalsIgnoreCase("state"));
-        if (!schedule && !inspectTick && !inspectSpawn && !inspectEntities && !inspectPiston && !broadcast && !sendBlock && !lockAction) {
-            sender.sendMessage("Usage: /ticklockprobe <lock|unlock|state|entitydebug> <world> <chunkX> <chunkZ>, /ticklockprobe <schedule|scheduletorch> <world> <blockX> <y> <blockZ> <delay>, /ticklockprobe count <world> <blockX> <y> <blockZ>, /ticklockprobe <broadcast|sendblock> <world> <blockX> <y> <blockZ>, /ticklockprobe pistonwatch <reset|count> <world> <x> <y> <z>, or /ticklockprobe spawn <world>");
+        if (!schedule && !inspectTick && !inspectSpawn && !inspectTopology && !inspectEntities && !inspectPiston && !broadcast && !sendBlock && !lockAction) {
+            sender.sendMessage("Usage: /ticklockprobe <lock|unlock|state|entitydebug> <world> <chunkX> <chunkZ>, /ticklockprobe topology <world> <chunkX> <chunkZ>, /ticklockprobe <schedule|scheduletorch> <world> <blockX> <y> <blockZ> <delay>, /ticklockprobe count <world> <blockX> <y> <blockZ>, /ticklockprobe <broadcast|sendblock> <world> <blockX> <y> <blockZ>, /ticklockprobe pistonwatch <reset|count> <world> <x> <y> <z>, or /ticklockprobe spawn <world>");
             return true;
         }
         try {
@@ -58,6 +59,27 @@ public final class ScheduledTickLockProbe extends JavaPlugin implements Listener
                 String key = key(worldName, x, y, z);
                 if (args[1].equalsIgnoreCase("reset")) pistonRetracts.put(key, 0);
                 sender.sendMessage("pistonRetractCount=" + pistonRetracts.getOrDefault(key, 0));
+                return true;
+            }
+            if (inspectTopology) {
+                int chunkX = Integer.parseInt(args[2]);
+                int chunkZ = Integer.parseInt(args[3]);
+                Class<?> multiPaper = Class.forName("puregero.multipaper.MultiPaper");
+                Object holder = multiPaper.getMethod("getChunkHolder", String.class, int.class, int.class)
+                        .invoke(null, worldName, chunkX, chunkZ);
+                Object owner = holder.getClass().getField("externalOwner").get(holder);
+                String ownerName = owner == null ? "none" : String.valueOf(owner.getClass().getMethod("getName").invoke(owner));
+                Object subscribers = holder.getClass().getField("externalSubscribers").get(holder);
+                java.util.List<String> subscriberStates = new java.util.ArrayList<>();
+                for (Object subscriber : (java.util.Collection<?>) subscribers) {
+                    Object connection = subscriber.getClass().getMethod("getConnection").invoke(subscriber);
+                    boolean open = connection != null && (boolean) connection.getClass().getMethod("isOpen").invoke(connection);
+                    subscriberStates.add(subscriber.getClass().getMethod("getName").invoke(subscriber) + ":open=" + open);
+                }
+                sender.sendMessage("topology worldUid=" + world.getUID() + " owner=" + ownerName + " ownerIsMe="
+                        + (owner != null && (boolean) owner.getClass().getMethod("isMe").invoke(owner))
+                        + " currentChunk=" + (holder.getClass().getMethod("getCurrentChunk").invoke(holder) != null)
+                        + " subscribers=" + subscriberStates);
                 return true;
             }
             Class<?> multiPaper = Class.forName("puregero.multipaper.MultiPaper");

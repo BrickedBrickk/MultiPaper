@@ -6,6 +6,7 @@ param(
     [int]$BackendBRconPort = 29832,
     [ValidateRange(1, 20)][int]$ClientCount = 20,
     [ValidateRange(10, 1800)][int]$DurationSeconds = 60,
+    [ValidateRange(0, 60)][int]$StartupDelaySeconds = 30,
     [switch]$MoveClients,
     [switch]$UseStrictSshTunnels,
     [string]$ProxyHost = '127.0.0.1',
@@ -25,8 +26,11 @@ if ([string]::IsNullOrWhiteSpace($RconPassword)) { throw 'Provide -RconPassword 
 if ($UsernamePrefix -notmatch '^[A-Za-z0-9_]{1,6}$') { throw 'UsernamePrefix must be 1-6 alphanumeric/underscore characters.' }
 $root = (Resolve-Path -LiteralPath $FixtureRoot).Path
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
-if (-not $root.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path -Leaf $root) -notmatch '^multipaper-26\.3-') {
-    throw "Refusing to run outside a disposable MultiPaper fixture: $root"
+$fixtureMarker = Join-Path $root '.multipaper-disposable'
+$fixtureHasExplicitMarker = Test-Path -LiteralPath $fixtureMarker -PathType Leaf
+if ((-not $root.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
+     (Split-Path -Leaf $root) -notmatch '^multipaper-26\.3-') -and -not $fixtureHasExplicitMarker) {
+    throw "Refusing to run outside a disposable MultiPaper fixture. Use a multipaper-26.3-* directory under the temp root, or add an explicit .multipaper-disposable marker to a verified disposable fixture: $root"
 }
 $rconScript = Join-Path $PSScriptRoot 'Send-RconCommand.ps1'
 $node = (Get-Command node.exe -ErrorAction Stop).Source
@@ -151,13 +155,13 @@ try {
         Remove-Item Env:MULTIPAPER_BOT_STATIONARY -ErrorAction SilentlyContinue
         $env:MULTIPAPER_BOT_MIN_X = [string]($X - 54)
         $env:MULTIPAPER_BOT_MAX_X = [string]($X + 54)
-        $env:MULTIPAPER_BOT_MOVEMENT_STEP = '0.12'
+        if (-not $env:MULTIPAPER_BOT_MOVEMENT_STEP) { $env:MULTIPAPER_BOT_MOVEMENT_STEP = '0.12' }
         $env:MULTIPAPER_BOT_SKIP_INITIAL_POSITION = '1'
     } else {
         $env:MULTIPAPER_BOT_STATIONARY = '1'
     }
     $env:NODE_PATH = if ($env:NODE_PATH) { $env:NODE_PATH } else { Join-Path $env:USERPROFILE 'node_modules' }
-    $arguments = @('scripts/Run-ProtocolMovingClients.js', $ProxyHost, "$ProxyPort", "$ClientCount", "$DurationSeconds", $effectiveUsernamePrefix, '30')
+    $arguments = @('scripts/Run-ProtocolMovingClients.js', $ProxyHost, "$ProxyPort", "$ClientCount", "$DurationSeconds", $effectiveUsernamePrefix, "$StartupDelaySeconds")
     $clientProcess = Start-Process -FilePath $node -WorkingDirectory (Split-Path $PSScriptRoot -Parent) -ArgumentList $arguments -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(90)
     $stagedClients = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)

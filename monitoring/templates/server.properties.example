@@ -1,0 +1,14 @@
+# Backend A: 25566; Backend B: 25567. Keep this port reachable only from the private server network.
+server-port=25566
+online-mode=true
+enable-rcon=false
+# Leave server-ip blank unless your host has a reviewed private bind requirement.
+server-ip=
+
+# Optional monitor integration only. If enabling RCON, restrict it to loopback
+# and protect this plaintext properties file with OS permissions. Generate a
+# unique password; the real password must never be committed or packaged.
+# enable-rcon=true
+# rcon.ip=127.0.0.1
+# rcon.port=25575
+# rcon.password=<private-rcon-secret>

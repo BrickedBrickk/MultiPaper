@@ -1,0 +1,6 @@
+master-connection:
+  master-address: <PC1-private-LAN-or-Tailscale-IP>:35353
+  my-name: backend-a
+
+sync-settings:
+  sync-permissions: true
