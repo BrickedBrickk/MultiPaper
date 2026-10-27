@@ -1,4 +1,9 @@
-## 2026-10-27 — RC5 inventory probe follow-up
+## 2026-10-27 — RC5 cross-owner shift-click verification
+
+- A later exact-RC4 synthetic run completed a cross-owner InvSee++ mode-1 shift-click with an existing destination stack. Both backend RCON views showed 8 diamonds on target and 8 on viewer before; after the click the target was empty and the viewer held 16. Aggregate count stayed 16 on both backends. This verifies one shift-click/stack-merge transaction only; simultaneous editors, drag, restart/interrupted transaction, and real-player duplication remain unverified. Full evidence: `performance-results/rc5-investigation-triage-20261027.md`.
+- Exact hashes rechecked: both Paperclip JARs `B32344B9D1A6954E300FFD66F6B6CEE1D3E27FCD36D377DA6D95CAA1E67AC098`; Master `E122A819950C50FF504CDC6600D6E5C4970CD9D25F45AC19ED974F9D194134B7`. Fixture used Java 25. The test-only Master, backends, and clients were cleanly stopped; ports 32951–32962 are closed. No source or release artifact changed.
+
+## 2026-10-27 — initial RC5 inventory probe follow-up
 
 - Corrected isolated shift-click routing reached a synthetic cross-owner pair on the exact RC4 fixture (administrator on backend A; target on backend B). Eight diamonds were given to the test target through fixture-local RCON. GrimAC disconnected the idle synthetic target while the protocol probe waited for its explicit `GO` input; the probe sends no click before that input. Therefore the attempt is inconclusive and contains no shift-click result or conservation assertion.
 - The fixture used a separate disposable world (`rc5_invsee_20261027`), and the attempt issued no chest/block/world-edit commands. A resumed audit found its recorded Java PIDs still listening despite the earlier status. Both backends received `save-all flush` and `stop`; after they exited, the fixture Master was stopped. The protocol probe and all three Java processes are now exited, and ports 32951–32962 are closed. No live RC4/Crafty server, world, player, or production process was accessed or changed.
