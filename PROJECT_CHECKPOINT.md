@@ -1,6 +1,14 @@
-# MultiPaper project checkpoint — 2026-10-26
+# MultiPaper project checkpoint — 2026-10-27
 
 This is the concise durable handoff. Preserve all existing dirty and untracked workspace content. Detailed chronology is retained in `RELEASE_CHECKPOINT.md` and the prior handoff in `PROJECT_CHECKPOINT_HISTORY_20261025.md`.
+
+## 2026-10-27 RC5 continuation
+
+- Current branch `feature/port-26.3` is at HEAD `483294876697a614ac0e55cfa327bf90c285cb88`. `fork` points to the owner-controlled `BrickedBrickk/MultiPaper`; `origin` still points to `PurpurMC/Purpur` and must not receive pushes. Product baseline remains exact RC4 source `2265a5a3bf54d1a482c5ac21bd856a9a2674ee32`; no production Java source changed after that commit.
+- Added a seeded 256-scenario inventory-removal conservation property test to `MultiPaperInventoryHandlerTest`; focused suite passed 36/36. Two clean Java 25 / Gradle 9.8 full builds passed with 188 suites, 10,746 tests, 0 failures/errors, 88 skipped, and byte-identical outputs. Details and hashes: `performance-results/rc5-inventory-conservation-property-20261027.md`.
+- This is test coverage only. No new production bug was reproduced and no RC5 product fix/artifact exists. Current-tip InvSee normal-click/reconnect and Ender Chest evidence remains scoped as documented; a new shift-click attempt was inconclusive because the fixture could not observe a cross-backend owner pair. Do not publish RC5 based on the test-only change or use the HEAD-versioned rebuild as an RC5 binary.
+- The disposable D: Paperweight source setup hit the known Windows `FileDescriptor.close0` stall and was cancelled. C: temp patch application and both clean builds completed. All disposable processes were stopped; no live RC4/Crafty server was accessed, modified, benchmarked, restarted, or interrupted.
+- Next priority remains exact-candidate reproduction of the reported InvSee duplication with two actual backend owners (simultaneous views, shift-click and drag), then owner/reconnect/restart persistence if reproducible. Continue the remaining gameplay and client gates in the objective; do not infer real-player GUI, Bedrock, old-client movement, farms, or intended-hardware capacity from synthetic or local-only tests.
 
 ## 2026-10-26 evaluation-package and inventory update
 
@@ -13,7 +21,7 @@ This is the concise durable handoff. Preserve all existing dirty and untracked w
 
 ## Current source and candidate
 
-- Repository: `D:\ProjectsV3\Minecraft Mods\MultiPaper-Fork`; branch `feature/port-26.3`; HEAD and origin: `2265a5a3bf54d1a482c5ac21bd856a9a2674ee32`.
+- Repository: `D:\ProjectsV3\Minecraft Mods\MultiPaper-Fork`; branch `feature/port-26.3`; current HEAD `483294876697a614ac0e55cfa327bf90c285cb88`. The exact RC4 product baseline is `2265a5a3bf54d1a482c5ac21bd856a9a2674ee32`; `fork` is the owner-controlled GitHub remote, while `origin` remains PurpurMC/Purpur.
 - Fixes already pushed: `d96c50a` fragmented proxy handshakes; `2265a5a` Master-backed shared world UUIDs.
 - Exact clean current-tip build worktree: `E:\multipaper-builds\MultiPaper-26.3-current-tip-2265-20261025`. Temurin 25.0.3.9 / Gradle 9.8. Patch application plus two sequential clean no-cache build passes succeeded. Each run: 188 suites, 10,745 tests, 0 failures/errors, 88 skipped. Outputs were byte-identical. Logs under `%TEMP%\multipaper-clean-build-2265-current-tip*20261025.log`.
 - Exact current-tip SHA-256 artifacts, also staged locally in `release-staging/MultiPaper-26.3-RC4-current-tip-2265-20261025/SHA256SUMS.txt`:

@@ -7,6 +7,9 @@ import net.minecraft.world.item.Items;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Random;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,6 +38,45 @@ class MultiPaperInventoryHandlerTest {
 
         assertEquals(2, inventory.items.get(0).getCount());
         assertTrue(duplicateToRemove.isEmpty());
+    }
+
+    @Test
+    void repeatedRandomRemovalConservesExactItemCountsAcrossPlayerCompartments() {
+        Random random = new Random(0x4d756c7469506170L);
+
+        for (int iteration = 0; iteration < 256; iteration++) {
+            Inventory inventory = new Inventory(null, new PlayerEquipment(null));
+            ItemStack diamonds = new ItemStack(Items.DIAMOND);
+            int diamondCount = 0;
+            int emeraldCount = 0;
+
+            for (List<ItemStack> compartment : inventory.compartments) {
+                for (int slot = 0; slot < compartment.size(); slot++) {
+                    int roll = random.nextInt(5);
+                    if (roll < 2) {
+                        int count = random.nextInt(1, 65);
+                        compartment.set(slot, new ItemStack(Items.DIAMOND, count));
+                        diamondCount += count;
+                    } else if (roll == 2) {
+                        int count = random.nextInt(1, 65);
+                        compartment.set(slot, new ItemStack(Items.EMERALD, count));
+                        emeraldCount += count;
+                    }
+                }
+            }
+
+            if (diamondCount == 0) continue;
+
+            int removalCount = random.nextInt(1, Math.min(diamondCount, 64) + 1);
+            ItemStack removal = new ItemStack(Items.DIAMOND, removalCount);
+            MultiPaperInventoryHandler.removeFromInventory("randomized-test", removal, inventory.compartments);
+
+            assertTrue(removal.isEmpty(), "Iteration " + iteration + " must fully consume the requested removal");
+            assertEquals(diamondCount - removalCount, countMatching(inventory.compartments, diamonds),
+                    "Iteration " + iteration + " must remove exactly the requested number of diamonds");
+            assertEquals(emeraldCount, countMatching(inventory.compartments, new ItemStack(Items.EMERALD)),
+                    "Iteration " + iteration + " must leave unrelated items untouched");
+        }
     }
 
     @Test
@@ -89,5 +131,15 @@ class MultiPaperInventoryHandlerTest {
         } finally {
             MultiPaperInventoryHandler.updatingInventory = false;
         }
+    }
+
+    private static int countMatching(List<? extends List<ItemStack>> compartments, ItemStack target) {
+        int count = 0;
+        for (List<ItemStack> compartment : compartments) {
+            for (ItemStack stack : compartment) {
+                if (ItemStack.isSameItemSameComponents(stack, target)) count += stack.getCount();
+            }
+        }
+        return count;
     }
 }
