@@ -1,6 +1,6 @@
 # MultiPaper 26.3 RC4 evaluation handoff
 
-Updated: 2026-10-26 (America/New_York)
+Updated: 2026-10-27 (America/New_York)
 
 ## Candidate and publication
 
@@ -57,3 +57,21 @@ Updated: 2026-10-26 (America/New_York)
 
 - Latest recorded check found no Gradle/Minecraft Java process or disposable test listener active. Test-owned services were stopped; no ports were left open. No production process was stopped or modified.
 - The worktree contains many prior unrelated/untracked test outputs, plugin downloads, logs and release archives. Preserve them; commit only reviewed source/docs artifacts. Do not add raw logs, worlds, credentials or the large ZIP to the source commit.
+
+## RC5 continuation — 2026-10-27
+
+- Current branch HEAD: `4267456bfadfb6104793d55a95994b47231d0ff4` (`Add randomized inventory conservation regression`), fast-forward pushed to `fork` (`BrickedBrickk/MultiPaper`); `origin` remains PurpurMC/Purpur and is not the push target. This commit changes one inventory unit test plus the project checkpoint and two investigation reports. No production Java source or RC4 release binary changed.
+- Added a deterministic 256-scenario inventory-removal property test across player inventory compartments. Focused `MultiPaperInventoryHandlerTestSuite`: 36 tests passed. Two clean Java 25.0.3+9 / Gradle 9.8 runs: each 188 suites, 10,746 tests, 0 failures/errors, 88 skipped; five artifact hashes matched between builds. Full details and SHA-256 values are in `performance-results/rc5-inventory-conservation-property-20261027.md`.
+- RC4 normal-click/reconnect/Ender Chest evidence and the previously fixed stale replacement race remain useful, but they do not certify simultaneous human GUI edits, InvSee shift-click/drag, or every disconnect/restart ordering. The latest shift-click fixture attempt found no cross-backend owner pair and sent no inventory action; it is inconclusive. No new production defect was reproduced, so **there is no RC5 product fix, RC5 JAR, RC5 archive, or RC5 pre-release to install**. Do not relabel the HEAD-versioned verification builds as RC5.
+- Other required open gates remain: exact-pair boats/passengers, leads, held equipment, villager sleep/wake/bed/chunk behavior, block animation vs actual state, cross-backend sleeping and one leave announcement, synchronized gameplay/global settings, authenticated Bedrock/Floodgate gameplay, older ViaBackwards plus GrimAC behavior, and intended-hardware 5/10/20-client capacity. Existing human Survival/farm and Bedrock limitations remain; preserve their exact scopes in `PROJECT_CHECKPOINT.md` and `RELEASE_CHECKPOINT.md`.
+- Verification used a detached worktree at `C:\Users\elibo\AppData\Local\Temp\rc5-inventory-property-20261027`. The initial D: Paperweight source setup stalled in Windows `FileDescriptor.close0`; it was interrupted and the C: retry completed. Focused/full Gradle processes ended, test-owned servers were stopped, and fixture ports 32951–32962 are closed. No live Crafty/RC4 host, world, player, or production process was accessed or changed.
+
+### Manual two-backend update order when a verified RC5 exists
+
+1. Schedule downtime and close external tunnels/new logins. Make fresh offline backups of both backend worlds and Master state; verify file counts, sizes, and hashes against the backup record, and keep the current RC4 JARs/plugin configs separately for rollback.
+2. Gracefully stop Backend 2 and Backend 1 through Crafty and wait until both Java processes exit and all world/player saves finish. Stop Master/proxy only after both backends have disconnected. Keep the original worlds in place; do not copy one backend's local configuration, secrets, plugin database, ports, or JVM options over another's.
+3. Verify the downloaded RC5 archive and every listed SHA-256 before extraction. Replace both backend Paperclip JARs with the same verified RC5 Paperclip and replace the Master JAR with the matching RC5 Master. Keep the six component versions/configs unchanged unless the RC5 compatibility matrix explicitly requires a reviewed change; keep RCON, backend listeners, keys, and admin-only Tailscale access private.
+4. Start Master/proxy, then Backend 1 and Backend 2. Confirm all report the expected RC5 commit/version and plugin list. Before reopening tunnels, verify shared world UUIDs, backend connection state, player data/inventory, scheduled tick state, and a controlled block/dimension transfer from both backend views. Preserve logs and stop if any identity, save, or replication check disagrees.
+5. If rollback is needed, close tunnels, gracefully stop Backend 2 then Backend 1 and Master/proxy, preserve diagnostic logs, restore the matching previous RC4 JARs, then verify world/player data before reopening. Restore an offline world backup only if integrity checks require it; never overwrite newer player progress with a pre-upgrade backup without an explicit recovery decision.
+
+These steps are a manual plan only. The user will perform any Crafty installation after an RC5 artifact exists and beta gates are reviewed; no deployment or Crafty access was performed here.
