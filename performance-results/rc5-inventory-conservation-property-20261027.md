@@ -25,6 +25,6 @@ These are verification-build outputs, not RC5 candidates. The server JAR differs
 
 ## Limitations and next work
 
-- The additional exact-candidate shift-click protocol attempt on 2026-10-27 was inconclusive because the fixture did not observe a cross-backend owner pair. It did not send the shift-click. Do not infer success or failure from it; see `rc5-investigation-triage-20261027.md`.
+- The additional exact-candidate shift-click protocol attempt on 2026-10-27 did observe a cross-backend owner pair after the probe was routed through the Master, but GrimAC disconnected the idle synthetic target while the probe awaited `GO`. The target was seeded with eight test diamonds; no click or post-click conservation assertion occurred. Do not infer success or failure from it; see `rc5-investigation-triage-20261027.md`.
 - No new production defect was reproduced in this test pass. Do not publish RC5 or relabel these outputs as RC5. Continue with controlled cross-owner GUI transaction scenarios, including two simultaneous viewers, shift-click and drag, then restart/persistence cases if an exact pair can be established. Leave human gameplay, Bedrock, old-client behavior, broad farms, and intended-hardware capacity gates explicit until measured.
 - An initial test on D: encountered the previously documented Paperweight `SetupMinecraftSources` stall at Windows `FileDescriptor.close0`; that disposable Gradle run was interrupted. Patch preparation and builds succeeded from C: temp. No live service, Crafty host, world, or player data was accessed or modified.

@@ -1,3 +1,9 @@
+## 2026-10-27 — RC5 inventory probe follow-up
+
+- Corrected isolated shift-click routing reached a synthetic cross-owner pair on the exact RC4 fixture (administrator on backend A; target on backend B). Eight diamonds were given to the test target through fixture-local RCON. GrimAC disconnected the idle synthetic target while the protocol probe waited for its explicit `GO` input; the probe sends no click before that input. Therefore the attempt is inconclusive and contains no shift-click result or conservation assertion.
+- The fixture used a separate disposable world (`rc5_invsee_20261027`), and the attempt issued no chest/block/world-edit commands. Its Master, both backends, and protocol probe have exited; ports 32951–32962 are closed. No live RC4/Crafty server, world, player, or production process was accessed or changed.
+- RC5 has no new product fix or release artifact from this attempt. Do not publish or relabel the verification builds as RC5. See `performance-results/rc5-investigation-triage-20261027.md` for details.
+
 ## 2026-10-26 — published evaluation pre-release
 
 - Published `v26.3-RC4` as a GitHub **pre-release** at https://github.com/BrickedBrickk/MultiPaper/releases/tag/v26.3-RC4. It is explicitly evaluation-only and not stable. The release tag resolves to exact product source commit `2265a5a3bf54d1a482c5ac21bd856a9a2674ee32`.
