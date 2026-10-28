@@ -57,6 +57,7 @@ run/
 /purpur-api
 
 *.sh
+!monitoring/start-monitor-pc2.sh
 multipaper.jar
 
 # paperclip / server runtime extraction and local logs
