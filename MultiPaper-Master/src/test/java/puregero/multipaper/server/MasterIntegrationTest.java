@@ -1020,10 +1020,6 @@ class MasterIntegrationTest {
         assertEquals("server-a", pollUntilOwner(serverB, chunkX, chunkZ, "server-a").owner,
                 "The existing owner remains authoritative until it unlocks");
 
-        // Simulate a preannounced asynchronous save whose payload is delayed at the old owner.
-        serverA.send(new WillSaveChunkLaterMessage(WORLD, chunkX, chunkZ));
-        serverA.request(new PingMessage());
-
         // Backend B is already waiting for ownership. Once A unlocks, B becomes owner.
         serverA.send(new UnlockChunkMessage(WORLD, chunkX, chunkZ));
         assertEquals("server-b", pollUntilOwner(serverB, chunkX, chunkZ, "server-b").owner);
@@ -1420,6 +1416,64 @@ class MasterIntegrationTest {
             return MessageDigest.getInstance("SHA-256").digest(bytes);
         } catch (NoSuchAlgorithmException impossible) {
             throw new AssertionError("SHA-256 is required by the Java runtime", impossible);
+        }
+    }
+
+    @Test
+    @Order(37)
+    void chunkOwnershipDoesNotTransferBeforePreannouncedChestSaveIsPersisted() throws Exception {
+        int chunkX = 34;
+        int chunkZ = 0;
+        String world = Files.createTempDirectory("multipaper-pending-chest-unlock-").toString();
+        byte[] savedChest = chestChunk(17);
+        TestServerClient owner = TestServerClient.connect(port, "pending-save-owner");
+        TestServerClient waiter = TestServerClient.connect(port, "pending-save-waiter");
+        try {
+            owner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            owner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            owner.request(new PingMessage());
+            assertEquals("pending-save-owner", pollUntilOwner(owner, chunkX, chunkZ, "pending-save-owner").owner);
+
+            waiter.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            waiter.send(new LockChunkMessage(world, chunkX, chunkZ));
+            waiter.request(new PingMessage());
+            assertEquals("pending-save-owner", pollUntilOwner(waiter, chunkX, chunkZ, "pending-save-owner").owner);
+
+            // Model Paper announcing its asynchronous save, then requesting unlock
+            // before the serialized chunk NBT reaches the Master.
+            owner.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            owner.request(new PingMessage());
+            owner.send(new UnlockChunkMessage(world, chunkX, chunkZ));
+
+            // The waiting backend must not acquire ownership or read an older chest
+            // image while A's announced save is still outstanding.
+            waiter.send(new LockChunkMessage(world, chunkX, chunkZ));
+            waiter.request(new PingMessage());
+            assertEquals("pending-save-owner", pollUntilOwner(waiter, chunkX, chunkZ, "pending-save-owner").owner,
+                    "Master must keep the previous owner until its announced chest save is persisted");
+
+            CompletableFuture<ServerBoundMessage> pendingRead = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return waiter.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ));
+                } catch (Exception failure) {
+                    throw new java.util.concurrent.CompletionException(failure);
+                }
+            });
+            Thread.sleep(200);
+            assertFalse(pendingRead.isDone(), "No-holder read must wait for the announced chest save");
+
+            ServerBoundMessage writeReply = owner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, savedChest));
+            assertTrue(((BooleanMessageReply) writeReply).result,
+                    "The previous owner must still be authorized to finish its pending save");
+            assertEquals("pending-save-waiter", pollUntilOwner(waiter, chunkX, chunkZ, "pending-save-waiter").owner,
+                    "Ownership should transfer only after the pending Master write completes");
+
+            byte[] persisted = ((DataMessageReply) pendingRead.get(10, TimeUnit.SECONDS)).data;
+            assertArrayEquals(savedChest, persisted, "The new owner must read the exact persisted chest image");
+            assertEquals(17, readChestItemCount(persisted), "The new owner must retain every chest item");
+        } finally {
+            owner.close();
+            waiter.close();
         }
     }
 }
