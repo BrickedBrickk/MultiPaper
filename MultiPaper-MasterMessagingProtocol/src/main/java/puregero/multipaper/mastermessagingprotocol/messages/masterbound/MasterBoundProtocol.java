@@ -5,11 +5,11 @@ import puregero.multipaper.mastermessagingprotocol.messages.Protocol;
 public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
 
     /**
-     * Reserved envelope transaction ID used to negotiate support for the
-     * appended CommitPlayerDataTransactionMessage without changing existing
-     * MasterBound/ServerBound message payloads or IDs.
+     * Reserved envelope transaction ID for playerdata transaction wire version 2.
+     * Version 2 adds participant before-image hashes; using a new marker keeps a
+     * peer that negotiated the earlier after-image-only format fail-closed.
      */
-    public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE;
+    public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE + 1;
 
     public MasterBoundProtocol() {
         addMessage(MasterBoundDataStreamMessage.class, MasterBoundDataStreamMessage::new);

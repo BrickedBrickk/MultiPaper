@@ -27,6 +27,7 @@ public final class CommitPlayerDataTransactionHandler {
             boolean committed = false;
             List<ServerConnection> connections = ServerConnection.getConnections();
             Map<UUID, byte[]> snapshots = new HashMap<>();
+            Map<UUID, byte[]> expectedHashes = new HashMap<>();
 
             // Hold the same connection-list monitor used by connect/disconnect
             // and socket-close handling from ownership validation through the
@@ -49,6 +50,7 @@ public final class CommitPlayerDataTransactionHandler {
                             break;
                         }
                         if (owner != sender) senderOwnsEveryParticipant = false;
+                        expectedHashes.put(participant.playerId(), participant.expectedPlayerDataHash());
                         snapshots.put(participant.playerId(), participant.playerData());
                     }
 
@@ -58,8 +60,8 @@ public final class CommitPlayerDataTransactionHandler {
                     // not authorize replacing that owner's full playerdata image.
                     if (allOwnersMatch && senderOwnsEveryParticipant) {
                         try {
-                            PlayerDataTransactionManager.commit(message.world, message.transactionId, snapshots);
-                            committed = true;
+                            committed = PlayerDataTransactionManager.commitIfCurrent(
+                                    message.world, message.transactionId, expectedHashes, snapshots);
                         } catch (IOException failure) {
                             System.err.println("Failed to commit playerdata transaction " + message.transactionId + " for world " + message.world);
                             failure.printStackTrace();

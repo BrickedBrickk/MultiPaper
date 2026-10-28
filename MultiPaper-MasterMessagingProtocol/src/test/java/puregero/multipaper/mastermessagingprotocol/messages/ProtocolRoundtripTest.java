@@ -87,8 +87,8 @@ class ProtocolRoundtripTest {
         })));
         assertEquals(44, protocol.getMessageId(new CommitPlayerDataTransactionMessage(
                 "world", UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-a", new byte[]{1}),
-                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-b", new byte[]{2})
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-a", new byte[32], new byte[]{1}),
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-b", new byte[32], new byte[]{2})
         })));
     }
 
@@ -158,6 +158,7 @@ class ProtocolRoundtripTest {
     @Test
     void playerDataCapabilityMarkerSurvivesBothMasterBoundDirections() {
         int marker = MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID;
+        assertEquals(Integer.MIN_VALUE + 1, marker, "The before-image transaction layout must negotiate a new capability version");
         UUID serverId = UUID.nameUUIDFromBytes("capability-peer".getBytes());
 
         EmbeddedChannel masterEncoder = new EmbeddedChannel(
@@ -275,8 +276,8 @@ class ProtocolRoundtripTest {
             };
         } else if (type == puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[].class) {
             return new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[]{
-                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-a", new byte[]{1, 2}),
-                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-b", new byte[]{3, 4})
+                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-a", new byte[32], new byte[]{1, 2}),
+                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-b", new byte[32], new byte[]{3, 4})
             };
         } else {
             fail("Unhandled sample parameter type " + type.getName() + " for " + context);
@@ -320,6 +321,7 @@ class ProtocolRoundtripTest {
             for (int i = 0; i < participantsA.length; i++) {
                 assertEquals(participantsA[i].playerId(), participantsB[i].playerId(), path + "[" + i + "].playerId");
                 assertEquals(participantsA[i].ownerName(), participantsB[i].ownerName(), path + "[" + i + "].ownerName");
+                assertArrayEquals(participantsA[i].expectedPlayerDataHash(), participantsB[i].expectedPlayerDataHash(), path + "[" + i + "].expectedPlayerDataHash");
                 assertArrayEquals(participantsA[i].playerData(), participantsB[i].playerData(), path + "[" + i + "].playerData");
             }
         } else if (valueA instanceof Object[] arrayA && valueB instanceof Object[] arrayB) {

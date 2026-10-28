@@ -9,6 +9,7 @@ import java.util.UUID;
 /** Durable participant after-images. Cross-backend commits require owner attestation before this message is accepted. */
 public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage {
     public static final int MAX_PLAYER_DATA_BYTES = 8 * 1024 * 1024;
+    public static final int PLAYER_DATA_HASH_BYTES = 32;
     private static final int PARTICIPANT_COUNT = 2;
 
     public final String world;
@@ -43,6 +44,8 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         for (int i = 0; i < count; i++) {
             UUID playerId = input.readUUID();
             String ownerName = readText(input, 128, "owner name");
+            byte[] expectedHash = new byte[PLAYER_DATA_HASH_BYTES];
+            input.readBytes(expectedHash);
             int length = input.readVarInt();
             if (length <= 0 || length > MAX_PLAYER_DATA_BYTES || length > input.readableBytes()) {
                 throw new IllegalArgumentException("Invalid playerdata transaction image size " + length);
@@ -52,7 +55,7 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
             if (!ids.add(playerId)) {
                 throw new IllegalArgumentException("Duplicate player in playerdata transaction: " + playerId);
             }
-            participants[i] = new Participant(playerId, ownerName, data);
+            participants[i] = new Participant(playerId, ownerName, expectedHash, data);
         }
     }
 
@@ -64,6 +67,7 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         for (Participant participant : participants) {
             output.writeUUID(participant.playerId());
             output.writeString(participant.ownerName());
+            output.writeBytes(participant.expectedPlayerDataHash());
             byte[] data = participant.playerData();
             output.writeVarInt(data.length);
             output.writeBytes(data);
@@ -92,10 +96,14 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         return value;
     }
 
-    public record Participant(UUID playerId, String ownerName, byte[] playerData) {
+    public record Participant(UUID playerId, String ownerName, byte[] expectedPlayerDataHash, byte[] playerData) {
         public Participant {
             java.util.Objects.requireNonNull(playerId, "playerId");
             ownerName = requireText(ownerName, 128, "owner name");
+            if (expectedPlayerDataHash == null || expectedPlayerDataHash.length != PLAYER_DATA_HASH_BYTES) {
+                throw new IllegalArgumentException("Expected playerdata SHA-256 must be 32 bytes");
+            }
+            expectedPlayerDataHash = expectedPlayerDataHash.clone();
             if (playerData == null || playerData.length == 0 || playerData.length > MAX_PLAYER_DATA_BYTES) {
                 throw new IllegalArgumentException("Invalid playerdata transaction image size");
             }
@@ -105,6 +113,11 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         @Override
         public byte[] playerData() {
             return playerData.clone();
+        }
+
+        @Override
+        public byte[] expectedPlayerDataHash() {
+            return expectedPlayerDataHash.clone();
         }
     }
 }

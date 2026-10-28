@@ -64,6 +64,50 @@ public final class PlayerDataTransactionManager {
         }
     }
 
+    /**
+     * Atomically commits a batch only if every durable playerdata file still has
+     * the exact before-image hash supplied by the caller. The expected hashes are
+     * checked under the same world lock as the journal write. Replays of an
+     * already committed identical transaction remain idempotent even though its
+     * after-images now differ from the original before-images.
+     */
+    public static boolean commitIfCurrent(String world, UUID transactionId,
+                                          Map<UUID, byte[]> expectedPlayerDataHashes,
+                                          Map<UUID, byte[]> playerSnapshots) throws IOException {
+        Objects.requireNonNull(transactionId, "transactionId");
+        Objects.requireNonNull(expectedPlayerDataHashes, "expectedPlayerDataHashes");
+        Objects.requireNonNull(playerSnapshots, "playerSnapshots");
+        if (!expectedPlayerDataHashes.keySet().equals(playerSnapshots.keySet())) {
+            throw new IOException("Expected playerdata hashes must match the transaction participants");
+        }
+
+        Path worldPath = Path.of(world).toAbsolutePath().normalize();
+        synchronized (lockFor(worldPath)) {
+            recoverPending(worldPath);
+            byte[] transaction = encode(transactionId, playerSnapshots);
+            byte[] digest = sha256(transaction);
+            Path doneFile = doneFile(worldPath, transactionId);
+            if (Files.exists(doneFile)) {
+                if (!MessageDigest.isEqual(FileLocker.readBytes(doneFile.toFile()), digest)) {
+                    throw new IOException("Playerdata transaction ID reused with different contents: " + transactionId);
+                }
+                return true;
+            }
+
+            for (Map.Entry<UUID, byte[]> entry : expectedPlayerDataHashes.entrySet()) {
+                byte[] expectedHash = Objects.requireNonNull(entry.getValue(), "expected playerdata hash");
+                if (expectedHash.length != 32) throw new IOException("Expected playerdata SHA-256 must be 32 bytes");
+                byte[] currentHash = sha256(FileLocker.readBytes(playerFile(worldPath, entry.getKey()).toFile()));
+                if (!MessageDigest.isEqual(expectedHash, currentHash)) return false;
+            }
+
+            Path pendingFile = pendingFile(worldPath, transactionId);
+            FileLocker.writeBytes(pendingFile.toFile(), transaction);
+            applyPending(worldPath, pendingFile, ignored -> { });
+            return true;
+        }
+    }
+
     public static byte[] readPlayer(String world, UUID playerId) throws IOException {
         Path worldPath = Path.of(world).toAbsolutePath().normalize();
         synchronized (lockFor(worldPath)) {
