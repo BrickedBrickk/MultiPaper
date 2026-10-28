@@ -1058,7 +1058,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..9df5cd764adfb07c53988a67406e9bc1307844f5
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/MultiPaperEntitiesHandler.java
-@@ -0,0 +1,393 @@
+@@ -0,0 +1,397 @@
 +package puregero.multipaper;
 +
 +import com.mojang.datafixers.util.Pair;
@@ -1358,11 +1358,7 @@ index 0000000000000000000000000000000000000000..9df5cd764adfb07c53988a67406e9bc1
 +            }
 +            modifyingPassengers = false;
 +        } else if (packet instanceof ClientboundSetEntityLinkPacket setEntityLinkPacket) {
-+            if (entities.length == 0) {
-+                ((Mob) entity).setLeashedTo(null, true);
-+            } else {
-+                ((Mob) entity).setLeashedTo(entities[0], true);
-+            }
++            applyEntityLinkUpdate(entity, entities);
 +        } else if (packet instanceof ClientboundTakeItemEntityPacket takeItemEntityPacket) {
 +            takingItem = true;
 +            ((LivingEntity) entities[0]).take(entity, takeItemEntityPacket.getAmount());
@@ -1370,6 +1366,15 @@ index 0000000000000000000000000000000000000000..9df5cd764adfb07c53988a67406e9bc1
 +        } else {
 +            LOGGER.warn("Unhandled dependencies packet " + packet);
 +        }
++    }
++
++    static void applyEntityLinkUpdate(Entity entity, Entity[] linkedEntities) {
++        if (!(entity instanceof Mob mob)) {
++            LOGGER.warn("Ignoring entity-link update for non-mob entity {} ({})", entity.getUUID(), entity.getClass().getName());
++            return;
++        }
++
++        mob.setLeashedTo(linkedEntities.length == 0 ? null : linkedEntities[0], true);
 +    }
 +
 +    public static void onEntitySpawn(Entity entity) {

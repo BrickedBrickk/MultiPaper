@@ -345,11 +345,7 @@ public class MultiPaperEntitiesHandler {
             }
             modifyingPassengers = false;
         } else if (packet instanceof ClientboundSetEntityLinkPacket setEntityLinkPacket) {
-            if (entities.length == 0) {
-                ((Mob) entity).setLeashedTo(null, true);
-            } else {
-                ((Mob) entity).setLeashedTo(entities[0], true);
-            }
+            applyEntityLinkUpdate(entity, entities);
         } else if (packet instanceof ClientboundTakeItemEntityPacket takeItemEntityPacket) {
             takingItem = true;
             ((LivingEntity) entities[0]).take(entity, takeItemEntityPacket.getAmount());
@@ -357,6 +353,15 @@ public class MultiPaperEntitiesHandler {
         } else {
             LOGGER.warn("Unhandled dependencies packet " + packet);
         }
+    }
+
+    static void applyEntityLinkUpdate(Entity entity, Entity[] linkedEntities) {
+        if (!(entity instanceof Mob mob)) {
+            LOGGER.warn("Ignoring entity-link update for non-mob entity {} ({})", entity.getUUID(), entity.getClass().getName());
+            return;
+        }
+
+        mob.setLeashedTo(linkedEntities.length == 0 ? null : linkedEntities[0], true);
     }
 
     public static void onEntitySpawn(Entity entity) {

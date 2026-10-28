@@ -1,0 +1,11 @@
+name: RC5BoatOwnerProbe
+version: 1.0
+main: rc5.boat.BoatOwnerProbePlugin
+api-version: '1.21'
+commands:
+  rc5boatowner:
+    description: Reports the current MultiPaper chunk owner for isolated RC5 boat tests
+    usage: /rc5boatowner <chunkX> <chunkZ>
+  rc5leashprobe:
+    description: Creates and inspects a disposable cross-backend wolf leash probe
+    usage: /rc5leashprobe <setup|state>
