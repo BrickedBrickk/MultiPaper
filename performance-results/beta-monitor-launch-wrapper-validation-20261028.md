@@ -2,7 +2,7 @@
 
 ## Change
 
-Added the missing `monitoring/start-monitor-pc2.sh` wrapper referenced by the setup guide. It requires a private config path, verifies the collector and config files exist, requires Python 3.10+, and `exec`s the collector with all remaining arguments. The README now documents invoking it via `sh`, so package file mode is not required. It never starts, stops, or configures a game service.
+Added the missing `monitoring/start-monitor-pc2.sh` wrapper referenced by the setup guide. It requires a private config path, verifies the collector and config files exist, requires Python 3.10+, and `exec`s the collector with all remaining arguments. The local README working tree documents invoking it via `sh`, so package file mode is not required; the broader README edits were left uncommitted to preserve pre-existing changes. It never starts, stops, or configures a game service.
 
 ## Verification
 
