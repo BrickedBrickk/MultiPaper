@@ -205,7 +205,10 @@ class Monitor:
         self.keep = int(retention["keep_rotated"])
         self.global_out = BoundedJsonl(self.root / "timeline.jsonl", self.max_bytes, self.keep)
         self.salt = os.urandom(32)
-        self.offsets: dict[str, tuple[int, int]] = {}
+        # (inode, byte offset, digest of the bytes immediately before that offset).
+        # The digest detects copy-truncate/rewrite rotations that retain an inode and
+        # grow back to at least the old size before the next poll.
+        self.offsets: dict[str, tuple[int, int, bytes]] = {}
         self.last_net: tuple[float, int, int] | None = None
         self.session_start = utc_now()
         self.last_summary_day: str | None = None
@@ -223,13 +226,21 @@ class Monitor:
                 st = path.stat()
                 key = str(path.resolve())
                 previous = self.offsets.get(key)
-                offset = previous[1] if previous and previous[0] == st.st_ino and st.st_size >= previous[1] else st.st_size
-                with path.open("r", encoding="utf-8", errors="replace") as f:
+                offset = st.st_size
+                if previous:
+                    old_inode, old_offset, old_fingerprint = previous
+                    same_file = old_inode == st.st_ino and st.st_size >= old_offset
+                    same_tail = same_file and self._log_tail_fingerprint(path, old_offset) == old_fingerprint
+                    # New files start at EOF; a changed/truncated existing file starts
+                    # at byte zero so events written since rotation are not lost.
+                    offset = old_offset if same_tail else 0
+                with path.open("rb") as f:
                     f.seek(offset)
                     for raw in f:
-                        if SECRET_RE.search(raw):
+                        line = raw.decode("utf-8", "replace")
+                        if SECRET_RE.search(line):
                             continue
-                        ev = parse_log_line(raw, server["id"], key, self.salt)
+                        ev = parse_log_line(line, server["id"], key, self.salt)
                         if ev:
                             self.emit(server["id"], ev)
                             if ev["event"] in {"exception", "crash", "inventory_inconsistency", "grim_violation"}:
@@ -238,9 +249,19 @@ class Monitor:
                                 if now - self.last_event_alert.get(alert_key, 0) >= 60:
                                     self.emit(server["id"], {"time": utc_now(), "server": server["id"], "event": "alert", "reason": ev["event"], "source": ev["source"]})
                                     self.last_event_alert[alert_key] = now
-                    self.offsets[key] = (st.st_ino, f.tell())
+                    new_offset = f.tell()
+                    self.offsets[key] = (st.st_ino, new_offset, self._log_tail_fingerprint(path, new_offset))
             except (OSError, UnicodeError):
                 continue
+
+    @staticmethod
+    def _log_tail_fingerprint(path: Path, offset: int, window_bytes: int = 256) -> bytes:
+        if offset <= 0:
+            return b""
+        start = max(0, offset - window_bytes)
+        with path.open("rb") as f:
+            f.seek(start)
+            return hashlib.sha256(f.read(offset - start)).digest()
 
     def sample_server(self, server: dict[str, Any]) -> dict[str, Any]:
         metrics: dict[str, Any] = {"time": utc_now(), "server": server["id"], "role": server.get("role", "unknown"), **host_metrics(server.get("process_dir")),

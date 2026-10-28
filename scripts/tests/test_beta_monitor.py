@@ -58,6 +58,39 @@ class BetaMonitorTests(unittest.TestCase):
             self.assertLessEqual(len(files), 3)
             self.assertTrue((Path(tmp) / "events.jsonl.1").exists())
 
+    def test_log_tail_detects_same_inode_rewrite_after_copy_truncate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log = root / "latest.log"
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(root / "monitor"),
+                "servers": [{"id": "backend1", "logs": [str(log)]}],
+            }))
+            log.write_bytes(b"[12:00:00 INFO]: Alpha joined the game\n")
+            m = monitor.Monitor(cfg)
+            server = m.cfg["servers"][0]
+            m.read_logs(server)  # Initial tail starts at the current end of file.
+            inode_before = log.stat().st_ino
+
+            replacement = b"[12:00:01 INFO]: Bravo joined the game\n"
+            self.assertEqual(len(replacement), log.stat().st_size)
+            log.write_bytes(replacement)
+            self.assertEqual(inode_before, log.stat().st_ino, "Fixture must model same-inode copy-truncate")
+            m.read_logs(server)
+
+            events_path = root / "monitor" / "backend1" / "events.jsonl"
+            events = [json.loads(line) for line in events_path.read_text().splitlines()] if events_path.exists() else []
+            self.assertEqual([event["event"] for event in events], ["player_join"])
+            self.assertNotIn("Bravo", json.dumps(events), "Player names must remain redacted")
+
+            with log.open("ab") as f:
+                f.write(b"[12:00:02 INFO]: Charlie joined the game\n")
+            m.read_logs(server)
+            events = [json.loads(line) for line in events_path.read_text().splitlines()]
+            self.assertEqual([event["event"] for event in events], ["player_join", "player_join"])
+            self.assertNotIn("Charlie", json.dumps(events), "Appended player names must remain redacted")
+
     def test_export_merge_only_sanitized_record_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
