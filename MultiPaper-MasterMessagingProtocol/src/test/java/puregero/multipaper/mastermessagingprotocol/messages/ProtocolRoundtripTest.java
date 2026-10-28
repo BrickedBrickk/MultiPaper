@@ -11,14 +11,18 @@ import puregero.multipaper.mastermessagingprotocol.MessageEncoder;
 import puregero.multipaper.mastermessagingprotocol.MessageLengthDecoder;
 import puregero.multipaper.mastermessagingprotocol.MessageLengthEncoder;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CallDataStorageMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.DownloadFileMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.HelloMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundProtocol;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage.Snapshot;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.FilesToSyncMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundProtocol;
+import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetSecretMessage;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -69,6 +73,23 @@ class ProtocolRoundtripTest {
         for (Class<? extends MasterBoundMessage> messageClass : messagesOf(protocol)) {
             roundTrip(protocol, messageClass);
         }
+    }
+
+    @Test
+    void appendedPlayerDataTransactionKeepsExistingMasterBoundWireIdsStable() {
+        MasterBoundProtocol protocol = new MasterBoundProtocol();
+        assertEquals(3, protocol.getMessageId(new DownloadFileMessage("test")));
+        assertEquals(5, protocol.getMessageId(new HelloMessage("test", UUID.randomUUID())));
+        assertEquals(43, protocol.getMessageId(new PersistContainerTransactionMessage(
+                "world", "transaction", new PersistContainerTransactionMessage.Snapshot[]{
+                new PersistContainerTransactionMessage.Snapshot(0, 0, new byte[]{1}),
+                new PersistContainerTransactionMessage.Snapshot(1, 1, new byte[]{2})
+        })));
+        assertEquals(44, protocol.getMessageId(new CommitPlayerDataTransactionMessage(
+                "world", UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-a", new byte[]{1}),
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-b", new byte[]{2})
+        })));
     }
 
     @Test
@@ -132,6 +153,36 @@ class ProtocolRoundtripTest {
         assertTrue(masterSideDecoder.writeInbound(framedReply));
         BooleanMessageReply decodedReply = masterSideDecoder.readInbound();
         assertTrue(decodedReply.result);
+    }
+
+    @Test
+    void playerDataCapabilityMarkerSurvivesBothMasterBoundDirections() {
+        int marker = MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID;
+        UUID serverId = UUID.nameUUIDFromBytes("capability-peer".getBytes());
+
+        EmbeddedChannel masterEncoder = new EmbeddedChannel(
+                new MessageLengthEncoder(), new MessageEncoder<>(new MasterBoundProtocol()));
+        EmbeddedChannel backendDecoder = new EmbeddedChannel(
+                new MessageLengthDecoder(), new MessageDecoder<>(new MasterBoundProtocol()));
+        HelloMessage acknowledgement = new HelloMessage("capability-peer", serverId);
+        acknowledgement.setTransactionId(marker);
+        assertTrue(masterEncoder.writeOutbound(acknowledgement));
+        assertTrue(backendDecoder.writeInbound((Object) masterEncoder.readOutbound()));
+        HelloMessage decodedAcknowledgement = backendDecoder.readInbound();
+        assertEquals(marker, decodedAcknowledgement.getTransactionId());
+        assertEquals(serverId, decodedAcknowledgement.serverUuid);
+
+        EmbeddedChannel backendEncoder = new EmbeddedChannel(
+                new MessageLengthEncoder(), new MessageEncoder<>(new ServerBoundProtocol()));
+        EmbeddedChannel masterDecoder = new EmbeddedChannel(
+                new MessageLengthDecoder(), new MessageDecoder<>(new ServerBoundProtocol()));
+        SetSecretMessage challenge = new SetSecretMessage("test-secret");
+        challenge.setTransactionId(marker);
+        assertTrue(backendEncoder.writeOutbound(challenge));
+        assertTrue(masterDecoder.writeInbound((Object) backendEncoder.readOutbound()));
+        SetSecretMessage decodedChallenge = masterDecoder.readInbound();
+        assertEquals(marker, decodedChallenge.getTransactionId());
+        assertEquals("test-secret", decodedChallenge.secret);
     }
 
     /**
@@ -222,6 +273,11 @@ class ProtocolRoundtripTest {
                     new Snapshot(-12, 34, new byte[]{1, 2, 3}, new byte[]{4, 5}),
                     new Snapshot(56, -78, new byte[]{9}, new byte[]{10, 11, 12})
             };
+        } else if (type == puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[].class) {
+            return new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[]{
+                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-a", new byte[]{1, 2}),
+                    new puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "owner-b", new byte[]{3, 4})
+            };
         } else {
             fail("Unhandled sample parameter type " + type.getName() + " for " + context);
             return null;
@@ -257,6 +313,14 @@ class ProtocolRoundtripTest {
                 assertEquals(snapshotsA[i].chunkZ(), snapshotsB[i].chunkZ(), path + "[" + i + "].chunkZ");
                 assertArrayEquals(snapshotsA[i].beforeData(), snapshotsB[i].beforeData(), path + "[" + i + "].beforeData");
                 assertArrayEquals(snapshotsA[i].afterData(), snapshotsB[i].afterData(), path + "[" + i + "].afterData");
+            }
+        } else if (valueA instanceof puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[] participantsA
+                && valueB instanceof puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage.Participant[] participantsB) {
+            assertEquals(participantsA.length, participantsB.length, path + " length");
+            for (int i = 0; i < participantsA.length; i++) {
+                assertEquals(participantsA[i].playerId(), participantsB[i].playerId(), path + "[" + i + "].playerId");
+                assertEquals(participantsA[i].ownerName(), participantsB[i].ownerName(), path + "[" + i + "].ownerName");
+                assertArrayEquals(participantsA[i].playerData(), participantsB[i].playerData(), path + "[" + i + "].playerData");
             }
         } else if (valueA instanceof Object[] arrayA && valueB instanceof Object[] arrayB) {
             assertEquals(arrayA.length, arrayB.length, path + " length");

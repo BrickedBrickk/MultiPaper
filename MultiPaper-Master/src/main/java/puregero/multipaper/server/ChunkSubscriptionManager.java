@@ -17,6 +17,9 @@ public class ChunkSubscriptionManager {
     // Index 0 in the list is the current chunk owning it
     private static final Map<ChunkKey, List<ServerConnection>> chunkLocks = new ConcurrentHashMap<>();
     private static final Map<ChunkKey, List<ServerConnection>> chunkSubscribers = new ConcurrentHashMap<>();
+    // Remember chunks that have had an owner. Even with no subscribers, a delayed
+    // write from a connected former owner must not be mistaken for first-write bootstrap.
+    private static final Map<ChunkKey, ServerConnection> previousOwners = new ConcurrentHashMap<>();
 
     // Different server connections process messages on different Netty event loops, so
     // ownership and subscription bookkeeping must support concurrent per-connection updates.
@@ -32,6 +35,27 @@ public class ChunkSubscriptionManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Runs the storage enqueue while ownership cannot change. First-write bootstrap is
+     * allowed only for chunks that have never had an owner; a previously owned chunk
+     * must be claimed again before any backend can replace its Master snapshot.
+     */
+    public static boolean runIfOwnerOrUnowned(ServerConnection connection, String world, int cx, int cz, Runnable action) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        synchronized (ChunkLock.getChunkLock(key)) {
+            List<ServerConnection> serverConnections = chunkLocks.get(key);
+            boolean hasOwner = serverConnections != null && !serverConnections.isEmpty();
+            if (hasOwner && serverConnections.get(0) != connection) {
+                return false;
+            }
+            if (!hasOwner && previousOwners.containsKey(key)) {
+                return false;
+            }
+            action.run();
+            return true;
+        }
     }
 
     public static ServerConnection getOwnerOrSubscriber(String world, int cx, int cz) {
@@ -89,6 +113,10 @@ public class ChunkSubscriptionManager {
                 }
             }
 
+            // A queued/non-forced locker does not become the owner. Track the connection
+            // that will be responsible for the current authoritative chunk image.
+            previousOwners.put(key, serverConnections.get(0));
+
             return serverConnections.get(0);
         }
     }
@@ -121,6 +149,10 @@ public class ChunkSubscriptionManager {
                     synchronized (objectPool) {
                         objectPool.add(serverConnections);
                     }
+                } else {
+                    // Ownership may have moved to a queued backend; retain its identity
+                    // if the current owner disconnects before the next unlock.
+                    previousOwners.put(key, serverConnections.get(0));
                 }
             }
 
@@ -236,6 +268,15 @@ public class ChunkSubscriptionManager {
         Set<ChunkKey> subscribedChunks = ChunkSubscriptionManager.subscribedChunks.remove(serverConnection);
         if (subscribedChunks != null) {
             subscribedChunks.forEach(chunk -> unsubscribe(serverConnection, chunk));
+        }
+
+        // A disconnected backend cannot send any more delayed snapshots. Retire only
+        // tombstones still attributed to it; a newer owner may already have replaced one.
+        for (Map.Entry<ChunkKey, ServerConnection> entry : previousOwners.entrySet()) {
+            ChunkKey key = entry.getKey();
+            synchronized (ChunkLock.getChunkLock(key)) {
+                previousOwners.remove(key, serverConnection);
+            }
         }
     }
 

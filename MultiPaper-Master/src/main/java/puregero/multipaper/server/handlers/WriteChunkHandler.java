@@ -3,6 +3,7 @@ package puregero.multipaper.server.handlers;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.server.ChunkLockManager;
+import puregero.multipaper.server.ChunkSubscriptionManager;
 import puregero.multipaper.server.EntitiesLockManager;
 import puregero.multipaper.server.ServerConnection;
 import puregero.multipaper.server.util.RegionFileCache;
@@ -28,6 +29,17 @@ public class WriteChunkHandler {
     public static void handle(ServerConnection connection, WriteChunkMessage message) {
         if (message.isTransientEntities) {
             handleTransientEntities(connection, message);
+            return;
+        }
+
+        if (message.path.equals("region")) {
+            boolean accepted = ChunkSubscriptionManager.runIfOwnerOrUnowned(connection, message.world, message.cx, message.cz,
+                    () -> writeData(connection, message, message.data));
+            if (!accepted) {
+                // Release any read wait registered by the old owner's preannounced save.
+                ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+                connection.sendReply(new BooleanMessageReply(false), message);
+            }
             return;
         }
 

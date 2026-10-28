@@ -33,6 +33,15 @@ public abstract class MessageHandler<T extends Message> extends SimpleChannelInb
         return callbacks.remove(message.getTransactionId()) != null;
     }
 
+    public boolean completeCallback(Message<?> request, T response) {
+        Consumer<T> callback = callbacks.remove(request.getTransactionId());
+        if (callback == null) {
+            return false;
+        }
+        callback.accept(response);
+        return true;
+    }
+
     /**
      * Called when a message is received.
      * @param message The message that has been received

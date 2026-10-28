@@ -7,6 +7,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChun
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadUidMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerConnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
@@ -392,6 +393,7 @@ class MasterProcessRestartPersistenceTest {
     private static void writePersistentData(TestServerClient client) throws Exception {
         assertAcknowledged(client.request(new WriteChunkMessage(WORLD, "region", CHUNK_X, CHUNK_Z, CHUNK_DATA)), "chunk data");
         assertAcknowledged(client.request(new WriteLevelMessage(WORLD, LEVEL_DATA)), "level data");
+        assertAcknowledged(client.request(new PlayerConnectMessage(UUID.fromString(PLAYER_UUID))), "player ownership");
         assertAcknowledged(client.request(new WritePlayerMessage(WORLD, PLAYER_UUID, PLAYER_DATA)), "player data");
     }
 

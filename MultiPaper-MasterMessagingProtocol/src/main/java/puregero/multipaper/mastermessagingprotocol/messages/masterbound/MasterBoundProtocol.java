@@ -4,6 +4,13 @@ import puregero.multipaper.mastermessagingprotocol.messages.Protocol;
 
 public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
 
+    /**
+     * Reserved envelope transaction ID used to negotiate support for the
+     * appended CommitPlayerDataTransactionMessage without changing existing
+     * MasterBound/ServerBound message payloads or IDs.
+     */
+    public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE;
+
     public MasterBoundProtocol() {
         addMessage(MasterBoundDataStreamMessage.class, MasterBoundDataStreamMessage::new);
         addMessage(CallDataStorageMessage.class, CallDataStorageMessage::new);
@@ -49,6 +56,9 @@ public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
         addMessage(WriteTickTimeMessage.class, WriteTickTimeMessage::new);
         addMessage(WriteUidMessage.class, WriteUidMessage::new);
         addMessage(PersistContainerTransactionMessage.class, PersistContainerTransactionMessage::new);
+        // Keep protocol IDs for every existing message stable for RC4 peers.
+        // New message types must be appended, never inserted into the list.
+        addMessage(CommitPlayerDataTransactionMessage.class, CommitPlayerDataTransactionMessage::new);
     }
 
 }

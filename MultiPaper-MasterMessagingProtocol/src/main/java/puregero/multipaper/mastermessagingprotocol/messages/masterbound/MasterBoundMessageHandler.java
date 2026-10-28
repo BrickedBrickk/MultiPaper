@@ -19,6 +19,8 @@ public abstract class MasterBoundMessageHandler extends MessageHandler<MasterBou
 
     public abstract void handle(ChunkChangedStatusMessage message);
 
+    public abstract void handle(CommitPlayerDataTransactionMessage message);
+
     public abstract void handle(DownloadFileMessage message);
 
     public abstract void handle(ForceReadChunkMessage message);

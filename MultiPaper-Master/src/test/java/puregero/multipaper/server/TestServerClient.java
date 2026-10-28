@@ -44,9 +44,12 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class TestServerClient extends ServerBoundMessageHandler {
 
     public final String name;
+    private final UUID serverUuid;
+    private volatile boolean acknowledgePlayerDataTransactionCapability;
     private volatile Channel channel;
 
     private final CompletableFuture<String> secretFuture = new CompletableFuture<>();
+    private final CompletableFuture<Boolean> capabilityFuture = new CompletableFuture<>();
     public final BlockingQueue<SetChunkOwnerMessage> chunkOwnerUpdates = new LinkedBlockingQueue<>();
     public final BlockingQueue<ServerStartedMessage> serverStartedMessages = new LinkedBlockingQueue<>();
     public final BlockingQueue<AddChunkSubscriberMessage> chunkSubscriberAdds = new LinkedBlockingQueue<>();
@@ -59,12 +62,23 @@ public class TestServerClient extends ServerBoundMessageHandler {
     public final List<ServerChangedChunkStatusMessage> chunkStatusChanges = new ArrayList<>();
     public volatile boolean shutdownReceived = false;
 
-    private TestServerClient(String name) {
+    private TestServerClient(String name, UUID serverUuid, boolean acknowledgePlayerDataTransactionCapability) {
         this.name = name;
+        this.serverUuid = serverUuid;
+        this.acknowledgePlayerDataTransactionCapability = acknowledgePlayerDataTransactionCapability;
     }
 
     public static TestServerClient connect(int port, String name) throws Exception {
-        TestServerClient client = new TestServerClient(name);
+        return connect(port, name, true);
+    }
+
+    public static TestServerClient connectLegacy(int port, String name) throws Exception {
+        return connect(port, name, false);
+    }
+
+    private static TestServerClient connect(int port, String name, boolean acknowledgeCapability) throws Exception {
+        UUID serverUuid = UUID.nameUUIDFromBytes(name.getBytes());
+        TestServerClient client = new TestServerClient(name, serverUuid, acknowledgeCapability);
         MessageBootstrap<ServerBoundMessage, MasterBoundMessage> bootstrap =
                 new MessageBootstrap<>(new ServerBoundProtocol(), new MasterBoundProtocol(), channel -> {
                     client.channel = channel;
@@ -74,9 +88,12 @@ public class TestServerClient extends ServerBoundMessageHandler {
         ChannelFuture future = bootstrap.connectTo("127.0.0.1", port).sync();
         assertTrue(future.isSuccess(), "Failed to connect to master");
 
-        client.send(new HelloMessage(name, UUID.nameUUIDFromBytes(name.getBytes())));
+        client.send(new HelloMessage(name, serverUuid));
         String secret = client.secretFuture.get(10, TimeUnit.SECONDS);
         assertTrue(!secret.isEmpty(), "Master did not send a secret");
+        if (acknowledgeCapability) {
+            assertTrue(client.capabilityFuture.get(10, TimeUnit.SECONDS), "Master did not negotiate playerdata transaction support");
+        }
         return client;
     }
 
@@ -88,8 +105,17 @@ public class TestServerClient extends ServerBoundMessageHandler {
         return secretFuture.get(timeoutMillis, TimeUnit.MILLISECONDS) != null;
     }
 
+    public boolean supportsPlayerDataTransactionProtocol() {
+        return capabilityFuture.getNow(false);
+    }
+
     public void send(MasterBoundMessage message) {
         channel.writeAndFlush(message);
+    }
+
+    public void sendHelloWithoutCapabilityAcknowledgement() {
+        acknowledgePlayerDataTransactionCapability = false;
+        send(new HelloMessage(name, serverUuid));
     }
 
     public ServerBoundMessage request(MasterBoundMessage message) throws Exception {
@@ -118,6 +144,16 @@ public class TestServerClient extends ServerBoundMessageHandler {
     @Override
     public void handle(SetSecretMessage message) {
         secretFuture.complete(message.secret);
+        if (message.getTransactionId() == MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID) {
+            if (acknowledgePlayerDataTransactionCapability) {
+                HelloMessage acknowledgement = new HelloMessage(name, serverUuid);
+                acknowledgement.setTransactionId(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID);
+                send(acknowledgement);
+                capabilityFuture.complete(true);
+            } else {
+                capabilityFuture.complete(false);
+            }
+        }
     }
 
     @Override

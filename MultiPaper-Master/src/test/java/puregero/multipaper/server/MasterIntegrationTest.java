@@ -9,6 +9,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import puregero.multipaper.mastermessagingprotocol.ChunkKey;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.LockChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PingMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerConnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerDisconnectMessage;
@@ -44,6 +45,7 @@ import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetChunk
 import puregero.multipaper.server.util.RegionFileCache;
 import se.llbit.nbt.CompoundTag;
 import se.llbit.nbt.IntArrayTag;
+import se.llbit.nbt.IntTag;
 import se.llbit.nbt.ListTag;
 import se.llbit.nbt.SpecificTag;
 import se.llbit.nbt.StringTag;
@@ -57,6 +59,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -347,6 +351,8 @@ class MasterIntegrationTest {
     @Order(13)
     void playerDataIsSharedThroughTheMaster() throws Exception {
         String uuid = UUID.randomUUID().toString();
+        ServerBoundMessage connectReply = serverA.request(new PlayerConnectMessage(UUID.fromString(uuid)));
+        assertTrue(((BooleanMessageReply) connectReply).result);
         ServerBoundMessage writeReply = serverA.request(new WritePlayerMessage(WORLD, uuid, PLAYER_PAYLOAD));
         assertTrue(((BooleanMessageReply) writeReply).result);
 
@@ -365,23 +371,80 @@ class MasterIntegrationTest {
         ServerBoundMessage second = serverB.request(new PlayerConnectMessage(player));
         assertFalse(((BooleanMessageReply) second).result, "Second connect for an online player must fail");
 
-        // PlayerDisconnect has no reply, so poll the stored player state by retrying connect.
+        byte[] currentData = new byte[1024 * 1024];
+        new java.util.Random(0x524335).nextBytes(currentData);
+        serverA.send(new WritePlayerMessage(WORLD, player.toString(), currentData));
+
+        // PlayerDisconnect has no reply. An ordered ping confirms Master has submitted its
+        // disconnect operation, then a per-player queue barrier avoids flooding delayed claims.
         serverA.send(new PlayerDisconnectMessage(player));
-        boolean reconnected = false;
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            ServerBoundMessage retry = serverB.request(new PlayerConnectMessage(player));
-            if (((BooleanMessageReply) retry).result) {
-                reconnected = true;
-                break;
+        assertTrue(((BooleanMessageReply) serverA.request(new PingMessage())).result);
+        PlayerDataOperationQueue.submit(player, () -> { }).get(30, TimeUnit.SECONDS);
+        ServerBoundMessage retry = serverB.request(new PlayerConnectMessage(player));
+        assertTrue(((BooleanMessageReply) retry).result, "Player must be connectable after the queued final save and disconnect");
+
+        ServerBoundMessage staleWrite = serverA.request(new WritePlayerMessage(WORLD, player.toString(),
+                "delayed-former-owner-data".getBytes(StandardCharsets.UTF_8)));
+        assertFalse(((BooleanMessageReply) staleWrite).result, "Former owner must not overwrite playerdata after disconnect");
+        ServerBoundMessage currentOwnerRead = serverB.request(new ReadPlayerMessage(WORLD, player.toString()));
+        assertArrayEquals(currentData, ((DataMessageReply) currentOwnerRead).data,
+                "The new owner's loaded snapshot must remain authoritative");
+
+        // A valid save already received by Master must survive a backend socket loss even
+        // when its disk write is still queued. channelInactive removes the backend from the
+        // live connection list before that queued disk operation can run.
+        UUID abruptDisconnectPlayer = UUID.randomUUID();
+        assertTrue(((BooleanMessageReply) serverB.request(new PlayerConnectMessage(abruptDisconnectPlayer))).result);
+        byte[] beforeDisconnect = "before-disconnect".getBytes(StandardCharsets.UTF_8);
+        byte[] finalSave = "final-save-received-before-socket-close".getBytes(StandardCharsets.UTF_8);
+        assertTrue(((BooleanMessageReply) serverB.request(new WritePlayerMessage(WORLD,
+                abruptDisconnectPlayer.toString(), beforeDisconnect))).result);
+
+        java.util.concurrent.CountDownLatch queuedSaveStarted = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseQueuedSave = new java.util.concurrent.CountDownLatch(1);
+        var queueBlocker = PlayerDataOperationQueue.submit(abruptDisconnectPlayer, () -> {
+            queuedSaveStarted.countDown();
+            try {
+                if (!releaseQueuedSave.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting to release queued playerdata operations");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(interrupted);
             }
-            Thread.sleep(100);
+        });
+        assertTrue(queuedSaveStarted.await(5, TimeUnit.SECONDS));
+        try {
+            serverB.send(new WritePlayerMessage(WORLD, abruptDisconnectPlayer.toString(), finalSave));
+            assertTrue(((BooleanMessageReply) serverB.request(new PingMessage())).result,
+                    "The player write must be handled before the ordered ping reply");
+            var writesDrained = PlayerDataOperationQueue.submit(abruptDisconnectPlayer, () -> { });
+            serverB.close();
+            long disconnectDeadline = System.currentTimeMillis() + 5_000;
+            while (ServerConnection.getConnections().stream()
+                    .anyMatch(connection -> "server-b".equals(connection.getBungeeCordName()))
+                    && System.currentTimeMillis() < disconnectDeadline) {
+                Thread.sleep(10);
+            }
+            assertFalse(ServerConnection.getConnections().stream()
+                            .anyMatch(connection -> "server-b".equals(connection.getBungeeCordName())),
+                    "Master must process channelInactive while the accepted save remains queued");
+            releaseQueuedSave.countDown();
+            queueBlocker.get(10, TimeUnit.SECONDS);
+            writesDrained.get(10, TimeUnit.SECONDS);
+
+            ServerBoundMessage persistedFinalSave = serverA.request(
+                    new ReadPlayerMessage(WORLD, abruptDisconnectPlayer.toString()));
+            assertArrayEquals(finalSave, ((DataMessageReply) persistedFinalSave).data,
+                    "A valid final save received before channelInactive must not be discarded");
+        } finally {
+            releaseQueuedSave.countDown();
         }
-        assertTrue(reconnected, "Player must be connectable after disconnecting");
+        serverB = TestServerClient.connect(port, "server-b");
     }
 
     @Test
-    @Order(15)
+    @Order(17)
     void crashRecoveryFreesOwnershipAndSubscriptions() throws Exception {
         // server-a currently owns (0, 0)/(2, 0) and is subscribed to the chunk at (5, 0).
         serverA.close();
@@ -422,7 +485,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(16)
+    @Order(18)
     void chunkDataRemainsReadableAfterOwnerCrash() throws Exception {
         // server-a crashed in the previous test; its stored data must still be available.
         ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(WORLD, "region", 5, 0));
@@ -433,7 +496,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(17)
+    @Order(19)
     void entityIdBlocksSkipTheReservedZeroEvenWhenPersistedStateIsZero() throws Exception {
         Path idFile = Path.of("entity-ids", "lastblock.txt").toAbsolutePath();
         Files.createDirectories(idFile.getParent());
@@ -449,7 +512,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(18)
+    @Order(20)
     void failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk() throws Exception {
         String world = "write-failure-world";
         int chunkX = 17;
@@ -491,7 +554,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(19)
+    @Order(21)
     void savedDataUsesSharedWorldRelativePathsAcrossBackends() throws Exception {
         final Path temporaryWorld = Path.of("build", "tmp", "multipaper-shared-data-" + UUID.randomUUID());
         final String sharedPath = temporaryWorld.resolve("world/dimensions/minecraft/overworld/data/paper/metadata.dat")
@@ -519,7 +582,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(20)
+    @Order(22)
     void abruptBackendSocketResetDoesNotBreakPeerConnections() throws Exception {
         TestServerClient resetPeer = TestServerClient.connect(port, "reset-peer");
         ServerConnection disconnected = ServerConnection.getConnection(resetPeer.name);
@@ -535,7 +598,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(21)
+    @Order(23)
     void forcedChunkReadWaitsForEveryOverlappingWrite() throws Exception {
         int chunkX = 20;
         int chunkZ = -4;
@@ -578,7 +641,8 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(22)
+
+    @Order(24)
     void forcedEntityReadWaitsForEveryOverlappingWrite() throws Exception {
         int chunkX = -20;
         int chunkZ = 4;
@@ -621,7 +685,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(23)
+    @Order(25)
     void disconnectingWriterReleasesPendingChunkRead() throws Exception {
         String world = "disconnect-pending-chunk-world";
         int chunkX = 27;
@@ -658,7 +722,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(24)
+    @Order(26)
     void disconnectingWriterReleasesPendingEntityRead() throws Exception {
         String world = "disconnect-pending-entities-world";
         int chunkX = -27;
@@ -695,7 +759,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(25)
+    @Order(27)
     void unownedChunkSubscribersDoNotRedirectReadsToEachOther() throws Exception {
         String world = "concurrent-startup-world";
         int chunkX = 41;
@@ -717,7 +781,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(26)
+    @Order(28)
     void entityReadersDoNotRedirectToBackendWaitingForFirstRead() throws Exception {
         String world = "concurrent-entity-startup-world";
         int chunkX = 43;
@@ -769,7 +833,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(27)
+    @Order(29)
     void concurrentChunkLocksAreAllReleasedWhenOneBackendDisconnects() throws Exception {
         String world = "concurrent-lock-bookkeeping-world";
         String firstName = "lock-bookkeeping-first";
@@ -843,7 +907,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(28)
+    @Order(30)
     void acknowledgedJsonWriteIsReadBackThroughMasterStorage() throws Exception {
         Path jsonFile = Path.of("build", "tmp", "multipaper-json-" + UUID.randomUUID() + ".json");
         String sharedPath = jsonFile.toString().replace('\\', '/');
@@ -866,7 +930,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(29)
+    @Order(31)
     void worldUidIsCreatedOnceAndSharedAcrossBackends() throws Exception {
         TestServerClient uidReader = TestServerClient.connect(port, "uid-storage-reader");
         try {
@@ -881,7 +945,7 @@ class MasterIntegrationTest {
     }
 
     @Test
-    @Order(30)
+    @Order(32)
     void transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures() throws Exception {
         int cx = 41;
         int cz = 37;
@@ -934,6 +998,353 @@ class MasterIntegrationTest {
         } finally {
             waitingReader.close();
         }
+    }
+
+    @Test
+    @Order(15)
+    void delayedOldOwnerChunkSnapshotCannotOverwriteNewOwnerSnapshot() throws Exception {
+        int chunkX = 31;
+        int chunkZ = 0;
+        byte[] oldOwnerSnapshot = chestChunk(32);
+        byte[] newOwnerSnapshot = chestChunk(17);
+
+        serverA.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+        assertEquals("server-a", pollUntilOwner(serverA, chunkX, chunkZ, "server-a").owner);
+
+        serverB.send(new SubscribeChunkMessage(WORLD, chunkX, chunkZ));
+        serverB.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        assertEquals("server-a", pollUntilOwner(serverB, chunkX, chunkZ, "server-a").owner,
+                "The existing owner remains authoritative until it unlocks");
+
+        // Simulate a preannounced asynchronous save whose payload is delayed at the old owner.
+        serverA.send(new WillSaveChunkLaterMessage(WORLD, chunkX, chunkZ));
+        serverA.request(new PingMessage());
+
+        // Backend B is already waiting for ownership. Once A unlocks, B becomes owner.
+        serverA.send(new UnlockChunkMessage(WORLD, chunkX, chunkZ));
+        assertEquals("server-b", pollUntilOwner(serverB, chunkX, chunkZ, "server-b").owner);
+
+        // B persists the new chunk image first. Then A's delayed old snapshot arrives late.
+        serverB.send(new WillSaveChunkLaterMessage(WORLD, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        ServerBoundMessage newWrite = serverB.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, newOwnerSnapshot));
+        assertTrue(((BooleanMessageReply) newWrite).result);
+
+        ServerBoundMessage staleWrite = serverA.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, oldOwnerSnapshot));
+        assertFalse(((BooleanMessageReply) staleWrite).result,
+                "Master must reject a delayed snapshot from a former owner after ownership handoff");
+
+        ServerBoundMessage readReply = serverB.request(new ForceReadChunkMessage(WORLD, "region", chunkX, chunkZ));
+        byte[] persisted = ((DataMessageReply) readReply).data;
+        assertArrayEquals(newOwnerSnapshot, persisted, "The Master chunk snapshot must remain the latest owner image");
+        assertEquals(17, readChestItemCount(persisted), "The newer owner's chest inventory must remain intact");
+    }
+
+    @Test
+    @Order(16)
+    void delayedFormerOwnerWriteIsRejectedBeforeNextOwnerClaimsChunk() throws Exception {
+        int chunkX = 32;
+        int chunkZ = 0;
+        byte[] currentSnapshot = chestChunk(17);
+        byte[] delayedOlderSnapshot = chestChunk(32);
+
+        serverA.send(new SubscribeChunkMessage(WORLD, chunkX, chunkZ));
+        serverA.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+        assertEquals("server-a", pollUntilOwner(serverA, chunkX, chunkZ, "server-a").owner);
+
+        assertTrue(((BooleanMessageReply) serverA.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, currentSnapshot))).result);
+        serverA.send(new UnlockChunkMessage(WORLD, chunkX, chunkZ));
+        assertEquals("", pollUntilOwner(serverA, chunkX, chunkZ, "").owner,
+                "The test must submit the stale write during the interval with no current owner");
+
+        ServerBoundMessage staleWrite = serverA.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, delayedOlderSnapshot));
+        assertFalse(((BooleanMessageReply) staleWrite).result,
+                "Master must reject former-owner writes until a new owner claims the chunk");
+        byte[] persisted = ((DataMessageReply) serverA.request(new ForceReadChunkMessage(WORLD, "region", chunkX, chunkZ))).data;
+        assertArrayEquals(currentSnapshot, persisted, "The ownerless gap must not replace the current chest NBT");
+        assertEquals(17, readChestItemCount(persisted), "The newer chest contents must remain intact");
+
+        serverB.send(new SubscribeChunkMessage(WORLD, chunkX, chunkZ));
+        serverB.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+        assertEquals("server-b", pollUntilOwner(serverB, chunkX, chunkZ, "server-b").owner);
+    }
+
+    @Test
+    @Order(35)
+    void delayedFormerOwnerWriteIsRejectedAfterLastSubscriberUnsubscribes() throws Exception {
+        int chunkX = 33;
+        int chunkZ = 0;
+        byte[] currentSnapshot = chestChunk(17);
+        byte[] delayedOlderSnapshot = chestChunk(32);
+        TestServerClient formerOwner = TestServerClient.connect(port, "last-subscriber-former-owner");
+        TestServerClient nextOwner = TestServerClient.connect(port, "last-subscriber-next-owner");
+        try {
+            formerOwner.send(new SubscribeChunkMessage(WORLD, chunkX, chunkZ));
+            formerOwner.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+            assertEquals("last-subscriber-former-owner", pollUntilOwner(formerOwner, chunkX, chunkZ, "last-subscriber-former-owner").owner);
+            assertTrue(((BooleanMessageReply) formerOwner.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, currentSnapshot))).result);
+            formerOwner.send(new UnlockChunkMessage(WORLD, chunkX, chunkZ));
+            assertEquals("", pollUntilOwner(formerOwner, chunkX, chunkZ, "").owner);
+            assertTrue(((BooleanMessageReply) formerOwner.request(new UnsubscribeChunkMessage(WORLD, chunkX, chunkZ))).result);
+
+            ServerBoundMessage staleWrite = formerOwner.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, delayedOlderSnapshot));
+            assertFalse(((BooleanMessageReply) staleWrite).result,
+                    "A delayed former-owner write must remain fenced after its last subscription is removed");
+            byte[] persisted = ((DataMessageReply) formerOwner.request(new ForceReadChunkMessage(WORLD, "region", chunkX, chunkZ))).data;
+            assertArrayEquals(currentSnapshot, persisted, "Unsubscribe must not make the old snapshot writable again");
+            assertEquals(17, readChestItemCount(persisted), "The authoritative chest contents must remain intact");
+
+            // A new owner must still be able to load and write the previously owned chunk.
+            nextOwner.send(new SubscribeChunkMessage(WORLD, chunkX, chunkZ));
+            nextOwner.send(new LockChunkMessage(WORLD, chunkX, chunkZ));
+            assertEquals("last-subscriber-next-owner", pollUntilOwner(nextOwner, chunkX, chunkZ, "last-subscriber-next-owner").owner);
+            assertTrue(((BooleanMessageReply) nextOwner.request(new WriteChunkMessage(WORLD, "region", chunkX, chunkZ, chestChunk(23)))).result);
+        } finally {
+            formerOwner.close();
+            nextOwner.close();
+        }
+    }
+
+    @Test
+    @Order(33)
+    void durableSameOwnerPlayerTransactionIsIdempotentAndValidatesOwnership() throws Exception {
+        TestServerClient editorOwner = TestServerClient.connect(port, "transaction-editor");
+        TestServerClient targetOwner = TestServerClient.connect(port, "transaction-target");
+        UUID editorId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        String world = java.nio.file.Files.createTempDirectory("multipaper-player-transaction-").toString();
+        byte[] editorAfter = {1, 2, 3};
+        byte[] targetAfter = {4, 5, 6};
+        CommitPlayerDataTransactionMessage.Participant[] participants = {
+                new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor", editorAfter),
+                new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-editor", targetAfter)
+        };
+
+        try {
+            assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(editorId))).result);
+            assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(targetId))).result);
+            CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(world, transactionId, participants);
+
+            assertTrue(((BooleanMessageReply) editorOwner.request(transaction)).result,
+                    "The active editor owner should commit when both player owners match");
+            assertArrayEquals(editorAfter, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, editorId.toString()))).data);
+            assertArrayEquals(targetAfter, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, targetId.toString()))).data);
+
+            byte[] laterEditorSave = {7, 8, 9};
+            assertTrue(((BooleanMessageReply) editorOwner.request(new WritePlayerMessage(world, editorId.toString(), laterEditorSave))).result);
+            assertTrue(((BooleanMessageReply) editorOwner.request(transaction)).result,
+                    "A duplicate transaction ID must acknowledge idempotently");
+            assertArrayEquals(laterEditorSave, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, editorId.toString()))).data,
+                    "Replaying a committed ID must not restore older snapshots");
+
+            CommitPlayerDataTransactionMessage wrongTargetOwner = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
+                    participants[0], new CommitPlayerDataTransactionMessage.Participant(targetId, "wrong-owner", targetAfter)
+            });
+            assertFalse(((BooleanMessageReply) editorOwner.request(wrongTargetOwner)).result,
+                    "The Master must reject a stale or incorrect target-owner claim");
+
+            TestServerClient unowned = TestServerClient.connect(port, "transaction-unowned");
+            try {
+                assertFalse(((BooleanMessageReply) unowned.request(transaction)).result,
+                        "A backend owning neither participant must not submit another backend's transaction");
+            } finally {
+                unowned.close();
+            }
+        } finally {
+            editorOwner.close();
+            targetOwner.close();
+        }
+    }
+
+    @Test
+    @Order(34)
+    void oneOwnerCannotCommitAnotherOwnersPlayerdataSnapshot() throws Exception {
+        TestServerClient editorOwner = TestServerClient.connect(port, "transaction-editor-a");
+        TestServerClient targetOwner = TestServerClient.connect(port, "transaction-target-b");
+        UUID editorId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        String world = java.nio.file.Files.createTempDirectory("multipaper-cross-owner-transaction-").toString();
+        byte[] editorAfter = {11, 12};
+        byte[] targetAfter = {91, 92};
+
+        try {
+            assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(editorId))).result);
+            assertTrue(((BooleanMessageReply) targetOwner.request(new PlayerConnectMessage(targetId))).result);
+            CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor-a", editorAfter),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-target-b", targetAfter)
+            });
+
+            assertFalse(((BooleanMessageReply) editorOwner.request(transaction)).result,
+                    "A matching owner name in the request is not consent from the target owner");
+            assertEquals(0, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, editorId.toString()))).data.length,
+                    "Rejected cross-owner transactions must not persist the editor image");
+            assertEquals(0, ((DataMessageReply) targetOwner.request(new ReadPlayerMessage(world, targetId.toString()))).data.length,
+                    "Rejected cross-owner transactions must not persist the target image");
+        } finally {
+            editorOwner.close();
+            targetOwner.close();
+        }
+    }
+
+    @Test
+    @Order(35)
+    void playerReadWaitsForEarlierQueuedSave() throws Exception {
+        TestServerClient owner = TestServerClient.connect(port, "ordered-player-read-owner");
+        UUID playerId = UUID.randomUUID();
+        String world = Files.createTempDirectory("multipaper-ordered-player-read-").toString();
+        byte[] oldData = {1, 2, 3};
+        byte[] newData = {7, 8, 9};
+        CountDownLatch blockerEntered = new CountDownLatch(1);
+        CountDownLatch releaseBlocker = new CountDownLatch(1);
+
+        try {
+            assertTrue(((BooleanMessageReply) owner.request(new PlayerConnectMessage(playerId))).result);
+            PlayerDataTransactionManager.writePlayer(world, playerId, oldData);
+
+            PlayerDataOperationQueue.submit(playerId, () -> {
+                blockerEntered.countDown();
+                try {
+                    if (!releaseBlocker.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out waiting to release playerdata queue blocker");
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Playerdata queue blocker interrupted", interrupted);
+                }
+            });
+            assertTrue(blockerEntered.await(5, TimeUnit.SECONDS), "Playerdata queue blocker should start");
+
+            CompletableFuture<ServerBoundMessage> writeReply = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return owner.request(new WritePlayerMessage(world, playerId.toString(), newData));
+                } catch (Exception failure) {
+                    throw new RuntimeException(failure);
+                }
+            });
+            // The Master replies to this subsequent message only after it has
+            // received and enqueued the preceding write on the same TCP channel.
+            owner.request(new PingMessage());
+
+            CompletableFuture<ServerBoundMessage> readReply = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return owner.request(new ReadPlayerMessage(world, playerId.toString()));
+                } catch (Exception failure) {
+                    throw new RuntimeException(failure);
+                }
+            });
+            owner.request(new PingMessage());
+            assertFalse(readReply.isDone(), "A read must wait behind the earlier queued player save");
+
+            releaseBlocker.countDown();
+            assertTrue(((BooleanMessageReply) writeReply.get(10, TimeUnit.SECONDS)).result);
+            assertArrayEquals(newData, ((DataMessageReply) readReply.get(10, TimeUnit.SECONDS)).data,
+                    "The ordered read must return the prior save's new image, not stale playerdata");
+        } finally {
+            releaseBlocker.countDown();
+            owner.close();
+        }
+    }
+
+    @Test
+    @Order(35)
+    void unacknowledgedMasterBoundPeerCannotCommitPlayerDataTransaction() throws Exception {
+        TestServerClient legacyPeer = TestServerClient.connectLegacy(port, "transaction-legacy-peer");
+        UUID playerId = UUID.randomUUID();
+        UUID secondPlayerId = UUID.randomUUID();
+        String world = Files.createTempDirectory("multipaper-legacy-player-transaction-").toString();
+        try {
+            assertFalse(legacyPeer.supportsPlayerDataTransactionProtocol(),
+                    "A peer that did not acknowledge the capability challenge must remain unsupported");
+            assertTrue(((BooleanMessageReply) legacyPeer.request(new PlayerConnectMessage(playerId))).result);
+            assertTrue(((BooleanMessageReply) legacyPeer.request(new PlayerConnectMessage(secondPlayerId))).result);
+
+            CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(
+                    world,
+                    UUID.randomUUID(),
+                    new CommitPlayerDataTransactionMessage.Participant[]{
+                            new CommitPlayerDataTransactionMessage.Participant(
+                                    playerId, "transaction-legacy-peer", new byte[]{42, 43}),
+                            new CommitPlayerDataTransactionMessage.Participant(
+                                    secondPlayerId, "transaction-legacy-peer", new byte[]{44, 45})
+                    });
+            assertFalse(((BooleanMessageReply) legacyPeer.request(transaction)).result,
+                    "An unacknowledged peer must not commit the new transaction message");
+            assertEquals(0, ((DataMessageReply) legacyPeer.request(
+                    new ReadPlayerMessage(world, playerId.toString()))).data.length,
+                    "A rejected transaction must not persist the first participant snapshot");
+            assertEquals(0, ((DataMessageReply) legacyPeer.request(
+                    new ReadPlayerMessage(world, secondPlayerId.toString()))).data.length,
+                    "A rejected transaction must not persist the second participant snapshot");
+        } finally {
+            legacyPeer.close();
+        }
+    }
+
+    @Test
+    @Order(36)
+    void repeatedHelloRequiresFreshPlayerDataCapabilityAcknowledgement() throws Exception {
+        TestServerClient peer = TestServerClient.connect(port, "transaction-renegotiating-peer");
+        UUID firstPlayer = UUID.randomUUID();
+        UUID secondPlayer = UUID.randomUUID();
+        String world = Files.createTempDirectory("multipaper-renegotiated-player-transaction-").toString();
+        try {
+            assertTrue(((BooleanMessageReply) peer.request(new PlayerConnectMessage(firstPlayer))).result);
+            assertTrue(((BooleanMessageReply) peer.request(new PlayerConnectMessage(secondPlayer))).result);
+
+            // TCP ordering ensures Master handles this new Hello before the following transaction.
+            peer.sendHelloWithoutCapabilityAcknowledgement();
+            CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(
+                    world,
+                    UUID.randomUUID(),
+                    new CommitPlayerDataTransactionMessage.Participant[]{
+                            new CommitPlayerDataTransactionMessage.Participant(firstPlayer, "transaction-renegotiating-peer", new byte[]{1}),
+                            new CommitPlayerDataTransactionMessage.Participant(secondPlayer, "transaction-renegotiating-peer", new byte[]{2})
+                    });
+            assertFalse(((BooleanMessageReply) peer.request(transaction)).result,
+                    "A peer must re-acknowledge after sending a new Hello");
+            assertEquals(0, ((DataMessageReply) peer.request(
+                    new ReadPlayerMessage(world, firstPlayer.toString()))).data.length);
+            assertEquals(0, ((DataMessageReply) peer.request(
+                    new ReadPlayerMessage(world, secondPlayer.toString()))).data.length);
+        } finally {
+            peer.close();
+        }
+    }
+
+    private static byte[] chestChunk(int itemCount) throws IOException {
+        CompoundTag root = new CompoundTag();
+        root.add("DataVersion", new IntTag(5023));
+        root.add("xPos", new IntTag(31));
+        root.add("zPos", new IntTag(0));
+
+        CompoundTag chest = new CompoundTag();
+        chest.add("id", new StringTag("minecraft:chest"));
+        chest.add("x", new IntTag(496));
+        chest.add("y", new IntTag(64));
+        chest.add("z", new IntTag(0));
+        ListTag items = new ListTag(10, new java.util.ArrayList<>());
+        CompoundTag stack = new CompoundTag();
+        stack.add("id", new StringTag("minecraft:diamond"));
+        stack.add("count", new IntTag(itemCount));
+        stack.add("Slot", new se.llbit.nbt.ByteTag((byte) 0));
+        items.add(stack);
+        chest.add("Items", items);
+        ListTag blockEntities = new ListTag(10, new java.util.ArrayList<>());
+        blockEntities.add(chest);
+        root.add("block_entities", blockEntities);
+        return compressedNbt(root);
+    }
+
+    private static int readChestItemCount(byte[] compressedChunk) throws IOException {
+        CompoundTag root = readCompressedNbt(compressedChunk);
+        ListTag blockEntities = root.get("block_entities").asList();
+        assertTrue(blockEntities != null && !blockEntities.isEmpty(), "Persisted chunk must contain its chest block entity");
+        ListTag items = blockEntities.get(0).asCompound().get("Items").asList();
+        assertTrue(items != null && !items.isEmpty(), "Persisted chest must retain its item stack");
+        return items.get(0).asCompound().get("count").intValue();
     }
 
     private static byte[] compressedNbt(CompoundTag root) throws IOException {

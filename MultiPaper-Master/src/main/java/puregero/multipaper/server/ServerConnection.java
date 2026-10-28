@@ -23,12 +23,15 @@ public class ServerConnection extends MasterBoundMessageHandler {
     private long lastPing = System.currentTimeMillis();
     private final CircularTimer timer = new CircularTimer();
     public final HashSet<UUID> playerUUIDs = new HashSet<>();
+    private final Set<UUID> disconnectingPlayers = ConcurrentHashMap.newKeySet();
     private final List<Player> players = new ArrayList<>();
     private double tps;
     private int port = -1;
     private volatile boolean started;
     private String host;
     private UUID uuid;
+    private volatile boolean playerDataTransactionCapabilityChallengeSent;
+    private volatile boolean playerDataTransactionProtocolSupported;
     private final Map<String, ServerAnnouncement> announcedServers = new ConcurrentHashMap<>();
 
     /**
@@ -105,6 +108,18 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     @Override
     public void handle(HelloMessage message) {
+        if (message.getTransactionId() == MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID) {
+            if (playerDataTransactionCapabilityChallengeSent
+                    && Objects.equals(name, message.name)
+                    && Objects.equals(uuid, message.serverUuid)) {
+                playerDataTransactionProtocolSupported = true;
+            }
+            return;
+        }
+
+        // Every new Hello starts a fresh negotiation. Do not carry a previous
+        // capability grant across a peer identity or protocol re-handshake.
+        playerDataTransactionProtocolSupported = false;
         name = message.name;
         host = ((InetSocketAddress) getAddress()).getAddress().getHostAddress();
         uuid = message.serverUuid;
@@ -128,7 +143,10 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
         System.out.println("Connection from " + getAddress() + " (" + name + ")");
 
-        send(new SetSecretMessage(MultiPaperServer.SECRET));
+        SetSecretMessage secret = new SetSecretMessage(MultiPaperServer.SECRET);
+        secret.setTransactionId(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID);
+        playerDataTransactionCapabilityChallengeSent = true;
+        send(secret);
     }
 
     @Override
@@ -145,6 +163,11 @@ public class ServerConnection extends MasterBoundMessageHandler {
         ChunkSubscriptionManager.unsubscribeAndUnlockAll(this);
 
         synchronized (connections) {
+            synchronized (playerUUIDs) {
+                for (UUID playerId : playerUUIDs) {
+                    markPlayerDisconnecting(playerId);
+                }
+            }
             connections.remove(this);
         }
 
@@ -183,8 +206,22 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     public boolean removePlayer(UUID uuid) {
         synchronized (playerUUIDs) {
-            return playerUUIDs.remove(uuid);
+            boolean removed = playerUUIDs.remove(uuid);
+            disconnectingPlayers.remove(uuid);
+            return removed;
         }
+    }
+
+    public void markPlayerDisconnecting(UUID uuid) {
+        disconnectingPlayers.add(uuid);
+    }
+
+    public boolean isPlayerDisconnecting(UUID uuid) {
+        return disconnectingPlayers.contains(uuid);
+    }
+
+    public boolean supportsPlayerDataTransactionProtocol() {
+        return playerDataTransactionProtocolSupported && connections.contains(this) && channel.isActive();
     }
 
     public List<Player> getPlayers() {
@@ -252,6 +289,11 @@ public class ServerConnection extends MasterBoundMessageHandler {
     @Override
     public void handle(ChunkChangedStatusMessage message) {
         ChunkChangedStatusHandler.handle(this, message);
+    }
+
+    @Override
+    public void handle(CommitPlayerDataTransactionMessage message) {
+        puregero.multipaper.server.handlers.CommitPlayerDataTransactionHandler.handle(this, message);
     }
 
     @Override
