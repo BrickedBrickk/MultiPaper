@@ -1,0 +1,9 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -3200,5 +3200,6 @@
+     public void handleContainerClick(final ServerboundContainerClickPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        if (puregero.multipaper.MultiPaperInventoryHandler.rejectUnsafeRemotePlayerInventoryClick(this.player)) return; // MultiPaper - fail closed until remote inventory transaction protocol is available
+         if (this.player.isImmobile()) return; // CraftBukkit
+         this.player.resetLastActionTime();
+         if (this.player.containerMenu.containerId == packet.containerId() && this.player.containerMenu.stillValid(this.player)) { // CraftBukkit
