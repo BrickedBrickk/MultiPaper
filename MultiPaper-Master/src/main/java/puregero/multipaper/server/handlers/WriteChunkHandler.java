@@ -66,7 +66,7 @@ public class WriteChunkHandler {
 
     private static void finishWrite(ServerConnection connection, WriteChunkMessage message, Throwable failure) {
         if (message.path.equals("region")) {
-            ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+            ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz, failure == null);
         }
         if (message.path.equals("entities")) {
             EntitiesLockManager.writeCompleted(connection, message.world, message.cx, message.cz);

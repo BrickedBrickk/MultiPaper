@@ -1681,4 +1681,64 @@ class MasterIntegrationTest {
             nextOwner.close();
         }
     }
+
+    @Test
+    @Order(40)
+    @Timeout(30)
+    void failedFinalChestWriteMustNotReleaseChunkToWaitingOwner() throws Exception {
+        // Earlier ordered crash-recovery coverage closes the shared server-a client.
+        serverA = TestServerClient.connect(port, "server-a");
+        String world = Files.createTempDirectory("multipaper-failed-handoff-chest-").toString();
+        int chunkX = -29;
+        int chunkZ = 37;
+        byte[] previousChest = chestChunk(17);
+        byte[] failedReplacement = chestChunk(29);
+
+        serverA.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+        serverA.send(new LockChunkMessage(world, chunkX, chunkZ));
+        serverA.request(new PingMessage());
+        assertEquals("server-a", pollUntilOwner(serverA, chunkX, chunkZ, "server-a").owner);
+        serverB.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+        serverB.send(new LockChunkMessage(world, chunkX, chunkZ));
+        serverB.request(new PingMessage());
+        assertEquals("server-a", pollUntilOwner(serverB, chunkX, chunkZ, "server-a").owner);
+        serverB.chunkOwnerUpdates.clear();
+
+        assertTrue(((BooleanMessageReply) serverA.request(
+                new WriteChunkMessage(world, "region", chunkX, chunkZ, previousChest))).result);
+        serverA.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+        serverA.request(new PingMessage());
+        serverA.send(new UnlockChunkMessage(world, chunkX, chunkZ));
+        serverA.request(new PingMessage());
+
+        // The closed cached region file makes the next save fail deterministically,
+        // as in failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk.
+        RegionFileCache.getRegionFile(Path.of(world, "region").toFile(), chunkX, chunkZ).close();
+        BooleanMessageReply failed = (BooleanMessageReply) serverA.request(
+                new WriteChunkMessage(world, "region", chunkX, chunkZ, failedReplacement));
+        assertFalse(failed.result, "The final replacement must be rejected when Master storage fails");
+
+        ServerConnection currentOwner = ChunkSubscriptionManager.getOwner(world, chunkX, chunkZ);
+        assertEquals("server-a", currentOwner == null ? null : currentOwner.getBungeeCordName(),
+                "A failed final chest save must not release ownership to a backend that would load stale NBT");
+        assertTrue(serverB.chunkOwnerUpdates.stream().noneMatch(update -> update.cx == chunkX && update.cz == chunkZ
+                        && "server-b".equals(update.owner)),
+                "Waiting backend must not receive ownership after the final chest snapshot failed");
+
+        // Simulate storage recovery and retry the retained final snapshot. Only
+        // this successful write may release the deferred ownership transfer.
+        RegionFileCache.closeAll();
+        serverA.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+        serverA.request(new PingMessage());
+        assertTrue(((BooleanMessageReply) serverA.request(
+                new WriteChunkMessage(world, "region", chunkX, chunkZ, failedReplacement))).result,
+                "The final chest snapshot should be accepted after the isolated storage fault is cleared");
+        assertEquals("server-b", pollUntilOwner(serverB, chunkX, chunkZ, "server-b").owner,
+                "A successful retry should resume the deferred ownership transfer");
+        byte[] recoveredChest = ((DataMessageReply) serverB.request(
+                new ForceReadChunkMessage(world, "region", chunkX, chunkZ))).data;
+        assertEquals(29, readChestItemCount(recoveredChest),
+                "The new owner must receive the exact snapshot that was rejected before the retry");
+        RegionFileCache.closeAll();
+    }
 }
