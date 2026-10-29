@@ -73,7 +73,7 @@ RC5 blocked review package artifact provenance
 Branch: feature/port-26.3
 Source checkout HEAD at packaging: $sourceCheckout
 Paperclip source commit: a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0 (see historical build evidence for exact provenance).
-Master source commit: $sourceCheckout. The Master was rebuilt for this package; the Paperclip below is the verified pre-existing RC5 candidate and was not rebuilt in this task.
+Master source commit: 14e03630c10423564f034a57845ddc7cd832b8e0. The Master was rebuilt from this product source commit; the Paperclip below is the verified pre-existing RC5 candidate and was not rebuilt in this task.
 Master build verification: evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
 Master build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential clean :MultiPaper-Master:build runs, no build cache and no daemon; 78 Master tests each, 0 failures/errors/skips; Master JARs byte-identical.
 The Paperclip's earlier source/build provenance is retained in the historical reports listed under evidence; this bundle does not claim the two binaries were built together.
