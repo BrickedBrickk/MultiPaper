@@ -121,6 +121,40 @@ public class ChunkSubscriptionManager {
         }
     }
 
+    /**
+     * Atomically force-claims a requested set only when none of its chunks is
+     * actively owned by another backend. Forced ownership is not a save handoff:
+     * the current owner may still have newer chunk NBT that has not reached Master.
+     */
+    public static boolean forceLockIfNoOtherOwner(ServerConnection connection, ChunkKey[] requested) {
+        int[] lockIndexes = Arrays.stream(requested)
+                .mapToInt(ChunkLock::getChunkLockIndex)
+                .distinct()
+                .sorted()
+                .toArray();
+        return withChunkLocks(lockIndexes, 0, () -> {
+            for (ChunkKey key : requested) {
+                List<ServerConnection> owners = chunkLocks.get(key);
+                if (owners != null && !owners.isEmpty() && owners.get(0) != connection) {
+                    return false;
+                }
+            }
+            for (ChunkKey key : requested) {
+                lock(connection, key.world, key.x, key.z, true);
+            }
+            return true;
+        });
+    }
+
+    private static boolean withChunkLocks(int[] indexes, int index, java.util.function.BooleanSupplier action) {
+        if (index == indexes.length) {
+            return action.getAsBoolean();
+        }
+        synchronized (ChunkLock.getChunkLock(indexes[index])) {
+            return withChunkLocks(indexes, index + 1, action);
+        }
+    }
+
     public static void unlock(ServerConnection serverConnection, String world, int cx, int cz) {
         unlock(serverConnection, new ChunkKey(world, cx, cz));
     }

@@ -26,6 +26,10 @@ public class ChunkLockManager {
         locks.waitForLock(world, cx, cz, callback);
     }
 
+    public static CompletableFuture<Void> waitForLockAsync(String world, int cx, int cz) {
+        return locks.waitForLockAsync(world, cx, cz);
+    }
+
     public static CompletableFuture<Void> releaseAll(ServerConnection connection) {
         return locks.releaseAll(connection);
     }

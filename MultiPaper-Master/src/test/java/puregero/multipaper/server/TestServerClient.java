@@ -119,6 +119,14 @@ public class TestServerClient extends ServerBoundMessageHandler {
         channel.writeAndFlush(message);
     }
 
+    public void sendWithoutFlush(MasterBoundMessage message) {
+        channel.write(message);
+    }
+
+    public void flush() {
+        channel.flush();
+    }
+
     public void sendHelloWithoutCapabilityAcknowledgement() {
         acknowledgePlayerDataTransactionCapability = false;
         send(new HelloMessage(name, serverUuid));

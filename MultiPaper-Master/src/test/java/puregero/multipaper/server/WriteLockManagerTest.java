@@ -32,6 +32,19 @@ class WriteLockManagerTest {
     }
 
     @Test
+    void asyncChunkBarrierCompletesOnlyAfterAnnouncedSaveFinishes() {
+        WriteLockManager manager = new WriteLockManager();
+        manager.lockUntilWrite(null, "async-handoff", 12, -4);
+        CompletableFuture<Void> barrier = manager.waitForLockAsync("async-handoff", 12, -4);
+
+        assertFalse(barrier.isDone(), "An announced chunk save must hold the asynchronous ownership barrier");
+        manager.writeStarted(null, "async-handoff", 12, -4);
+        manager.writeCompleted(null, "async-handoff", 12, -4);
+
+        assertTrue(barrier.isDone(), "The barrier must complete when the announced save finishes");
+    }
+
+    @Test
     void disconnectMustNotReleaseBarrierForAlreadyAcceptedAsyncWrite() {
         WriteLockManager manager = new WriteLockManager();
         AtomicInteger reads = new AtomicInteger();

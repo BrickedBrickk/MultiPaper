@@ -110,6 +110,10 @@ final class WriteLockManager {
     }
 
     void waitForLock(String world, int cx, int cz, Runnable callback) {
+        waitForLockAsync(world, cx, cz).thenRun(callback);
+    }
+
+    CompletableFuture<Void> waitForLockAsync(String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
         AtomicReference<CompletableFuture<Void>> pending = new AtomicReference<>();
 
@@ -122,10 +126,9 @@ final class WriteLockManager {
 
         CompletableFuture<Void> lock = pending.get();
         if (lock == null) {
-            callback.run();
-        } else {
-            lock.thenRun(() -> waitForLock(world, cx, cz, callback));
+            return CompletableFuture.completedFuture(null);
         }
+        return lock.thenCompose(ignored -> waitForLockAsync(world, cx, cz));
     }
 
     CompletableFuture<Void> releaseAll(ServerConnection connection) {

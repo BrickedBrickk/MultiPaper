@@ -211,15 +211,22 @@ class MasterIntegrationTest {
         }));
         assertFalse(((BooleanMessageReply) denied).result, "A server that owns none of the requested chunks must be denied");
 
-        // Once server-b owns a chunk in the set, it can force-take the rest.
+        // Owning one chunk in the set does not authorize stealing another
+        // backend's active chunk before that backend has saved and released it.
         serverB.send(new LockChunkMessage(WORLD, 3, 0));
         SetChunkOwnerMessage ownerB = pollUntilOwner(serverB, 3, 0, "server-b");
         assertEquals("server-b", ownerB.owner);
 
+        serverB.send(new SubscribeChunkMessage(WORLD, 2, 0));
+        assertEquals("server-a", pollUntilOwner(serverB, 2, 0, "server-a").owner);
+        serverA.send(new UnlockChunkMessage(WORLD, 2, 0));
+        assertEquals("", pollUntilOwner(serverB, 2, 0, "").owner,
+                "The prior owner must release the chunk before the forced request succeeds");
+
         ServerBoundMessage forced = serverB.request(new RequestChunkOwnershipMessage(WORLD, new ChunkKey[]{
                 new ChunkKey(WORLD, 2, 0), new ChunkKey(WORLD, 3, 0)
         }));
-        assertTrue(((BooleanMessageReply) forced).result, "A server owning one requested chunk must be able to force-take the set");
+        assertTrue(((BooleanMessageReply) forced).result, "A server owning one requested chunk may claim an unowned chunk");
 
         // A third server must now see server-b as the owner of (2, 0).
         TestServerClient serverC = TestServerClient.connect(port, "server-c");
@@ -1612,6 +1619,64 @@ class MasterIntegrationTest {
                 reader.close();
             }
             owner.close();
+        }
+    }
+
+    @Test
+    @Order(39)
+    void forcedOwnershipTransferMustNotStealChunkWhileFormerOwnersSaveIsInFlight() throws Exception {
+        int chunkX = 41;
+        int chunkZ = 0;
+        String world = Files.createTempDirectory("multipaper-forced-handoff-chest-").toString();
+        byte[] oldSnapshot = chestChunk(11);
+        byte[] latestSnapshot = chestChunk(23);
+        TestServerClient owner = TestServerClient.connect(port, "forced-handoff-old-owner");
+        TestServerClient nextOwner = TestServerClient.connect(port, "forced-handoff-next-owner");
+        try {
+            owner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            owner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            assertEquals("forced-handoff-old-owner", pollUntilOwner(owner, chunkX, chunkZ, "forced-handoff-old-owner").owner);
+            assertTrue(((BooleanMessageReply) owner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, oldSnapshot))).result);
+
+            nextOwner.send(new SubscribeChunkMessage(world, chunkX + 1, chunkZ));
+            nextOwner.send(new LockChunkMessage(world, chunkX + 1, chunkZ));
+            assertEquals("forced-handoff-next-owner", pollUntilOwner(nextOwner, chunkX + 1, chunkZ, "forced-handoff-next-owner").owner);
+
+            // Model an owner save already queued locally but still in flight to
+            // Master. Another backend must not steal ownership during this gap.
+            owner.sendWithoutFlush(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            nextOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            nextOwner.request(new PingMessage());
+            ServerBoundMessage denied = nextOwner.request(new RequestChunkOwnershipMessage(world, new ChunkKey[]{
+                    new ChunkKey(world, chunkX, chunkZ), new ChunkKey(world, chunkX + 1, chunkZ)
+            }));
+            assertFalse(((BooleanMessageReply) denied).result,
+                    "Master must refuse to force-steal a chunk from an active owner whose save announcement may still be in flight");
+
+            owner.flush();
+            ServerBoundMessage deniedWithRegisteredSave = nextOwner.request(new RequestChunkOwnershipMessage(world, new ChunkKey[]{
+                    new ChunkKey(world, chunkX, chunkZ), new ChunkKey(world, chunkX + 1, chunkZ)
+            }));
+            assertFalse(((BooleanMessageReply) deniedWithRegisteredSave).result,
+                    "An active-owner conflict must be denied without waiting for its registered save barrier");
+            ServerBoundMessage write = owner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, latestSnapshot));
+            assertTrue(((BooleanMessageReply) write).result,
+                    "The previous owner must remain authorized to commit its pending final snapshot");
+            owner.send(new UnlockChunkMessage(world, chunkX, chunkZ));
+            assertEquals("", pollUntilOwner(owner, chunkX, chunkZ, "").owner,
+                    "The old owner must persist and release the chunk before a new owner claims it");
+            assertTrue(((BooleanMessageReply) nextOwner.request(new RequestChunkOwnershipMessage(world, new ChunkKey[]{
+                    new ChunkKey(world, chunkX, chunkZ), new ChunkKey(world, chunkX + 1, chunkZ)
+            }))).result, "The requester may claim the chunk after its previous owner releases it");
+            assertEquals("forced-handoff-next-owner", pollUntilOwner(nextOwner, chunkX, chunkZ, "forced-handoff-next-owner").owner);
+            ServerBoundMessage reply = nextOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ));
+            assertTrue(reply instanceof DataMessageReply);
+            byte[] persisted = ((DataMessageReply) reply).data;
+            assertArrayEquals(latestSnapshot, persisted, "The new owner must read the committed final chest image");
+            assertEquals(23, readChestItemCount(persisted), "Every item in the final chest snapshot must survive safe handoff");
+        } finally {
+            owner.close();
+            nextOwner.close();
         }
     }
 }

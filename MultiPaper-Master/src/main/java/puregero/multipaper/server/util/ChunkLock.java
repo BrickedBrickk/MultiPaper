@@ -18,4 +18,12 @@ public class ChunkLock {
         return locks[key.hashCode() & LOCK_COUNT_MASK];
     }
 
+    public static int getChunkLockIndex(ChunkKey key) {
+        return key.hashCode() & LOCK_COUNT_MASK;
+    }
+
+    public static Object getChunkLock(int index) {
+        return locks[index];
+    }
+
 }
