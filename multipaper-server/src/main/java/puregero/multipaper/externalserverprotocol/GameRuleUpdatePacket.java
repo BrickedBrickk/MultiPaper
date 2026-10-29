@@ -8,7 +8,7 @@ import puregero.multipaper.MultiPaper;
 
 public class GameRuleUpdatePacket extends ExternalServerPacket {
 
-    private static boolean updatingGamerules = false;
+    static boolean updatingGamerules = false;
 
     private final String world;
     private final String name;
@@ -38,11 +38,19 @@ public class GameRuleUpdatePacket extends ExternalServerPacket {
         MultiPaper.runSync(() -> {
             World bukkitWorld = Bukkit.getWorld(world);
             if (bukkitWorld != null) {
-                updatingGamerules = true;
-                bukkitWorld.setGameRuleValue(name, value);
-                updatingGamerules = false;
+                runWithGameruleUpdatesSuppressed(() -> bukkitWorld.setGameRuleValue(name, value));
             }
         });
+    }
+
+    static void runWithGameruleUpdatesSuppressed(Runnable update) {
+        boolean previous = updatingGamerules;
+        updatingGamerules = true;
+        try {
+            update.run();
+        } finally {
+            updatingGamerules = previous;
+        }
     }
 
     public static void onGameRuleChange(World world, String name, String value) {

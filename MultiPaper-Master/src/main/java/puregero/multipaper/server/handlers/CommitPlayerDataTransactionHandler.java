@@ -45,7 +45,9 @@ public final class CommitPlayerDataTransactionHandler {
                             }
                         }
                         if (owner == null || owner.isPlayerDisconnecting(participant.playerId())
-                                || !participant.ownerName().equals(owner.getBungeeCordName())) {
+                                || !participant.ownerName().equals(owner.getBungeeCordName())
+                                || !owner.supportsPlayerSessionProtocol()
+                                || !participant.sessionId().equals(owner.getPlayerSessionId(participant.playerId()))) {
                             allOwnersMatch = false;
                             break;
                         }

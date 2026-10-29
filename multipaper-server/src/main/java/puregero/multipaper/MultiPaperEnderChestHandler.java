@@ -18,6 +18,7 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
 
     private final ServerPlayer player;
     private ItemStack[] sentItems = new ItemStack[0];
+    private long syncRevision;
 
     public MultiPaperEnderChestHandler(ServerPlayer player) {
         this.player = player;
@@ -52,14 +53,18 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
 
         CompoundTag itemsRoot = new CompoundTag();
         ListTag items = new ListTag();
+        long revision = -1;
         for (int i = 0; i < sentItems.length; i++) {
             ItemStack item = container.getItem(i);
             if (!ItemStack.matches(item, sentItems[i])) {
+                ItemStack replacingItem = sentItems[i].copy();
                 sentItems[i] = item.copy();
 
                 if (broadcastChanges) {
+                    if (revision < 0) revision = nextSyncRevision();
                     CompoundTag itemToSend = MultiPaper.itemStackToNBT(item);
                     itemToSend.putInt("Slot", i);
+                    itemToSend.put("Replacing", MultiPaper.itemStackToNBT(replacingItem));
                     items.add(itemToSend);
                 }
             }
@@ -67,8 +72,16 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
 
         if (!items.isEmpty()) {
             itemsRoot.put("items", items);
+            itemsRoot.putLong("revision", revision);
             MultiPaper.broadcastPacketToExternalServers(new PlayerInventoryUpdatePacket(player, "enderchest", itemsRoot));
         }
+    }
+
+    private synchronized long nextSyncRevision() {
+        if (syncRevision == Long.MAX_VALUE) {
+            throw new IllegalStateException("Ender Chest sync revision exhausted for " + player.getUUID());
+        }
+        return ++syncRevision;
     }
 
     public void containerChanged() {
@@ -96,6 +109,7 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
     public static void sendFullEnderChestUpdate(ServerPlayer player, ExternalServerConnection... connections) {
         CompoundTag itemsRoot = new CompoundTag();
         ListTag items = new ListTag();
+        long revision = player.enderChestHandler == null ? 0 : player.enderChestHandler.nextSyncRevision();
         for (int i = 0; i < player.getEnderChestInventory().getContainerSize(); i++) {
             ItemStack item = player.getEnderChestInventory().getItem(i);
             CompoundTag itemToSend = MultiPaper.itemStackToNBT(item);
@@ -104,6 +118,7 @@ public class MultiPaperEnderChestHandler implements ContainerListener {
         }
 
         itemsRoot.put("items", items);
+        itemsRoot.putLong("revision", revision);
         for (ExternalServerConnection connection : connections) {
             connection.send(new PlayerInventoryUpdatePacket(player, "enderchest", itemsRoot));
         }

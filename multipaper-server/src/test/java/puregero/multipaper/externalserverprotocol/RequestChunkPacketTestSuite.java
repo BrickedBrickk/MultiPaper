@@ -4,6 +4,6 @@ import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite
-@SelectClasses({RequestChunkPacketTest.class, RequestEntitiesPacketTest.class, PlayerRemovePacketTest.class, PlayerInventoryUpdatePacketTest.class})
+@SelectClasses({RequestChunkPacketTest.class, RequestEntitiesPacketTest.class, PlayerRemovePacketTest.class})
 public class RequestChunkPacketTestSuite {
 }

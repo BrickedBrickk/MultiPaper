@@ -82,7 +82,38 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
                 return;
             }
 
+            if (!isUpdateFromPlayerOwner(component, connection.externalServer == null ? null : connection.externalServer.getName(), playerOwnerName)) {
+                LOGGER.warn("Ignoring {} inventory update for player {} from non-owner backend {} (owner {})",
+                        component, uuid, connection.externalServer == null ? "unknown" : connection.externalServer.getName(), playerOwnerName);
+                return;
+            }
+
             ListTag items = tag.getListOrEmpty("items");
+            if ("enderchest".equals(component)) {
+                if (items.isEmpty()) return;
+                // Validate the complete delta before advancing its revision so a
+                // malformed slot or stack cannot consume the sequence and leave
+                // this mirror permanently behind the owner.
+                int size = player.getEnderChestInventory().getContainerSize();
+                for (Tag entry : items) {
+                    if (!(entry instanceof CompoundTag item)) return;
+                    int slot = item.getIntOr("Slot", 0);
+                    if (slot < 0 || slot >= size) return;
+                    MultiPaper.itemStackFromNBT(item);
+                    item.getCompound("Replacing").ifPresent(MultiPaper::itemStackFromNBT);
+                }
+                if (!(player instanceof puregero.multipaper.ExternalPlayer externalPlayer)) {
+                    LOGGER.warn("Ignoring remote Ender Chest update for non-mirror player {}", uuid);
+                    return;
+                }
+                long revision = tag.getLongOr("revision", -1L);
+                if (!externalPlayer.acceptEnderChestSyncRevision(revision)) {
+                    LOGGER.debug("Ignoring stale or unversioned Ender Chest update revision {} for player {}",
+                            revision, uuid);
+                    return;
+                }
+            }
+
             items.forEach(i -> {
                 CompoundTag item = (CompoundTag) i;
                 ItemStack itemStack = MultiPaper.itemStackFromNBT(item);
@@ -102,5 +133,10 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
 
     String getPlayerOwnerName() {
         return playerOwnerName;
+    }
+
+    static boolean isUpdateFromPlayerOwner(String component, String sourceBackendName, String ownerBackendName) {
+        return !"enderchest".equals(component)
+                || sourceBackendName != null && sourceBackendName.equals(ownerBackendName);
     }
 }

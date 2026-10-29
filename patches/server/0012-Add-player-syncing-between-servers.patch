@@ -17,29 +17,6 @@ index 82db269d5fcb304cc3e38c14adced776303ad633..6c74645f6ee61144d95d223bcc92d5fd
                  metrics.addCustomChart(new Metrics.SimplePie("online_mode", () -> Bukkit.getOnlineMode() ? "online" : (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.isProxyOnlineMode() ? "bungee" : "offline"))); // Purpur
                  metrics.addCustomChart(new Metrics.SimplePie("purpur_version", () -> (org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion() != null) ? org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion() : "unknown")); // Purpur
                  metrics.addCustomChart(new Metrics.SimplePie("multipaper_version", () -> (CraftServer.class.getPackage().getImplementationVersion() != null) ? CraftServer.class.getPackage().getImplementationVersion() : "unknown")); // MultiPaper
-diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 13144ea01bc27db95a13b267d39529b012a4c9c4..76796539d0aaf09ae34a8b45613bbb8cf825f801 100644
---- a/src/main/java/net/minecraft/network/Connection.java
-+++ b/src/main/java/net/minecraft/network/Connection.java
-@@ -48,6 +48,8 @@ import org.slf4j.Logger;
- import org.slf4j.Marker;
- import org.slf4j.MarkerFactory;
- 
-+import puregero.multipaper.MultiPaper;
-+
- public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
- 
-     private static final float AVERAGE_PACKETS_SMOOTHING = 0.75F;
-@@ -658,6 +660,9 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
-         this.preparing = false;
-         clearPacketQueue(); // Paper
-         // Spigot End
-+        if (getPlayer() != null && getPlayer().hasRegisteredOnMaster) {
-+            MultiPaper.sendPlayerDisconnect(getPlayer()); // MultiPaper
-+        }
-         if (this.channel == null) {
-             this.delayedDisconnect = disconnectReason;
-         }
 diff --git a/src/main/java/net/minecraft/network/FriendlyByteBuf.java b/src/main/java/net/minecraft/network/FriendlyByteBuf.java
 index 1f4b64a5f812376c499c98cb4be62469bd0b7dbe..9b69dee2dc5cc23440ab4daf2052796d7eaf2f1f 100644
 --- a/src/main/java/net/minecraft/network/FriendlyByteBuf.java

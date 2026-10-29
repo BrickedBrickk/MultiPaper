@@ -63,6 +63,8 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     private final MessageBootstrap<ServerBoundMessage, MasterBoundMessage> bootstrap;
     private volatile SocketChannel channel;
     private volatile boolean channelActive = false;
+    private volatile boolean supportsPlayerDataTransactionProtocol = false;
+    private volatile boolean supportsPlayerSessionProtocol = false;
     private long lastPingReceived;
     private final Set<MasterBoundMessage> unhandledRequests = ConcurrentHashMap.newKeySet();
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
@@ -106,6 +108,8 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         channel = (SocketChannel) ctx.channel();
+        supportsPlayerDataTransactionProtocol = false;
+        supportsPlayerSessionProtocol = false;
         LOGGER.info("Connected to " + channel.remoteAddress());
         channel.write(new HelloMessage(myName, thisServersUuid));
 
@@ -114,7 +118,10 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         }
 
         for (MasterBoundMessage unhandledRequest : unhandledRequests) {
-            channel.write(unhandledRequest);
+            if (!(unhandledRequest instanceof CommitPlayerDataTransactionMessage)
+                    && !(unhandledRequest instanceof RegisterPlayerSessionMessage)) {
+                channel.write(unhandledRequest);
+            }
         }
 
         lastPingReceived = System.currentTimeMillis();
@@ -136,6 +143,29 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         }
 
         channelActive = true;
+        MinecraftServer minecraftServer = MinecraftServer.getServer();
+        if (minecraftServer != null) {
+            // Master drops player ownership when this backend connection goes down.
+            // Restore it before subsequent player saves are sent on the new channel.
+            for (ServerPlayer player : minecraftServer.getPlayerList().getPlayers()) {
+                if (!MultiPaper.isRealPlayer(player)) continue;
+                send(new PlayerConnectMessage(player.getUUID()), reply -> {
+                    if (reply instanceof BooleanMessageReply ownership) {
+                        if (!ownership.result) {
+                            LOGGER.error("Could not restore Master ownership for online player {} after reconnect", player.getUUID());
+                            MultiPaper.runSync(() -> {
+                                if (minecraftServer.getPlayerList().getPlayer(player.getUUID()) == player) {
+                                    player.connection.disconnect(net.minecraft.network.chat.Component.literal(
+                                            "Could not restore this player's MultiPaper session safely."));
+                                }
+                            });
+                        } else {
+                            registerPlayerSession(player);
+                        }
+                    }
+                });
+            }
+        }
         serverStartMessageTracker.onConnect(channel::write);
         channel.flush();
     }
@@ -143,8 +173,11 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         channelActive = false;
+        supportsPlayerDataTransactionProtocol = false;
+        supportsPlayerSessionProtocol = false;
         serverStartMessageTracker.onDisconnect();
         LOGGER.info("Lost connection to " + ((SocketChannel) ctx.channel()).remoteAddress());
+        failPendingPlayerSessionRegistrations();
         connect();
     }
 
@@ -197,11 +230,19 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     }
 
     public void send(MasterBoundMessage message) {
+        if (message instanceof CommitPlayerDataTransactionMessage && !supportsPlayerDataTransactionProtocol) {
+            LOGGER.warn("Refusing to send playerdata transaction before MasterBound capability negotiation");
+            return;
+        }
         waitForActiveChannel();
         channel.writeAndFlush(message);
     }
 
     public void send(MasterBoundMessage message, Consumer<ServerBoundMessage> callback) {
+        if (message instanceof CommitPlayerDataTransactionMessage && !supportsPlayerDataTransactionProtocol) {
+            callback.accept(new BooleanMessageReply(false));
+            return;
+        }
         waitForActiveChannel();
         unhandledRequests.add(message);
         send(setCallback(message, reply -> {
@@ -220,6 +261,10 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
     public <T extends ServerBoundMessage> CompletableFuture<T> trySendAndAwaitReply(MasterBoundMessage message, Class<T> expectedClass) {
         CompletableFuture<T> future = new CompletableFuture<>();
+        if (message instanceof CommitPlayerDataTransactionMessage && !supportsPlayerDataTransactionProtocol) {
+            future.completeExceptionally(new IllegalStateException("Master does not advertise playerdata transaction protocol support"));
+            return future;
+        }
         MasterBoundMessage request = setCallback(message, reply -> {
             unhandledRequests.remove(message);
             completeReply(future, expectedClass, reply);
@@ -269,6 +314,70 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     @Override
     public void handle(SetSecretMessage message) {
         secret = message.secret;
+        if (message.getTransactionId() == MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID) {
+            if (!supportsPlayerDataTransactionProtocol) {
+                supportsPlayerDataTransactionProtocol = true;
+                HelloMessage acknowledgement = new HelloMessage(myName, thisServersUuid);
+                acknowledgement.setTransactionId(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID);
+                send(acknowledgement);
+                for (MasterBoundMessage unhandledRequest : unhandledRequests) {
+                    if (unhandledRequest instanceof CommitPlayerDataTransactionMessage) {
+                        channel.writeAndFlush(unhandledRequest);
+                    }
+                }
+            }
+        } else if (message.getTransactionId() == MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID) {
+            if (!supportsPlayerSessionProtocol) {
+                supportsPlayerSessionProtocol = true;
+                HelloMessage acknowledgement = new HelloMessage(myName, thisServersUuid);
+                acknowledgement.setTransactionId(MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
+                send(acknowledgement);
+                registerOnlinePlayerSessions();
+            }
+        } else {
+            supportsPlayerDataTransactionProtocol = false;
+            failPendingPlayerDataTransactions();
+        }
+    }
+
+    private void failPendingPlayerDataTransactions() {
+        for (MasterBoundMessage request : unhandledRequests) {
+            if (request instanceof CommitPlayerDataTransactionMessage && unhandledRequests.remove(request)) {
+                completeCallback(request, new BooleanMessageReply(false));
+            }
+        }
+    }
+
+    public void registerPlayerSession(ServerPlayer player) {
+        if (!supportsPlayerSessionProtocol || !channelActive || !MultiPaper.isRealPlayer(player)) return;
+        UUID sessionId = PlayerSyncSession.getSessionId(player);
+        RegisterPlayerSessionMessage request = new RegisterPlayerSessionMessage(player.getUUID(), sessionId);
+        send(request, reply -> {
+            if (!(reply instanceof BooleanMessageReply accepted) || !accepted.result) {
+                LOGGER.warn("Master rejected live player session registration for {}", player.getScoreboardName());
+            }
+        });
+    }
+
+    private void registerOnlinePlayerSessions() {
+        MinecraftServer minecraftServer = MinecraftServer.getServer();
+        if (minecraftServer == null) return;
+        for (ServerPlayer player : minecraftServer.getPlayerList().getPlayers()) {
+            if (!MultiPaper.isRealPlayer(player)) continue;
+            send(new PlayerConnectMessage(player.getUUID()), reply -> {
+                if (reply instanceof BooleanMessageReply ownership && ownership.result) {
+                    registerPlayerSession(player);
+                }
+            });
+        }
+    }
+
+    private void failPendingPlayerSessionRegistrations() {
+        for (MasterBoundMessage request : unhandledRequests) {
+            if (request instanceof RegisterPlayerSessionMessage && unhandledRequests.remove(request)) {
+                completeCallback(request, new BooleanMessageReply(false));
+            }
+        }
     }
 
     @Override

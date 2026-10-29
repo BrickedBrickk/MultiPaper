@@ -1,0 +1,134 @@
+From: MultiPaper fork maintainers
+Subject: [PATCH] Fence chunk unload subscription after owner release failures
+
+diff --git a/src/main/java/puregero/multipaper/MultiPaperChunkHandler.java b/src/main/java/puregero/multipaper/MultiPaperChunkHandler.java
+--- a/src/main/java/puregero/multipaper/MultiPaperChunkHandler.java
++++ b/src/main/java/puregero/multipaper/MultiPaperChunkHandler.java
+@@ -4,7 +4,9 @@ import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray;
+ import ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder;
+ import io.papermc.paper.util.MCUtil;
+ import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.ChunkEntitySlices;
++import ca.spottedleaf.concurrentutil.completable.Completable;
+ import net.minecraft.core.BlockPos;
++import net.minecraft.nbt.CompoundTag;
+ import net.minecraft.network.protocol.Packet;
+ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+ import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+@@ -34,6 +36,8 @@ import java.util.HashSet;
+ import java.util.Iterator;
+ import java.util.UUID;
+ import java.util.concurrent.CompletableFuture;
++import java.util.function.Consumer;
++import java.util.function.BooleanSupplier;
+ 
+ public class MultiPaperChunkHandler {
+ 
+@@ -48,13 +52,42 @@ public class MultiPaperChunkHandler {
+ 
+     }
+ 
+-    public static void onChunkUnload(NewChunkHolder newChunkHolder, @Nullable ChunkAccess chunk, @Nullable ChunkEntitySlices chunkEntitySlices) {
+-        if (newChunkHolder.hasExternalLockRequest) {
+-            MultiPaper.unlockChunk(newChunkHolder, chunk, chunkEntitySlices);
++    public static void onChunkUnload(NewChunkHolder newChunkHolder, @Nullable ChunkAccess chunk, @Nullable ChunkEntitySlices chunkEntitySlices, @Nullable Completable<CompoundTag> chunkWrite) {
++        Runnable finishUnload = () -> {
++            boolean unsubscribed = releaseOwnershipThenUnsubscribe(newChunkHolder.hasExternalLockRequest,
++                    () -> MultiPaper.unlockChunkAfterPersistedUnload(newChunkHolder, chunk, chunkEntitySlices),
++                    () -> MultiPaper.getConnection().sendAndAwaitReply(new UnsubscribeChunkMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ), BooleanMessageReply.class).thenRun(() ->
++                            onChunkUnsubscribed(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ)
++                    ));
++            if (!unsubscribed) {
++                LOGGER.error("Retaining chunk subscription because ownership could not be safely released for {}", newChunkHolder.chunkX + "," + newChunkHolder.chunkZ);
++            }
++        };
++
++        if (chunkWrite == null) {
++            finishUnload.run();
++        } else {
++            afterChunkWrite(chunkWrite, MultiPaper::runSync, finishUnload, failure ->
++                LOGGER.error("Could not confirm chunk {} save before releasing its Master ownership", newChunkHolder.chunkX + "," + newChunkHolder.chunkZ, failure)
++            );
+         }
+-        MultiPaper.getConnection().sendAndAwaitReply(new UnsubscribeChunkMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ), BooleanMessageReply.class).thenRun(() ->
+-            onChunkUnsubscribed(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ)
+-        );
++    }
++
++    static boolean releaseOwnershipThenUnsubscribe(boolean ownershipReleaseRequired, BooleanSupplier releaseOwnership, Runnable unsubscribe) {
++        if (ownershipReleaseRequired && !releaseOwnership.getAsBoolean()) return false;
++        unsubscribe.run();
++        return true;
++    }
++
++    static void afterChunkWrite(Completable<CompoundTag> chunkWrite, Consumer<Runnable> runOnTickThread,
++                                Runnable afterSave, Consumer<Throwable> onFailure) {
++        chunkWrite.whenComplete((ignored, failure) -> {
++            if (failure != null) {
++                onFailure.accept(failure);
++            } else {
++                runOnTickThread.accept(afterSave);
++            }
++        });
+     }
+ 
+     public static void onChunkUnsubscribed(String world, int cx, int cz) {
+diff --git a/src/main/java/puregero/multipaper/MultiPaper.java b/src/main/java/puregero/multipaper/MultiPaper.java
+--- a/src/main/java/puregero/multipaper/MultiPaper.java
++++ b/src/main/java/puregero/multipaper/MultiPaper.java
+@@ -611,14 +611,23 @@ public class MultiPaper {
+     }
+ 
+     public static void unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
++        unlockChunk(newChunkHolder, chunkAccess, chunkEntitySlices, true);
++    }
++
++    /** Releases a chunk after Paper's unload-save future completed; the live block entity map is already unloaded. */
++    public static boolean unlockChunkAfterPersistedUnload(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
++        return unlockChunk(newChunkHolder, chunkAccess, chunkEntitySlices, false);
++    }
++
++    private static boolean unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices, boolean persistChunk) {
+         if (chunkAccess instanceof LevelChunk levelChunk && MultiPaper.isChunkLocal(newChunkHolder)) {
+             if (!MultiPaperExternalBlocksHandler.persistTicksBeforeUnlock(levelChunk)) {
+                 // Keep the Master lock until a durable sender recovery copy exists.
+-                return;
++                return false;
+             }
+-            if (!persistChunkBeforeUnlock(levelChunk)) {
++            if (persistChunk && !persistChunkBeforeUnlock(levelChunk)) {
+                 // Ownership must not move to a backend that would read an older chunk image.
+-                return;
++                return false;
+             }
+             if (chunkEntitySlices != null) {
+                 java.util.Arrays.stream(chunkEntitySlices.getRawEntities()).forEach(MultiPaperEntitiesHandler::onEntityUnlock);
+@@ -646,6 +655,7 @@ public class MultiPaper {
+         getConnection().send(new UnlockChunkMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
+         newChunkHolder.externalOwner = null;
+         newChunkHolder.hasExternalLockRequest = false;
++        return true;
+     }
+ 
+     public static void willSaveChunk(ServerLevel level, int x, int z) {
+@@ -656,6 +674,21 @@ public static void willSaveChunk(ServerLevel level, int x, int z) {
+         getConnection().send(new WillSaveChunkLaterMessage(level.getWorld().getName(), x, z));
+     }
+ 
++    /** Persist the authoritative block and chunk state before Master can hand ownership over. */
++    private static boolean persistChunkBeforeUnlock(LevelChunk chunk) {
++        ServerLevel level = (ServerLevel) chunk.getLevel();
++        try {
++            CompoundTag serialized = SerializableChunkData.copyOf(level, chunk).write();
++            willSaveChunk(level, chunk.getPos().x(), chunk.getPos().z());
++            writeChunk(chunk.getPos(), level, serialized);
++            return true;
++        } catch (Exception failure) {
++            LOGGER.error("Could not persist chunk {} in world {} before releasing ownership; retaining Master lock",
++                    chunk.getPos(), level.getWorld().getName(), failure);
++            return false;
++        }
++    }
++
+     public static byte[] nbtCompressToBytes(CompoundTag compoundTag) throws IOException {
+         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+         DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(buffer);

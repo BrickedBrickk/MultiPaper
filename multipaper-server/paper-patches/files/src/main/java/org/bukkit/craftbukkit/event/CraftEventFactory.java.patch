@@ -1,0 +1,9 @@
+--- a/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
++++ b/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
+@@ -2345,5 +2345,6 @@ public class CraftEventFactory {
+             }
+             level.getGameRules().set(rule, value, level);
++            puregero.multipaper.externalserverprotocol.GameRuleUpdatePacket.onGameRuleChange(level.getWorld(), rule.id(), rule.serialize(value)); // MultiPaper - sync gamerules changed through commands and Bukkit APIs
+             return new GameRuleSetResult<>(value, false);
+         } else {
+             return new GameRuleSetResult<>(level.getGameRules().get(rule), true);

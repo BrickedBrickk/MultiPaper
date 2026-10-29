@@ -50,6 +50,7 @@ public class TestServerClient extends ServerBoundMessageHandler {
 
     private final CompletableFuture<String> secretFuture = new CompletableFuture<>();
     private final CompletableFuture<Boolean> capabilityFuture = new CompletableFuture<>();
+    private final CompletableFuture<Boolean> sessionCapabilityFuture = new CompletableFuture<>();
     public final BlockingQueue<SetChunkOwnerMessage> chunkOwnerUpdates = new LinkedBlockingQueue<>();
     public final BlockingQueue<ServerStartedMessage> serverStartedMessages = new LinkedBlockingQueue<>();
     public final BlockingQueue<AddChunkSubscriberMessage> chunkSubscriberAdds = new LinkedBlockingQueue<>();
@@ -93,6 +94,7 @@ public class TestServerClient extends ServerBoundMessageHandler {
         assertTrue(!secret.isEmpty(), "Master did not send a secret");
         if (acknowledgeCapability) {
             assertTrue(client.capabilityFuture.get(10, TimeUnit.SECONDS), "Master did not negotiate playerdata transaction support");
+            assertTrue(client.sessionCapabilityFuture.get(10, TimeUnit.SECONDS), "Master did not negotiate player session support");
         }
         return client;
     }
@@ -107,6 +109,10 @@ public class TestServerClient extends ServerBoundMessageHandler {
 
     public boolean supportsPlayerDataTransactionProtocol() {
         return capabilityFuture.getNow(false);
+    }
+
+    public boolean supportsPlayerSessionProtocol() {
+        return sessionCapabilityFuture.getNow(false);
     }
 
     public void send(MasterBoundMessage message) {
@@ -152,6 +158,15 @@ public class TestServerClient extends ServerBoundMessageHandler {
                 capabilityFuture.complete(true);
             } else {
                 capabilityFuture.complete(false);
+            }
+        } else if (message.getTransactionId() == MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID) {
+            if (acknowledgePlayerDataTransactionCapability) {
+                HelloMessage acknowledgement = new HelloMessage(name, serverUuid);
+                acknowledgement.setTransactionId(MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
+                send(acknowledgement);
+                sessionCapabilityFuture.complete(true);
+            } else {
+                sessionCapabilityFuture.complete(false);
             }
         }
     }

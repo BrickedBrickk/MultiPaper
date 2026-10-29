@@ -39,6 +39,7 @@ public class ExternalPlayer extends ServerPlayer {
     public static HashMap<UUID, String> loadedStats = new HashMap<>();
     public final UUID playerSyncSessionId;
     public final String playerOwnerName;
+    private final EnderChestSyncRevision enderChestSyncRevision = new EnderChestSyncRevision();
     public ExternalServerConnection externalServerConnection;
     private final InetSocketAddress address;
     private boolean sendPackets = true;
@@ -58,6 +59,10 @@ public class ExternalPlayer extends ServerPlayer {
 
     static boolean shouldBroadcastSyncedData(@Nullable GameProfile gameProfile, boolean updatingData) {
         return !updatingData && gameProfile != null;
+    }
+
+    public synchronized boolean acceptEnderChestSyncRevision(long revision) {
+        return enderChestSyncRevision.accept(revision);
     }
 
     public static ExternalPlayer create(ExternalServerConnection externalServerConnection, GameProfile gameProfile, String world, double x, double y, double z, float yaw, float pitch, GameType gamemode, InetSocketAddress address, CompoundTag saveData, String advancements, String stats, int entityId, UUID playerSyncSessionId, String playerOwnerName) {

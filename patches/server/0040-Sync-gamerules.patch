@@ -74,10 +74,10 @@ index c59d149f703b8ad4452ca92a860bb43d00c18f7e..535542deade6ae177a4fa606c22b3aa2
      private static void addPacket(Class<? extends ExternalServerPacket> clazz, Function<FriendlyByteBuf, ExternalServerPacket> deserializer) {
 diff --git a/src/main/java/puregero/multipaper/externalserverprotocol/GameRuleUpdatePacket.java b/src/main/java/puregero/multipaper/externalserverprotocol/GameRuleUpdatePacket.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..dbe6646c697e7cae7e22ae78740aab39aa73aac2
+index 0000000000000000000000000000000000000000..29d3c9761066bc6d02b5dfa1101bc81fd0af6cfe
 --- /dev/null
 +++ b/src/main/java/puregero/multipaper/externalserverprotocol/GameRuleUpdatePacket.java
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,61 @@
 +package puregero.multipaper.externalserverprotocol;
 +
 +import net.minecraft.network.FriendlyByteBuf;
@@ -88,7 +88,7 @@ index 0000000000000000000000000000000000000000..dbe6646c697e7cae7e22ae78740aab39
 +
 +public class GameRuleUpdatePacket extends ExternalServerPacket {
 +
-+    private static boolean updatingGamerules = false;
++    static boolean updatingGamerules = false;
 +
 +    private final String world;
 +    private final String name;
@@ -118,11 +118,19 @@ index 0000000000000000000000000000000000000000..dbe6646c697e7cae7e22ae78740aab39
 +        MultiPaper.runSync(() -> {
 +            World bukkitWorld = Bukkit.getWorld(world);
 +            if (bukkitWorld != null) {
-+                updatingGamerules = true;
-+                bukkitWorld.setGameRuleValue(name, value);
-+                updatingGamerules = false;
++                runWithGameruleUpdatesSuppressed(() -> bukkitWorld.setGameRuleValue(name, value));
 +            }
 +        });
++    }
++
++    static void runWithGameruleUpdatesSuppressed(Runnable update) {
++        boolean previous = updatingGamerules;
++        updatingGamerules = true;
++        try {
++            update.run();
++        } finally {
++            updatingGamerules = previous;
++        }
 +    }
 +
 +    public static void onGameRuleChange(World world, String name, String value) {

@@ -43,6 +43,7 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         Set<UUID> ids = new HashSet<>();
         for (int i = 0; i < count; i++) {
             UUID playerId = input.readUUID();
+            UUID sessionId = input.readUUID();
             String ownerName = readText(input, 128, "owner name");
             byte[] expectedHash = new byte[PLAYER_DATA_HASH_BYTES];
             input.readBytes(expectedHash);
@@ -55,7 +56,7 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
             if (!ids.add(playerId)) {
                 throw new IllegalArgumentException("Duplicate player in playerdata transaction: " + playerId);
             }
-            participants[i] = new Participant(playerId, ownerName, expectedHash, data);
+            participants[i] = new Participant(playerId, sessionId, ownerName, expectedHash, data);
         }
     }
 
@@ -66,6 +67,7 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         output.writeVarInt(participants.length);
         for (Participant participant : participants) {
             output.writeUUID(participant.playerId());
+            output.writeUUID(participant.sessionId());
             output.writeString(participant.ownerName());
             output.writeBytes(participant.expectedPlayerDataHash());
             byte[] data = participant.playerData();
@@ -96,9 +98,10 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
         return value;
     }
 
-    public record Participant(UUID playerId, String ownerName, byte[] expectedPlayerDataHash, byte[] playerData) {
+    public record Participant(UUID playerId, UUID sessionId, String ownerName, byte[] expectedPlayerDataHash, byte[] playerData) {
         public Participant {
             java.util.Objects.requireNonNull(playerId, "playerId");
+            java.util.Objects.requireNonNull(sessionId, "sessionId");
             ownerName = requireText(ownerName, 128, "owner name");
             if (expectedPlayerDataHash == null || expectedPlayerDataHash.length != PLAYER_DATA_HASH_BYTES) {
                 throw new IllegalArgumentException("Expected playerdata SHA-256 must be 32 bytes");
@@ -108,6 +111,11 @@ public final class CommitPlayerDataTransactionMessage extends MasterBoundMessage
                 throw new IllegalArgumentException("Invalid playerdata transaction image size");
             }
             playerData = playerData.clone();
+        }
+
+        /** Legacy-shaped constructor creates an intentionally unregistered epoch, which Master will reject. */
+        public Participant(UUID playerId, String ownerName, byte[] expectedPlayerDataHash, byte[] playerData) {
+            this(playerId, new UUID(0, 0), ownerName, expectedPlayerDataHash, playerData);
         }
 
         @Override

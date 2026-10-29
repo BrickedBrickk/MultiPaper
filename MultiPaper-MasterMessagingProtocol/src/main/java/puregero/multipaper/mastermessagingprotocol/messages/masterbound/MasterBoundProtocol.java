@@ -6,10 +6,12 @@ public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
 
     /**
      * Reserved envelope transaction ID for playerdata transaction wire version 2.
-     * Version 2 adds participant before-image hashes; using a new marker keeps a
-     * peer that negotiated the earlier after-image-only format fail-closed.
+     * Version 3 binds participant before-images to the registered live session
+     * epochs; each transaction layout has a distinct marker so older peers stay
+     * fail-closed.
      */
-    public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE + 1;
+    public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE + 3;
+    public static final int PLAYER_SESSION_CAPABILITY_ID = Integer.MIN_VALUE + 2;
 
     public MasterBoundProtocol() {
         addMessage(MasterBoundDataStreamMessage.class, MasterBoundDataStreamMessage::new);
@@ -59,6 +61,7 @@ public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
         // Keep protocol IDs for every existing message stable for RC4 peers.
         // New message types must be appended, never inserted into the list.
         addMessage(CommitPlayerDataTransactionMessage.class, CommitPlayerDataTransactionMessage::new);
+        addMessage(RegisterPlayerSessionMessage.class, RegisterPlayerSessionMessage::new);
     }
 
 }

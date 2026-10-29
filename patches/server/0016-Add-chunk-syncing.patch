@@ -228,7 +228,7 @@ index 535ab99585cd4463d051334681bc80b5d20df7c0..65c444c0bb9adca2c8f0bf8545c5294e
                  this.world.unload(levelChunk);
              }
 +
-+            MultiPaperChunkHandler.onChunkUnload(this, chunk, entityChunk); // MultiPaper
++            MultiPaperChunkHandler.onChunkUnload(this, chunk, entityChunk, chunkWrite[0]); // MultiPaper - release ownership after the unload snapshot is durable
          }
  
          // unload entity data

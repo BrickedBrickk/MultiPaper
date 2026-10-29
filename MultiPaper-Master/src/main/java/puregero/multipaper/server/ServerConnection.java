@@ -32,6 +32,9 @@ public class ServerConnection extends MasterBoundMessageHandler {
     private UUID uuid;
     private volatile boolean playerDataTransactionCapabilityChallengeSent;
     private volatile boolean playerDataTransactionProtocolSupported;
+    private volatile boolean playerSessionCapabilityChallengeSent;
+    private volatile boolean playerSessionProtocolSupported;
+    private final Map<UUID, UUID> playerSessionIds = new ConcurrentHashMap<>();
     private final Map<String, ServerAnnouncement> announcedServers = new ConcurrentHashMap<>();
 
     /**
@@ -116,10 +119,21 @@ public class ServerConnection extends MasterBoundMessageHandler {
             }
             return;
         }
+        if (message.getTransactionId() == MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID) {
+            if (playerSessionCapabilityChallengeSent
+                    && Objects.equals(name, message.name)
+                    && Objects.equals(uuid, message.serverUuid)) {
+                playerSessionProtocolSupported = true;
+            }
+            return;
+        }
 
         // Every new Hello starts a fresh negotiation. Do not carry a previous
         // capability grant across a peer identity or protocol re-handshake.
         playerDataTransactionProtocolSupported = false;
+        playerSessionProtocolSupported = false;
+        playerDataTransactionCapabilityChallengeSent = false;
+        playerSessionCapabilityChallengeSent = false;
         name = message.name;
         host = ((InetSocketAddress) getAddress()).getAddress().getHostAddress();
         uuid = message.serverUuid;
@@ -147,6 +161,11 @@ public class ServerConnection extends MasterBoundMessageHandler {
         secret.setTransactionId(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID);
         playerDataTransactionCapabilityChallengeSent = true;
         send(secret);
+
+        SetSecretMessage sessionSecret = new SetSecretMessage(MultiPaperServer.SECRET);
+        sessionSecret.setTransactionId(MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
+        playerSessionCapabilityChallengeSent = true;
+        send(sessionSecret);
     }
 
     @Override
@@ -170,6 +189,7 @@ public class ServerConnection extends MasterBoundMessageHandler {
             }
             connections.remove(this);
         }
+        playerSessionIds.clear();
 
         System.out.println(ctx.channel().remoteAddress() + " (" + name + ") closed");
     }
@@ -208,8 +228,26 @@ public class ServerConnection extends MasterBoundMessageHandler {
         synchronized (playerUUIDs) {
             boolean removed = playerUUIDs.remove(uuid);
             disconnectingPlayers.remove(uuid);
+            playerSessionIds.remove(uuid);
             return removed;
         }
+    }
+
+    public boolean supportsPlayerSessionProtocol() {
+        return playerSessionProtocolSupported && connections.contains(this) && channel.isActive();
+    }
+
+    public UUID getPlayerSessionId(UUID playerId) {
+        return playerSessionIds.get(playerId);
+    }
+
+    public boolean registerPlayerSession(UUID playerId, UUID sessionId) {
+        if (!hasPlayer(playerId) || isPlayerDisconnecting(playerId) || !supportsPlayerSessionProtocol()
+                || sessionId == null || sessionId.equals(new UUID(0, 0))) {
+            return false;
+        }
+        playerSessionIds.put(playerId, sessionId);
+        return true;
     }
 
     public void markPlayerDisconnecting(UUID uuid) {
@@ -319,6 +357,11 @@ public class ServerConnection extends MasterBoundMessageHandler {
     @Override
     public void handle(PlayerDisconnectMessage message) {
         PlayerDisconnectHandler.handle(this, message);
+    }
+
+    @Override
+    public void handle(RegisterPlayerSessionMessage message) {
+        RegisterPlayerSessionHandler.handle(this, message);
     }
 
     @Override

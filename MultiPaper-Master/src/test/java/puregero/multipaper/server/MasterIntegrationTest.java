@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Timeout;
 import puregero.multipaper.mastermessagingprotocol.ChunkKey;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.LockChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RegisterPlayerSessionMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PingMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerConnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerDisconnectMessage;
@@ -1112,6 +1113,8 @@ class MasterIntegrationTest {
         TestServerClient targetOwner = TestServerClient.connect(port, "transaction-target");
         UUID editorId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
+        UUID editorSessionId = UUID.randomUUID();
+        UUID targetSessionId = UUID.randomUUID();
         UUID transactionId = UUID.randomUUID();
         String world = java.nio.file.Files.createTempDirectory("multipaper-player-transaction-").toString();
         byte[] editorBefore = {0, 0, 0};
@@ -1119,13 +1122,15 @@ class MasterIntegrationTest {
         byte[] editorAfter = {1, 2, 3};
         byte[] targetAfter = {4, 5, 6};
         CommitPlayerDataTransactionMessage.Participant[] participants = {
-                new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor", sha256(editorBefore), editorAfter),
-                new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-editor", sha256(targetBefore), targetAfter)
+                new CommitPlayerDataTransactionMessage.Participant(editorId, editorSessionId, "transaction-editor", sha256(editorBefore), editorAfter),
+                new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-editor", sha256(targetBefore), targetAfter)
         };
 
         try {
             assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(editorId))).result);
             assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(targetId))).result);
+            assertTrue(((BooleanMessageReply) editorOwner.request(new RegisterPlayerSessionMessage(editorId, editorSessionId))).result);
+            assertTrue(((BooleanMessageReply) editorOwner.request(new RegisterPlayerSessionMessage(targetId, targetSessionId))).result);
             assertTrue(((BooleanMessageReply) editorOwner.request(new WritePlayerMessage(world, editorId.toString(), editorBefore))).result);
             assertTrue(((BooleanMessageReply) editorOwner.request(new WritePlayerMessage(world, targetId.toString(), targetBefore))).result);
             CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(world, transactionId, participants);
@@ -1147,8 +1152,8 @@ class MasterIntegrationTest {
             assertTrue(((BooleanMessageReply) editorOwner.request(new WritePlayerMessage(world, editorId.toString(), currentEditor))).result);
             assertTrue(((BooleanMessageReply) editorOwner.request(new WritePlayerMessage(world, targetId.toString(), currentTarget))).result);
             CommitPlayerDataTransactionMessage staleBatch = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                    new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor", sha256(currentEditor), new byte[]{41}),
-                    new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-editor", sha256(new byte[]{99}), new byte[]{42})
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, editorSessionId, "transaction-editor", sha256(currentEditor), new byte[]{41}),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-editor", sha256(new byte[]{99}), new byte[]{42})
             });
             assertFalse(((BooleanMessageReply) editorOwner.request(staleBatch)).result,
                     "The Master must reject the complete transaction when any participant before-image is stale");
@@ -1158,8 +1163,8 @@ class MasterIntegrationTest {
                     "A stale batch must not write its stale participant");
 
             CommitPlayerDataTransactionMessage freshBatch = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                    new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor", sha256(currentEditor), new byte[]{51}),
-                    new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-editor", sha256(currentTarget), new byte[]{52})
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, editorSessionId, "transaction-editor", sha256(currentEditor), new byte[]{51}),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-editor", sha256(currentTarget), new byte[]{52})
             });
             assertTrue(((BooleanMessageReply) editorOwner.request(freshBatch)).result,
                     "A transaction with current before-images should commit");
@@ -1167,10 +1172,31 @@ class MasterIntegrationTest {
             assertArrayEquals(new byte[]{52}, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, targetId.toString()))).data);
 
             CommitPlayerDataTransactionMessage wrongTargetOwner = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                    participants[0], new CommitPlayerDataTransactionMessage.Participant(targetId, "wrong-owner", sha256(targetBefore), targetAfter)
+                    participants[0], new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "wrong-owner", sha256(targetBefore), targetAfter)
             });
             assertFalse(((BooleanMessageReply) editorOwner.request(wrongTargetOwner)).result,
                     "The Master must reject a stale or incorrect target-owner claim");
+
+            UUID reconnectedEditorSessionId = UUID.randomUUID();
+            assertTrue(((BooleanMessageReply) editorOwner.request(
+                    new RegisterPlayerSessionMessage(editorId, reconnectedEditorSessionId))).result);
+            CommitPlayerDataTransactionMessage staleEpochBatch = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, editorSessionId, "transaction-editor", sha256(new byte[]{51}), new byte[]{61}),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-editor", sha256(new byte[]{52}), new byte[]{62})
+            });
+            assertFalse(((BooleanMessageReply) editorOwner.request(staleEpochBatch)).result,
+                    "A transaction from an earlier login epoch must not commit after same-backend reconnect");
+            assertArrayEquals(new byte[]{51}, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, editorId.toString()))).data);
+            assertArrayEquals(new byte[]{52}, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, targetId.toString()))).data);
+
+            CommitPlayerDataTransactionMessage currentEpochBatch = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, reconnectedEditorSessionId, "transaction-editor", sha256(new byte[]{51}), new byte[]{63}),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-editor", sha256(new byte[]{52}), new byte[]{64})
+            });
+            assertTrue(((BooleanMessageReply) editorOwner.request(currentEpochBatch)).result,
+                    "A transaction carrying the current registered epochs should remain eligible");
+            assertArrayEquals(new byte[]{63}, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, editorId.toString()))).data);
+            assertArrayEquals(new byte[]{64}, ((DataMessageReply) editorOwner.request(new ReadPlayerMessage(world, targetId.toString()))).data);
 
             TestServerClient unowned = TestServerClient.connect(port, "transaction-unowned");
             try {
@@ -1192,6 +1218,8 @@ class MasterIntegrationTest {
         TestServerClient targetOwner = TestServerClient.connect(port, "transaction-target-b");
         UUID editorId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
+        UUID editorSessionId = UUID.randomUUID();
+        UUID targetSessionId = UUID.randomUUID();
         String world = java.nio.file.Files.createTempDirectory("multipaper-cross-owner-transaction-").toString();
         byte[] editorAfter = {11, 12};
         byte[] targetAfter = {91, 92};
@@ -1199,9 +1227,11 @@ class MasterIntegrationTest {
         try {
             assertTrue(((BooleanMessageReply) editorOwner.request(new PlayerConnectMessage(editorId))).result);
             assertTrue(((BooleanMessageReply) targetOwner.request(new PlayerConnectMessage(targetId))).result);
+            assertTrue(((BooleanMessageReply) editorOwner.request(new RegisterPlayerSessionMessage(editorId, editorSessionId))).result);
+            assertTrue(((BooleanMessageReply) targetOwner.request(new RegisterPlayerSessionMessage(targetId, targetSessionId))).result);
             CommitPlayerDataTransactionMessage transaction = new CommitPlayerDataTransactionMessage(world, UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                    new CommitPlayerDataTransactionMessage.Participant(editorId, "transaction-editor-a", sha256(new byte[0]), editorAfter),
-                    new CommitPlayerDataTransactionMessage.Participant(targetId, "transaction-target-b", sha256(new byte[0]), targetAfter)
+                    new CommitPlayerDataTransactionMessage.Participant(editorId, editorSessionId, "transaction-editor-a", sha256(new byte[0]), editorAfter),
+                    new CommitPlayerDataTransactionMessage.Participant(targetId, targetSessionId, "transaction-target-b", sha256(new byte[0]), targetAfter)
             });
 
             assertFalse(((BooleanMessageReply) editorOwner.request(transaction)).result,
@@ -1213,6 +1243,61 @@ class MasterIntegrationTest {
         } finally {
             editorOwner.close();
             targetOwner.close();
+        }
+    }
+
+    @Test
+    @Order(38)
+    void livePlayerSessionEpochRequiresNegotiatedCurrentOwnerAndIsClearedOnDisconnect() throws Exception {
+        TestServerClient owner = TestServerClient.connect(port, "session-epoch-owner");
+        TestServerClient legacyOwner = TestServerClient.connectLegacy(port, "session-epoch-legacy-owner");
+        TestServerClient nextOwner = TestServerClient.connect(port, "session-epoch-next-owner");
+        UUID playerId = UUID.randomUUID();
+        UUID legacyPlayerId = UUID.randomUUID();
+        UUID firstSession = UUID.randomUUID();
+        UUID nextSession = UUID.randomUUID();
+
+        try {
+            assertTrue(owner.supportsPlayerSessionProtocol());
+            assertFalse(legacyOwner.supportsPlayerSessionProtocol());
+            assertTrue(((BooleanMessageReply) owner.request(new PlayerConnectMessage(playerId))).result);
+            assertTrue(((BooleanMessageReply) legacyOwner.request(new PlayerConnectMessage(legacyPlayerId))).result);
+
+            assertFalse(((BooleanMessageReply) legacyOwner.request(
+                    new RegisterPlayerSessionMessage(legacyPlayerId, UUID.randomUUID()))).result,
+                    "A peer that did not negotiate session support must not register a session epoch");
+            assertFalse(((BooleanMessageReply) nextOwner.request(
+                    new RegisterPlayerSessionMessage(playerId, UUID.randomUUID()))).result,
+                    "A different backend must not register another owner's player session");
+            assertFalse(((BooleanMessageReply) owner.request(
+                    new RegisterPlayerSessionMessage(playerId, new UUID(0, 0)))).result,
+                    "An empty session epoch must not be registered as a valid transaction epoch");
+
+            assertTrue(((BooleanMessageReply) owner.request(
+                    new RegisterPlayerSessionMessage(playerId, firstSession))).result);
+            ServerConnection ownerConnection = ServerConnection.getConnection("session-epoch-owner");
+            assertEquals(firstSession, ownerConnection.getPlayerSessionId(playerId),
+                    "Master must retain the registered session epoch for the active owner");
+            assertTrue(((BooleanMessageReply) owner.request(
+                    new RegisterPlayerSessionMessage(playerId, nextSession))).result,
+                    "A reconnect on the same owner may advance the session epoch");
+            assertEquals(nextSession, ownerConnection.getPlayerSessionId(playerId));
+
+            owner.send(new PlayerDisconnectMessage(playerId));
+            assertFalse(((BooleanMessageReply) owner.request(
+                    new RegisterPlayerSessionMessage(playerId, firstSession))).result,
+                    "A disconnecting session must not be re-registered");
+            assertNull(ownerConnection.getPlayerSessionId(playerId),
+                    "Disconnect must retire the registered session epoch");
+            assertTrue(((BooleanMessageReply) owner.request(new PlayerConnectMessage(playerId))).result,
+                    "The ordered disconnect must finish before a reconnect registers its new epoch");
+            assertTrue(((BooleanMessageReply) owner.request(
+                    new RegisterPlayerSessionMessage(playerId, nextSession))).result);
+            assertEquals(nextSession, ownerConnection.getPlayerSessionId(playerId));
+        } finally {
+            owner.close();
+            legacyOwner.close();
+            nextOwner.close();
         }
     }
 
@@ -1285,7 +1370,7 @@ class MasterIntegrationTest {
         try {
             HelloMessage oldCapabilityAcknowledgement = new HelloMessage(
                     legacyPeer.name, UUID.nameUUIDFromBytes(legacyPeer.name.getBytes(StandardCharsets.UTF_8)));
-            oldCapabilityAcknowledgement.setTransactionId(Integer.MIN_VALUE);
+            oldCapabilityAcknowledgement.setTransactionId(Integer.MIN_VALUE + 1);
             legacyPeer.send(oldCapabilityAcknowledgement);
             assertFalse(legacyPeer.supportsPlayerDataTransactionProtocol(),
                     "A peer acknowledging the old after-image-only marker must remain unsupported");

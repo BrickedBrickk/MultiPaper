@@ -69,7 +69,7 @@
  
              this.asyncCompleteUnloadTask(MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, chunkWrite[0]);
 +
-+            puregero.multipaper.MultiPaperChunkHandler.onChunkUnload(this, chunk, entityChunk); // MultiPaper
++            puregero.multipaper.MultiPaperChunkHandler.onChunkUnload(this, chunk, entityChunk, chunkWrite[0]); // MultiPaper - release ownership after the unload snapshot is durable
          }
  
          // unload entity data

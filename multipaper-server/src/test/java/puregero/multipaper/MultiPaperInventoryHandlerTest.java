@@ -1,14 +1,17 @@
 package puregero.multipaper;
 
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.PlayerEquipment;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,6 +29,78 @@ class MultiPaperInventoryHandlerTest {
 
         assertFalse(inventory.items.isDirty);
         assertFalse(inventory.items.markDirty());
+    }
+
+    @Test
+    void onlyExternalPlayerInventoryOwnersAreMarkedAsRemote() {
+        assertTrue(MultiPaperInventoryHandler.isRemotePlayerInventoryOwner(Mockito.mock(ExternalPlayer.class)));
+        assertFalse(MultiPaperInventoryHandler.isRemotePlayerInventoryOwner(Mockito.mock(ServerPlayer.class)));
+    }
+
+    @Test
+    void invSeeMainAndEnderInventoryApiMarkersDetectRemoteAndUnresolvedTargets() {
+        UUID remoteTarget = UUID.randomUUID();
+        FakeInvSeeMainInventory inventory = new FakeInvSeeMainInventory(remoteTarget);
+        FakeInvSeeEnderInventory enderInventory = new FakeInvSeeEnderInventory(remoteTarget);
+
+        assertTrue(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(inventory, remoteTarget::equals),
+                "InvSee's shared SpectatorInventory marker must detect a remote main-inventory owner");
+        assertTrue(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(enderInventory, remoteTarget::equals),
+                "InvSee's shared SpectatorInventory marker must detect a remote ender-inventory owner");
+        assertFalse(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(inventory, ignored -> false),
+                "A locally owned InvSee target can keep vanilla inventory behavior");
+        assertFalse(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(enderInventory, ignored -> false),
+                "A locally owned InvSee ender target can keep vanilla inventory behavior");
+        assertFalse(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(new Object(), ignored -> true),
+                "Ordinary inventory views must not be classified as InvSee menus");
+        assertTrue(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(new BrokenInvSeeMainInventory(), ignored -> false),
+                "A marked menu with an unreadable target must fail closed");
+        assertTrue(MultiPaperInventoryHandler.isRemoteInvSeeSpectatorInventory(new BrokenInvSeeEnderInventory(), ignored -> false),
+                "A marked ender menu with an unreadable target must fail closed");
+    }
+
+    public interface FakeInvSeeMainInventoryType extends com.janboerman.invsee.spigot.api.MainSpectatorInventory { }
+
+    public static final class FakeInvSeeMainInventory implements FakeInvSeeMainInventoryType {
+        private final UUID target;
+
+        public FakeInvSeeMainInventory(UUID target) {
+            this.target = target;
+        }
+
+        @Override
+        public UUID getSpectatedPlayerId() {
+            return target;
+        }
+    }
+
+    public static final class BrokenInvSeeMainInventory implements FakeInvSeeMainInventoryType {
+        @Override
+        public UUID getSpectatedPlayerId() {
+            throw new IllegalStateException("simulated inaccessible InvSee target");
+        }
+    }
+
+    public interface FakeInvSeeEnderInventoryType extends com.janboerman.invsee.spigot.api.EnderSpectatorInventory { }
+
+    public static final class FakeInvSeeEnderInventory implements FakeInvSeeEnderInventoryType {
+        private final UUID target;
+
+        public FakeInvSeeEnderInventory(UUID target) {
+            this.target = target;
+        }
+
+        @Override
+        public UUID getSpectatedPlayerId() {
+            return target;
+        }
+    }
+
+    public static final class BrokenInvSeeEnderInventory implements FakeInvSeeEnderInventoryType {
+        @Override
+        public UUID getSpectatedPlayerId() {
+            throw new IllegalStateException("simulated inaccessible InvSee target");
+        }
     }
 
     @Test

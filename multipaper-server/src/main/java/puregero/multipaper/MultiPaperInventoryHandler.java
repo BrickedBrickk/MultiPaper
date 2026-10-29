@@ -16,6 +16,10 @@ import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.entity.Relative;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.EnderEyeItem;
@@ -125,6 +129,67 @@ public class MultiPaperInventoryHandler {
         }
 
         return false;
+    }
+
+    /**
+     * TEMPORARY SAFETY GATE: InvSee-style edits to another backend's player
+     * mirror are unsafe until the peer transaction/acknowledgement protocol is
+     * implemented. Refuse the click before vanilla mutates either the mirror or
+     * the editor's cursor/inventory. Replace this gate with that protocol; this
+     * is not the RC5-02 transaction fix.
+     */
+    public static boolean rejectUnsafeRemotePlayerInventoryClick(ServerPlayer editor) {
+        AbstractContainerMenu menu = editor.containerMenu;
+        boolean containsRemotePlayerInventory = menu.slots.stream().anyMatch(slot ->
+                slot.container instanceof Inventory inventory && isRemotePlayerInventoryOwner(inventory.items.player));
+        if (!containsRemotePlayerInventory) {
+            // InvSee++ 0.31.22's 26.3 main and ender menus use custom Containers
+            // rather than player Inventory. Their Bukkit inventories implement the
+            // public SpectatorInventory API and expose the spectated UUID. Do not rely
+            // on concrete versioned NMS class names: the API marker remains stable.
+            org.bukkit.inventory.Inventory topInventory = editor.getBukkitEntity().getOpenInventory().getTopInventory();
+            containsRemotePlayerInventory = isRemoteInvSeeSpectatorInventory(topInventory, uuid -> {
+                ServerPlayer target = net.minecraft.server.MinecraftServer.getServer().getPlayerList().getPlayer(uuid);
+                // An unresolved target is unsafe too: offline InvSee snapshots are not
+                // owned by this backend's live player state and must not be edited here.
+                return target == null || target instanceof ExternalPlayer;
+            });
+        }
+        if (!containsRemotePlayerInventory) {
+            return false;
+        }
+
+        editor.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                "Editing a player inventory owned by another backend is temporarily disabled for item safety."));
+        menu.sendAllDataToRemote();
+        return true;
+    }
+
+    static boolean isRemotePlayerInventoryOwner(Player inventoryOwner) {
+        return inventoryOwner instanceof ExternalPlayer;
+    }
+
+    static boolean isRemoteInvSeeSpectatorInventory(Object inventory, java.util.function.Predicate<java.util.UUID> isRemoteOrUnresolvedTarget) {
+        Class<?> marker = findInterface(inventory == null ? null : inventory.getClass(), "com.janboerman.invsee.spigot.api.SpectatorInventory");
+        if (marker == null) return false;
+
+        try {
+            Object targetId = marker.getMethod("getSpectatedPlayerId").invoke(inventory);
+            return !(targetId instanceof java.util.UUID uuid) || isRemoteOrUnresolvedTarget.test(uuid);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            // If InvSee exposes its marker but its target cannot be resolved, fail closed.
+            return true;
+        }
+    }
+
+    private static Class<?> findInterface(Class<?> type, String name) {
+        if (type == null) return null;
+        for (Class<?> implemented : type.getInterfaces()) {
+            if (implemented.getName().equals(name)) return implemented;
+            Class<?> inherited = findInterface(implemented, name);
+            if (inherited != null) return inherited;
+        }
+        return findInterface(type.getSuperclass(), name);
     }
 
     public static void updateInventory(ServerPlayer player, String name, int slot, ItemStack replacingItem, ItemStack item) {

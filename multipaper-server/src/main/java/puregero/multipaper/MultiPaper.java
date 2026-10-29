@@ -167,7 +167,11 @@ public class MultiPaper {
     public static CompletableFuture<Boolean> sendPlayerConnect(ServerPlayer player) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         getConnection().send(new PlayerConnectMessage(player.getUUID()), message -> {
-            future.complete(((BooleanMessageReply) message).result);
+            boolean connected = ((BooleanMessageReply) message).result;
+            if (connected) {
+                getConnection().registerPlayerSession(player);
+            }
+            future.complete(connected);
         });
         return future;
     }
@@ -611,14 +615,23 @@ public class MultiPaper {
     }
 
     public static void unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
+        unlockChunk(newChunkHolder, chunkAccess, chunkEntitySlices, true);
+    }
+
+    /** Releases a chunk after Paper's unload-save future completed; the live block entity map is already unloaded. */
+    public static boolean unlockChunkAfterPersistedUnload(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices) {
+        return unlockChunk(newChunkHolder, chunkAccess, chunkEntitySlices, false);
+    }
+
+    private static boolean unlockChunk(NewChunkHolder newChunkHolder, ChunkAccess chunkAccess, ChunkEntitySlices chunkEntitySlices, boolean persistChunk) {
         if (chunkAccess instanceof LevelChunk levelChunk && MultiPaper.isChunkLocal(newChunkHolder)) {
             if (!MultiPaperExternalBlocksHandler.persistTicksBeforeUnlock(levelChunk)) {
                 // Keep the Master lock until a durable sender recovery copy exists.
-                return;
+                return false;
             }
-            if (!persistChunkBeforeUnlock(levelChunk)) {
+            if (persistChunk && !persistChunkBeforeUnlock(levelChunk)) {
                 // Ownership must not move to a backend that would read an older chunk image.
-                return;
+                return false;
             }
             if (chunkEntitySlices != null) {
                 java.util.Arrays.stream(chunkEntitySlices.getRawEntities()).forEach(MultiPaperEntitiesHandler::onEntityUnlock);
@@ -646,6 +659,7 @@ public class MultiPaper {
         getConnection().send(new UnlockChunkMessage(newChunkHolder.world.getWorld().getName(), newChunkHolder.chunkX, newChunkHolder.chunkZ));
         newChunkHolder.externalOwner = null;
         newChunkHolder.hasExternalLockRequest = false;
+        return true;
     }
 
     public static void willSaveChunk(ServerLevel level, int x, int z) {

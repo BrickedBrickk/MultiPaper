@@ -12,6 +12,7 @@ import puregero.multipaper.mastermessagingprotocol.MessageLengthDecoder;
 import puregero.multipaper.mastermessagingprotocol.MessageLengthEncoder;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CallDataStorageMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.CommitPlayerDataTransactionMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.RegisterPlayerSessionMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.DownloadFileMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.HelloMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.MasterBoundMessage;
@@ -37,6 +38,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -87,9 +89,10 @@ class ProtocolRoundtripTest {
         })));
         assertEquals(44, protocol.getMessageId(new CommitPlayerDataTransactionMessage(
                 "world", UUID.randomUUID(), new CommitPlayerDataTransactionMessage.Participant[]{
-                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-a", new byte[32], new byte[]{1}),
-                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), "backend-b", new byte[32], new byte[]{2})
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), UUID.randomUUID(), "backend-a", new byte[32], new byte[]{1}),
+                new CommitPlayerDataTransactionMessage.Participant(UUID.randomUUID(), UUID.randomUUID(), "backend-b", new byte[32], new byte[]{2})
         })));
+        assertEquals(45, protocol.getMessageId(new RegisterPlayerSessionMessage(UUID.randomUUID(), UUID.randomUUID())));
     }
 
     @Test
@@ -158,7 +161,7 @@ class ProtocolRoundtripTest {
     @Test
     void playerDataCapabilityMarkerSurvivesBothMasterBoundDirections() {
         int marker = MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID;
-        assertEquals(Integer.MIN_VALUE + 1, marker, "The before-image transaction layout must negotiate a new capability version");
+        assertEquals(Integer.MIN_VALUE + 3, marker, "The session-fenced transaction layout must negotiate a new capability version");
         UUID serverId = UUID.nameUUIDFromBytes("capability-peer".getBytes());
 
         EmbeddedChannel masterEncoder = new EmbeddedChannel(
@@ -184,6 +187,13 @@ class ProtocolRoundtripTest {
         SetSecretMessage decodedChallenge = masterDecoder.readInbound();
         assertEquals(marker, decodedChallenge.getTransactionId());
         assertEquals("test-secret", decodedChallenge.secret);
+    }
+
+    @Test
+    void playerSessionCapabilityUsesSeparateMarker() {
+        assertEquals(Integer.MIN_VALUE + 2, MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
+        assertNotEquals(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID,
+                MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
     }
 
     /**

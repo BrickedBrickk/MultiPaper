@@ -30,6 +30,7 @@ public abstract class MasterBoundMessageHandler extends MessageHandler<MasterBou
     public abstract void handle(PlayerConnectMessage message);
 
     public abstract void handle(PlayerDisconnectMessage message);
+    public abstract void handle(RegisterPlayerSessionMessage message);
 
     public abstract void handle(ReadAdvancementMessage message);
 
