@@ -1,5 +1,16 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Beta monitor readable-summary verification — 2026-10-29
+
+- Added a UTF-8 human-readable daily summary generated from sanitized JSON summary fields, refreshed every five minutes, and included it in the export allowlist. Unavailable metrics are explicit; host-wide network rates and Java-process CPU/RSS have distinct labels. Regressions verify text output, event counts, no session hash leakage, text-summary export excluding private config, and refresh cadence.
+- Python monitor tests passed **10/10**; `py_compile` and `git diff --check` passed. Source/test/doc hashes and precise limits: `performance-results/rc5-monitor-readable-summary-20261029.md`.
+- This does not verify runtime instrumentation, RCON, target-host resource collection, or overhead on either Crafty PC. Continue to treat logs as source-limited. It does not change any of the 13 bug statuses or RC5 release gates.
+
+### Blocked review ZIP v36 — 2026-10-29
+
+- Refreshed the local review ZIP with the current tracker, monitor script/README, and readable-summary test report while preserving the same Master/Paperclip binary hashes. Latest ZIP v37 SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; all 51 payload checksums verified from archive members, 53 unique entries, no unsafe data paths. Full exclusions and limits: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+- This is a blocked documentation/monitoring review package, **not for installation or distribution**. P0 chest and InvSee++ gates remain open; no live server access occurred.
+
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
 
 ### RC5-01 Crafty1 log evidence and current-source recheck — 2026-10-29

@@ -1,5 +1,17 @@
 # RC5 blocked local review bundle — 2026-10-28
 
+## v37 refresh — tracker-current readable monitor package — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v37-20261029.zip`, 82,720,099 bytes, SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; detached sidecar matched. Embedded manifest SHA-256 `2cb76876bd313868a892057e31ea193dfff76a85a2c086f5d67704eb11467d6b`; all 51 payload hashes verified directly from ZIP entries; 53 unique entries. Unsafe world/backup/playerdata/region/log/database/key paths: zero. Credential-pattern hits in docs/data: zero (source is excluded because its code intentionally names credential fields and detection patterns). Tracker, monitor report and blocked label are present.
+
+V37 carries the unchanged Master (`1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`) and Paperclip (`8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692`) from v35/v36, with the current tracker including the v36 audit entry and the readable-summary monitor evidence. It remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**; P0 inventory conservation/chest integrity, target-PC monitor measurement and exact-stack gates remain unresolved.
+
+## v36 refresh — readable beta monitor summary — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v36-20261029.zip`, 82,719,885 bytes, SHA-256 `a71065d90421e2c42e7715b23a89403ddab6d993f244cdafebd87fe1502aa91c`; detached sidecar matched. Embedded manifest SHA-256 `28fda80858e1d11b0ce3a704894b1a84a34a559a555ab64c9614496a4fc7646f`; all 51 payload hashes verified directly from ZIP entries; 53 entries total and no duplicate paths. Unsafe world/backup/playerdata/region/log/database/key paths: zero. Credential-pattern hits in documentation/data: zero; the source code is excluded from that text scan because it intentionally contains password-detection and environment-variable identifiers. The blocked label, monitor source, and readable-summary report are present.
+
+V36 preserves the exact v35 binaries (Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692`) and adds the current tracker, monitor script/README, and `rc5-monitor-readable-summary-20261029.md`. It remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**. This packaging check does not close the P0 InvSee++ or chest validation gates and does not certify target-host monitoring overhead/runtime coverage.
+
 ## v35 refresh — exact-candidate InvSee++ containment evidence — 2026-10-29
 
 Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip`, 82,716,603 bytes, SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`; sidecar matched. Embedded manifest SHA-256 `879be66aa967cc27e6333a9291187c65a029e188cb9c2cca876cdc129bc744a4`; all 50 payload hashes passed direct member verification, 52 entries total. Duplicate/unsafe paths, world/backup/playerdata/region/log/database/key paths, private-key markers, and literal RCON password patterns: zero. The README and build provenance identify the source commit and keep the bundle blocked.

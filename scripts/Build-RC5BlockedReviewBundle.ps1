@@ -56,7 +56,8 @@ $reports = @(
     'rc5-session-epoch-master-protocol-rerun-20261029.md',
     'rc5-session-registration-runtime-20261029.md',
     'rc5-session-sender-bytecode-provenance-20261029.md',
-    'rc5-official-component-availability-20261029.md'
+    'rc5-official-component-availability-20261029.md',
+    'rc5-monitor-readable-summary-20261029.md'
 )
 foreach ($report in $reports) {
     $source = Join-Path $repo "performance-results\$report"

@@ -1,5 +1,13 @@
 # MultiPaper 26.3 RC4 evaluation handoff
 
+## 2026-10-29 monitor update and blocked review ZIP v36
+
+The beta monitor produces a readable daily text summary alongside JSON and refreshes it every five minutes. Ten focused Python tests pass, including sanitized export and refresh cadence. The blocked local review ZIP v37 (`release-staging/MultiPaper-26.3-RC5-blocked-current-source-v37-20261029.zip`) has SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; all 51 payload hashes were verified from the ZIP. It preserves the same Master/Paperclip hashes and remains explicitly blocked/not for installation. Full monitor/package scope: `performance-results/rc5-monitor-readable-summary-20261029.md` and `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+## Beta monitor summary update — 2026-10-29
+
+The monitor now writes a readable daily `.txt` summary next to the existing JSON, refreshes it every five minutes, and includes it in privacy-allowlisted exports. Missing data is labeled unavailable; host-wide network and Java-process CPU/RSS are distinguished. The focused suite passed 10/10, Python compilation and `git diff --check` passed. This does not verify the monitor on either Crafty PC or claim event coverage not emitted by logs. Details and SHA-256 values: `performance-results/rc5-monitor-readable-summary-20261029.md`. Continue with `docs/RC5_BUG_TRACKER.md`; RC5 is still blocked and the live SMP remains untouched.
+
 ## 2026-10-29 blocked bundle v35
 
 Current review archive is `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip` (82,716,603 bytes; SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`). It includes `rc5-current-candidate-invsee-ender-gate-20261029.md`; all 50 payload checksums and archive safety checks passed. It is **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**. No P0 gate was cleared; start with `docs/RC5_BUG_TRACKER.md`.

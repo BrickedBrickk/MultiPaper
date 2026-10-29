@@ -215,6 +215,7 @@ class Monitor:
         self.last_net: dict[str, tuple[float, int, int]] = {}
         self.session_start = utc_now()
         self.last_summary_day: str | None = None
+        self.last_summary_at = 0.0
         self.active_alerts: set[tuple[str, str]] = set()
         self.last_event_alert: dict[tuple[str, str], float] = {}
 
@@ -324,9 +325,11 @@ class Monitor:
             self.read_logs(server)
             self.sample_server(server)
         today = dt.datetime.now(dt.timezone.utc).date().isoformat()
-        if today != self.last_summary_day:
+        now = time.monotonic()
+        if today != self.last_summary_day or now - self.last_summary_at >= 300:
             self.write_daily_summary()
             self.last_summary_day = today
+            self.last_summary_at = now
 
     def write_daily_summary(self) -> None:
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
@@ -338,8 +341,11 @@ class Monitor:
         dest = self.root / "summaries" / f"{day}.json"
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+        (dest.parent / f"{day}.txt").write_text(format_daily_summary(summary), encoding="utf-8")
         cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=int(self.cfg["retention"].get("days", 14)))
-        for p in (self.root / "summaries").glob("*.json"):
+        for p in (self.root / "summaries").iterdir():
+            if p.suffix not in {".json", ".txt"}:
+                continue
             try:
                 if dt.date.fromisoformat(p.stem) < cutoff.date(): p.unlink()
             except ValueError: pass
@@ -366,7 +372,7 @@ class Monitor:
         with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as z:
             for p in self.root.rglob("*"):
                 rel = p.relative_to(self.root)
-                name_ok = rel.name == "timeline.jsonl" or re.fullmatch(r"(?:events|metrics)\.jsonl(?:\.\d+)?", rel.name) or (rel.parent.name == "summaries" and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", rel.name))
+                name_ok = rel.name == "timeline.jsonl" or re.fullmatch(r"(?:events|metrics)\.jsonl(?:\.\d+)?", rel.name) or (rel.parent.name == "summaries" and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.(?:json|txt)", rel.name))
                 if p.is_file() and p.resolve() != destination.resolve() and name_ok: z.write(p, rel)
             z.writestr("EXPORT-NOTES.txt", "MultiPaper beta monitor export. No raw Minecraft logs, configuration, RCON credentials, chat, IP addresses, or player names are included. Player identifiers, if present in events, are per-process salted hashes.\n")
 
@@ -388,6 +394,43 @@ class Monitor:
                     self.global_out.write(item)
                     merged += 1
         return merged
+
+
+def format_daily_summary(summary: dict[str, Any]) -> str:
+    """Render a human-readable view using only the already-sanitized summary fields."""
+    lines = ["MultiPaper beta monitor — daily summary (UTC)",
+             f"Date: {summary.get('date_utc', 'unknown')}",
+             f"Generated: {summary.get('generated_utc', 'unknown')}",
+             f"Retention: {summary.get('retention_days', 'unknown')} days"]
+    servers = summary.get("servers", {})
+    for server_id, data in sorted(servers.items()):
+        metrics = data.get("latest_metrics") or {}
+        role = metrics.get("role", "unknown role")
+        if not isinstance(role, str) or not re.fullmatch(r"[A-Za-z0-9_. -]{1,40}", role):
+            role = "unknown role"
+        lines.extend(["", f"Server: {server_id} ({role})",
+                      f"  Sample: {metrics.get('time', 'unavailable')}"])
+        fields = (("tps_1m", "TPS (1m)"), ("mspt_avg_5s", "MSPT average (5s)"),
+                  ("mspt_max_5s", "MSPT max (5s)"), ("players_online", "Players online"),
+                  ("cpu_percent", "Host CPU (%)"), ("memory_percent", "Host memory (%)"),
+                  ("disk_percent", "Disk used (%)"),
+                  ("network_rx_bytes_per_sec", "Host network receive (bytes/s)"),
+                  ("network_tx_bytes_per_sec", "Host network send (bytes/s)"),
+                  ("process_cpu_percent", "Java process CPU (%)"),
+                  ("process_rss_bytes", "Java process RSS (bytes)"))
+        for key, label in fields:
+            value = metrics.get(key)
+            lines.append(f"  {label}: {value if value is not None else 'unavailable'}")
+        if metrics.get("network_rx_bytes_per_sec") is not None or metrics.get("network_tx_bytes_per_sec") is not None:
+            lines.append("  Network counters are host-wide, not per process.")
+        counts = data.get("event_counts_today") or {}
+        if counts:
+            lines.append("  Observed categorized events (bounded retained logs):")
+            for event, count in sorted(counts.items()):
+                lines.append(f"    {event}: {count}")
+        else:
+            lines.append("  Observed categorized events: none in retained event records")
+    return "\n".join(lines) + "\n"
 
 
 def main() -> int:

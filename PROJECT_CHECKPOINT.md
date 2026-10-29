@@ -1,5 +1,11 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## Beta monitor readable summaries — 2026-10-29
+
+Added a privacy-safe UTF-8 daily text summary alongside the existing JSON summary. It refreshes every five minutes, identifies unavailable metrics, separates host and Java-process measures, labels network rates host-wide, and is included in allowlisted diagnostics ZIPs. Focused Python suite: 10/10 passed; `py_compile` and `git diff --check` passed. Hashes and scope: `performance-results/rc5-monitor-readable-summary-20261029.md`. This validates synthetic formatting/export only; host instrumentation, target-PC overhead, and actual event availability remain unverified. RC5 remains blocked by P0 InvSee++ conservation and chest validation gates.
+
+Refreshed the blocked local review ZIP to v37: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v37-20261029.zip`, SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`. All 51 payload hashes verified directly from archive members, 53 unique entries, zero unsafe data paths and zero credential-pattern hits outside source code. It preserves the prior exact binary pair. It remains blocked/not for installation or distribution; see `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
 ## RC5 blocked review bundle v35 — 2026-10-29
 
 Refreshed the local review-only package with the exact-current Paperclip/Master InvSee++ EnderSee denial report. ZIP: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip`, 82,716,603 bytes, SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`. All 50 payload hashes and path/secret exclusion checks passed. It is **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**; see `performance-results/rc5-blocked-local-bundle-20261028.md`. No release gate was cleared.

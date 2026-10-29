@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 
 MODULE = Path(__file__).parents[1] / "multipaper-beta-monitor.py"
@@ -58,6 +59,34 @@ class BetaMonitorTests(unittest.TestCase):
             self.assertLessEqual(len(files), 3)
             self.assertTrue((Path(tmp) / "events.jsonl.1").exists())
 
+    def test_host_network_counter_baselines_are_independent_per_server(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(root / "monitor"),
+                "servers": [{"id": "master"}, {"id": "backend1"}],
+            }))
+            m = monitor.Monitor(cfg)
+            master = m.cfg["servers"][0]
+            backend = m.cfg["servers"][1]
+            snapshots = [
+                {"network_rx_bytes": 100, "network_tx_bytes": 200},
+                {"network_rx_bytes": 100, "network_tx_bytes": 200},
+                {"network_rx_bytes": 500, "network_tx_bytes": 800},
+                {"network_rx_bytes": 500, "network_tx_bytes": 800},
+            ]
+            with patch.object(monitor, "host_metrics", side_effect=snapshots), \
+                    patch.object(monitor.time, "monotonic", side_effect=[0.0, 0.0, 10.0, 10.0]):
+                self.assertIsNone(m.sample_server(master)["network_rx_bytes_per_sec"])
+                self.assertIsNone(m.sample_server(backend)["network_rx_bytes_per_sec"])
+                master_sample = m.sample_server(master)
+                backend_sample = m.sample_server(backend)
+
+            for sample in (master_sample, backend_sample):
+                self.assertEqual(sample["network_rx_bytes_per_sec"], 40.0)
+                self.assertEqual(sample["network_tx_bytes_per_sec"], 60.0)
+
     def test_log_tail_detects_same_inode_rewrite_after_copy_truncate(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -109,6 +138,49 @@ class BetaMonitorTests(unittest.TestCase):
             master = monitor.Monitor(cfg2)
             self.assertEqual(master.merge_export(bundle), 1)
             self.assertIn("pc2-backend", (root / "master" / "timeline.jsonl").read_text())
+
+    def test_daily_human_summary_is_readable_and_exported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({"output_dir": str(root / "monitor"), "servers": [{"id": "backend1", "role": "backend"}]}))
+            m = monitor.Monitor(cfg)
+            metrics = {"time": "2026-10-29T12:00:00Z", "server": "backend1", "role": "backend",
+                       "tps_1m": 19.5, "mspt_avg_5s": None, "players_online": 4,
+                       "cpu_percent": 22.0, "network_rx_bytes_per_sec": 100.0}
+            monitor.BoundedJsonl(m.root / "backend1" / "metrics.jsonl", 10000, 2).write(metrics)
+            m.emit("backend1", {"time": monitor.utc_now(), "server": "backend1", "event": "player_join", "subject": "ab12cd34ef56"})
+            m.write_daily_summary()
+
+            summaries = m.root / "summaries"
+            report = next(summaries.glob("*.txt"))
+            rendered = report.read_text(encoding="utf-8")
+            self.assertIn("TPS (1m): 19.5", rendered)
+            self.assertIn("MSPT average (5s): unavailable", rendered)
+            self.assertIn("Players online: 4", rendered)
+            self.assertIn("player_join: 1", rendered)
+            self.assertNotIn("ab12cd34ef56", rendered)
+            self.assertNotIn("private.json", rendered)
+
+            bundle = root / "support.zip"
+            m.export(bundle)
+            with zipfile.ZipFile(bundle) as z:
+                self.assertIn(f"summaries/{report.name}", z.namelist())
+                self.assertFalse(any("private.json" in name for name in z.namelist()))
+
+    def test_daily_summary_refreshes_at_five_minute_interval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({"output_dir": str(root / "monitor"), "servers": [{"id": "backend1"}]}))
+            m = monitor.Monitor(cfg)
+            with patch.object(m, "read_logs"), patch.object(m, "sample_server"), \
+                    patch.object(m, "write_daily_summary", wraps=m.write_daily_summary) as write_summary, \
+                    patch.object(monitor.time, "monotonic", side_effect=[0.0, 299.0, 300.0]):
+                m.run_once()
+                m.run_once()
+                m.run_once()
+            self.assertEqual(write_summary.call_count, 2)
 
 
 if __name__ == "__main__": unittest.main()
