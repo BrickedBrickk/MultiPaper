@@ -2,6 +2,11 @@
 
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
 
+### RC5 blocked review package v35 — 2026-10-29
+
+- Review-only archive `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip`: 82,716,603 bytes, SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`. All 50 payload hashes verified directly from ZIP entries; 52 total entries; zero unsafe paths, world/playerdata/backup/log/database/key files, or private-key/literal-RCON text hits. New exact-candidate InvSee containment evidence is included.
+- The package remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**. RC5-01 chest loss attribution/recovery remains P0 `TESTING`; RC5-02 InvSee++ conservation remains P0 `BLOCKED`.
+
 ### RC5-02 exact packaged-pair EnderSee gate runtime — 2026-10-29
 
 - On the exact Java 25 Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692` / Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E` pair with official InvSee++ 0.31.22, a protocol-valid remote EnderSee pickup was denied before vanilla mutation. Owner NBT retained exactly diamond x16; the client observed empty cursor and unchanged slot at matching menu state ID 2. Full evidence hashes, fixture scope, and limits: `performance-results/rc5-current-candidate-invsee-ender-gate-20261029.md`.

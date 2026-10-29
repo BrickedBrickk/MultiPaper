@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 blocked review bundle v35 — 2026-10-29
+
+Refreshed the local review-only package with the exact-current Paperclip/Master InvSee++ EnderSee denial report. ZIP: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip`, 82,716,603 bytes, SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`. All 50 payload hashes and path/secret exclusion checks passed. It is **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**; see `performance-results/rc5-blocked-local-bundle-20261028.md`. No release gate was cleared.
+
 ## RC5 exact packaged-pair InvSee++ EnderSee containment — 2026-10-29
 
 On fresh disposable Java 25 fixtures with the packaged Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692`, Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, and InvSee++ 0.31.22, one remote EnderSee pickup was denied; the target retained exactly 16 diamonds and the client resynced an empty cursor at matching state ID 2. Full hashes/limits: `performance-results/rc5-current-candidate-invsee-ender-gate-20261029.md`. This is containment only; RC5-02 remains P0 BLOCKED and RC5 cannot be installed/published.

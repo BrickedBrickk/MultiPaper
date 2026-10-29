@@ -1,5 +1,11 @@
 # RC5 blocked local review bundle — 2026-10-28
 
+## v35 refresh — exact-candidate InvSee++ containment evidence — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v35-20261029.zip`, 82,716,603 bytes, SHA-256 `04e76bfc5a8cadbb4c53773889bac35f4ab9c4093b60bf2a2a7d7d6881c651d8`; sidecar matched. Embedded manifest SHA-256 `879be66aa967cc27e6333a9291187c65a029e188cb9c2cca876cdc129bc744a4`; all 50 payload hashes passed direct member verification, 52 entries total. Duplicate/unsafe paths, world/backup/playerdata/region/log/database/key paths, private-key markers, and literal RCON password patterns: zero. The README and build provenance identify the source commit and keep the bundle blocked.
+
+V35 adds the exact packaged-pair InvSee++ EnderSee gate runtime evidence, without claiming functional remote editing or item-conservation repair. Packaging checkout HEAD is `57f21b0bf27ecdd753a45b15ea4401533736002e`; product code used by the included binaries is `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0`. The P0 chest attribution and InvSee++ gates remain open; do not install or distribute.
+
 ## v34 refresh — committed provenance and readable package note — 2026-10-29
 
 Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v34-20261029.zip`, 82,714,132 bytes, SHA-256 `88d0c1ee3b53bd294b278acb90b2d2ed40f8c1f7d3aed692ca8c297991580bf7`; sidecar matched. Its embedded manifest SHA-256 is `af8de8460246e5351c6ded06a67cad69934c14dc0ed175eb36770bd83cfbe8b8`; all 49 payload entries verified from ZIP member bytes, 51 entries total. Duplicate/unsafe archive paths, world/backup/playerdata/region/log/database/key paths, private-key markers and literal RCON-password patterns: zero. README status and committed-source provenance matched expected values.
