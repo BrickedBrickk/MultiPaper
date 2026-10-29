@@ -1,3 +1,7 @@
+# RC5 2026-10-29 exact-pair chest follow-up
+
+The corrected fresh-world current-pair rerun (`...053801`) passed synthetic Java login/chunk delivery, all six proxy commands, and protocol-777 status. The chest held exact diamond x29 after owner Backend A shutdown and Backend B restart. Backend A nevertheless logged 20 distinct Master-rejected chunk snapshots during orderly shutdown, including the populated chest's chunk; Master owner-per-coordinate diagnostics are absent. Treat selected chest contents as persisted in this schedule, while the save rejection cause remains unresolved and the full test failed closed. See `performance-results/rc5-current-sixcomponent-shutdown-write-rejections-20261029.md` and the new tracker entry. RC5-01 stays P0 TESTING. No live SMP access occurred; fixture processes/listeners were closed.
+
 # MultiPaper 26.3 RC4 evaluation handoff
 
 ## 2026-10-29 v45 review bundle and exact normal-pair chest regression
@@ -855,3 +859,6 @@ The reviewed readiness source/tests and evidence are now committed and pushed as
 ## RC5 session-registration ACK runtime follow-up — 2026-10-29
 
 Read `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-session-registration-ack-readiness-runtime-20261029.md`. The backend registration callback was verified in a fresh disposable A-login/A-reconnect/B-owner-transfer sequence: all three received Master acceptance, were still current, and reported ready for the exact session. The assertion mode is in `scripts/Test-RC5PlayerSessionReconnectRuntime.ps1`. The run used a temporary diagnostic Paperclip with one INFO statement, not for distribution; the normal JAR and source were restored byte-for-byte. All fixture processes and ports closed. The readiness change still is not wired into a remote InvSee transaction; RC5-02 remains P0 BLOCKED, gate stays fail-closed, and RC5 must not be installed/published. Preserve unrelated worktree files.
+# RC5 2026-10-29 continuation — exact-pair smoke retry
+
+The follow-up current-pair six-component fixture did not reach chest seeding: the synthetic proxy player disconnected and its derived chunk was unloaded (`That position is not loaded`). It did confirm synthetic Java login and `/tps`/`/mspt` responses, while `/list`, `/slist`, `/mpdebug`, and `/version` were not returned. Exceptional cleanup logged seven distinct Master-rejected persistence coordinates on disposable Backend B; Master owner correlation is absent, so classify cause as unresolved and do not dismiss it. No chest contents were tested and this is not evidence of live corruption. Raw stream hashes and details are in the new top entry of `docs/RC5_BUG_TRACKER.md`; rerun with an explicitly forceloaded chunk and owner-correlated writes. Fixture listeners/processes were closed. Continue treating RC5-01 as P0 TESTING; live SMP untouched.

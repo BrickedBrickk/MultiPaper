@@ -133,6 +133,7 @@ $master = $null; $backendA = $null; $backendB = $null; $backendRestart = $null; 
 $oldNodePath = $env:NODE_PATH; $oldMcData = $env:MULTIPAPER_MC_DATA_26_3
 $passwordA = Get-Property (Join-Path $FixtureRoot 'backend-a\server.properties') 'rcon.password'
 $passwordB = Get-Property (Join-Path $FixtureRoot 'backend-b\server.properties') 'rcon.password'
+$proxyProbeExitCode = 0
 
 try {
     $master = Start-Process -FilePath $JavaExecutable -WorkingDirectory (Join-Path $FixtureRoot 'master') -ArgumentList @('-jar', 'master.jar', "$MasterPort", "$ProxyPort") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logRoot 'master.out') -RedirectStandardError (Join-Path $logRoot 'master.err') -PassThru
@@ -164,7 +165,14 @@ try {
     $probeOutput = (& $NodeExecutable $probe '127.0.0.1' "$ProxyPort" 'StackSmoke' '26.3' $ExpectedBackendA $ExpectedBackendB 2>&1 | Out-String)
     $probeExitCode = $LASTEXITCODE
     $probeOutput
-    if ($probeExitCode -ne 0) { throw "Exact-pair proxy command/chunk smoke failed with exit code $probeExitCode." }
+    $proxyProbeExitCode = $probeExitCode
+    if ($proxyProbeExitCode -ne 0) {
+        Write-Output "PROXY_COMMAND_PROBE=FAIL exit=$proxyProbeExitCode"
+        if (-not $ChestPersistenceProbe) { throw "Exact-pair proxy command/chunk smoke failed with exit code $proxyProbeExitCode." }
+        Write-Output 'Continuing only the requested isolated chest persistence assertions; command synchronization remains unverified.'
+    } else {
+        Write-Output 'PROXY_COMMAND_PROBE=PASS'
+    }
 
     $status = (& (Join-Path $repo 'scripts\Probe-ServerStatus.ps1') -Host2 '127.0.0.1' -Port $ProxyPort | Out-String)
     if ($status -notmatch 'Protocol\s*:\s*777' -or $status -notmatch 'MultiPaper 26\.3') { throw "Proxy server-list status ping failed: $status" }
@@ -177,6 +185,9 @@ try {
         $chestX = [Math]::Floor([double]::Parse($positionMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)) + 3
         $chestY = [Math]::Floor([double]::Parse($positionMatch.Groups[2].Value, [Globalization.CultureInfo]::InvariantCulture)) - 1
         $chestZ = [Math]::Floor([double]::Parse($positionMatch.Groups[3].Value, [Globalization.CultureInfo]::InvariantCulture))
+        # The proxy probe disconnects before returning; explicitly keep its selected
+        # test chunk loaded before RCON seeds the chest.
+        Invoke-Rcon $BackendARconPort $passwordA "forceload add $chestX $chestZ" | Out-Null
         $setChestReply = Invoke-Rcon $BackendARconPort $passwordA "setblock $chestX $chestY $chestZ minecraft:chest replace"
         $setItemsReply = Invoke-Rcon $BackendARconPort $passwordA "item replace block $chestX $chestY $chestZ container.0 with minecraft:diamond $chestCount"
         $seedRead = Invoke-Rcon $BackendARconPort $passwordA "data get block $chestX $chestY $chestZ Items"
@@ -228,6 +239,11 @@ try {
     if ($persistenceErrors.Count) {
         throw "Disposable stack did not pass persistence-log gate: $($persistenceErrors.Count) Master-rejected chunk write log lines. Logs: $logRoot"
     }
+    if ($proxyProbeExitCode -ne 0) {
+        throw "Chest persistence assertions completed, but proxy command synchronization was not verified (probe exit $proxyProbeExitCode)."
+    }
+
+    if ($ChestPersistenceProbe) { Invoke-Rcon $BackendARconPort $passwordA 'forceload remove all' | Out-Null }
 
     if ($RunVanillaMechanics) {
         $worldName = Get-Property (Join-Path $FixtureRoot 'backend-a\server.properties') 'level-name'
@@ -241,13 +257,25 @@ try {
     $mechanicsLabel = if ($RunVanillaMechanics) { 'and two-backend vanilla mechanics' } else { '' }
     Write-Output "PASS: current clean-built Paperclip/Master pair, six hash-pinned current official plugins, all five backend plugins on both owners, Geyser Standalone startup/loopback bind, proxy login/chunks/commands, and protocol-777 status ping $mechanicsLabel. Logs: $logRoot"
 } finally {
-    try { Invoke-Rcon $BackendARconPort $passwordA 'save-all flush' | Out-Null } catch { }
-    try { Invoke-Rcon $BackendBRconPort $passwordB 'save-all flush' | Out-Null } catch { }
-    try { Invoke-Rcon $BackendARconPort $passwordA 'stop' | Out-Null } catch { }
-    try { Invoke-Rcon $BackendBRconPort $passwordB 'stop' | Out-Null } catch { }
-    foreach ($process in @($backendA, $backendB)) { if ($process -and -not $process.HasExited) { try { $process.WaitForExit(30000) } catch { } } }
-    if ($geyser -and -not $geyser.HasExited) { try { Stop-Process -Id $geyser.Id -Force -ErrorAction SilentlyContinue } catch { } }
-    foreach ($process in $owned) { if ($process -and -not $process.HasExited) { try { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } catch { } } }
+    foreach ($entry in @(@($BackendARconPort, $passwordA, $backendA), @($BackendBRconPort, $passwordB, $backendB))) {
+        $process = $entry[2]
+        if ($process -and -not $process.HasExited) {
+            if ($entry[0] -eq $BackendARconPort -and $ChestPersistenceProbe) { try { Invoke-Rcon ([int]$entry[0]) ([string]$entry[1]) 'forceload remove all' | Out-Null } catch { } }
+            try { Invoke-Rcon ([int]$entry[0]) ([string]$entry[1]) 'save-all flush' | Out-Null } catch { }
+            try { Invoke-Rcon ([int]$entry[0]) ([string]$entry[1]) 'stop' | Out-Null } catch { }
+            try { if (-not $process.WaitForExit(60000)) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } } catch { }
+        }
+    }
+    if ($geyser -and -not $geyser.HasExited) {
+        try { Stop-Process -Id $geyser.Id -Force -ErrorAction SilentlyContinue } catch { }
+        try { $null = $geyser.WaitForExit(15000) } catch { }
+    }
+    foreach ($process in $owned) {
+        if ($process -and -not $process.HasExited) {
+            try { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } catch { }
+            try { $null = $process.WaitForExit(15000) } catch { }
+        }
+    }
     if ($oldNodePath) { $env:NODE_PATH = $oldNodePath } else { Remove-Item Env:NODE_PATH -ErrorAction SilentlyContinue }
     if ($oldMcData) { $env:MULTIPAPER_MC_DATA_26_3 = $oldMcData } else { Remove-Item Env:MULTIPAPER_MC_DATA_26_3 -ErrorAction SilentlyContinue }
 }
