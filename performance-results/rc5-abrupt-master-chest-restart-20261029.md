@@ -27,3 +27,11 @@ This demonstrates process-crash recovery after an acknowledged write on the curr
 After the focused restart-class run, the full `:MultiPaper-Master:test` suite was run sequentially on Temurin Java 25.0.3.9 / Gradle 9.8 with `--offline --no-daemon --console plain --no-build-cache --max-workers=1`. **94 tests across 10 XML suites passed; 0 failures, 0 errors, 0 skipped.** The full-run restart-class XML SHA-256 is `624B8D7201B0ED03710A668C3B21E89258E62440C81CAA6653F384014BFC5360`.
 
 The runtime Master JAR at `MultiPaper-Master/build/libs/multipaper-master-3.0.0.jar` hashes to `466A094E84C711D5367333BB2A167A76F505D49CEFC1997C9CB2B492E49A1DD1`, matching the previously retained Master output. This change adds tests only; no runtime JAR changed, so it does not claim two new clean reproducible builds.
+
+## Combined owner handoff and abrupt restart regression
+
+Added `populatedChestHandoffSurvivesAbruptMasterTerminationAfterAcknowledgedWrite`. The disposable test seeds 11 diamonds, registers backend B as waiting owner, announces A's final asynchronous save, queues A's unlock, writes/acknowledges the exact final chest snapshot with 41 diamonds, and verifies B only takes ownership after that save is stored. B reads byte-identical NBT before Master is forcibly terminated. A fresh Master and new owner then claim the chunk and again read exact byte-identical final NBT with all 41 diamonds.
+
+The entire Java 25.0.3.9 / Gradle 9.8 Master module suite passed after this addition: **95 tests across 10 suites, 0 failures/errors/skips**. Restart-class XML SHA-256: `EC138F3C12C8003D13BFFB1B04FDFCB71B96687B90072DD0D1875E534CAC2D85`. Current test source SHA-256: `69E398D2227F0EE3D8CBFEFC3C98372457AC42AAB4D728F3C59A5A052342A2CF`. Master runtime JAR remained unchanged at SHA-256 `466A094E84C711D5367333BB2A167A76F505D49CEFC1997C9CB2B492E49A1DD1`.
+
+This covers graceful owner handoff plus acknowledged persistence across an abrupt Master process stop. It does not cover backend process crash before its final save reaches Master, power loss, actual live Crafty chest attribution/recovery, or full Paperclip runtime. RC5-01 remains P0 TESTING.

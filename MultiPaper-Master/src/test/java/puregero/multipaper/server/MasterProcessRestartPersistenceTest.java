@@ -11,7 +11,10 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerCo
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ForceReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.LockChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PingMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.UnlockChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WillSaveChunkLaterMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage;
@@ -223,6 +226,89 @@ class MasterProcessRestartPersistenceTest {
             assertEquals(0, recoveredMaster.exitValue(), "Recovered Master should exit successfully");
         } finally {
             closeClient(nextOwner);
+            stopIfRunning(recoveredMaster);
+        }
+    }
+
+    @Test
+    @Timeout(120)
+    void populatedChestHandoffSurvivesAbruptMasterTerminationAfterAcknowledgedWrite() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("chest-handoff-abrupt-restart-master");
+        Files.createDirectories(masterDirectory);
+        String world = "chest-handoff-abrupt-restart-world";
+        int chunkX = -23;
+        int chunkZ = 31;
+        byte[] initialChest = chestChunk(chunkX, chunkZ, 11);
+        byte[] finalChest = chestChunk(chunkX, chunkZ, 41);
+
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient oldOwner = null;
+        TestServerClient waitingOwner = null;
+        try {
+            awaitListening(firstMaster, masterPort);
+            oldOwner = TestServerClient.connect(masterPort, "abrupt-handoff-old-owner");
+            oldOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            oldOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(oldOwner, chunkX, chunkZ, "abrupt-handoff-old-owner");
+
+            waitingOwner = TestServerClient.connect(masterPort, "abrupt-handoff-waiting-owner");
+            waitingOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            waitingOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(waitingOwner, chunkX, chunkZ, "abrupt-handoff-old-owner");
+            assertAcknowledged(oldOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, initialChest)),
+                    "initial chest snapshot");
+
+            // Model Paper's final asynchronous save during unload. Ownership must
+            // stay with A until this exact new chest snapshot has reached Master.
+            oldOwner.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            oldOwner.request(new PingMessage());
+            oldOwner.send(new UnlockChunkMessage(world, chunkX, chunkZ));
+            assertAcknowledged(oldOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, finalChest)),
+                    "final chest snapshot before ownership transfer");
+            awaitChunkOwner(waitingOwner, chunkX, chunkZ, "abrupt-handoff-waiting-owner");
+
+            byte[] handedOff = readData(waitingOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)),
+                    "First Master", "handed-off chest chunk");
+            assertArrayEquals(finalChest, handedOff, "New owner must receive the final pre-unload chest image");
+            assertEquals(41, readChestItemCount(handedOff), "No chest items may be lost at the ownership boundary");
+
+            oldOwner.close();
+            oldOwner = null;
+            waitingOwner.close();
+            waitingOwner = null;
+            firstMaster.destroyForcibly();
+            assertTrue(firstMaster.waitFor(10, TimeUnit.SECONDS), "First disposable Master did not terminate forcibly");
+        } finally {
+            closeClient(oldOwner);
+            closeClient(waitingOwner);
+            stopIfRunning(firstMaster);
+        }
+
+        Process recoveredMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient recoveredOwner = null;
+        try {
+            awaitListening(recoveredMaster, masterPort);
+            recoveredOwner = TestServerClient.connect(masterPort, "abrupt-handoff-recovered-owner");
+            recoveredOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            recoveredOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(recoveredOwner, chunkX, chunkZ, "abrupt-handoff-recovered-owner");
+
+            byte[] restored = readData(recoveredOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)),
+                    "Abruptly recovered Master", "handed-off chest chunk");
+            assertArrayEquals(finalChest, restored,
+                    "Exact chest snapshot must survive both owner handoff and abrupt Master termination");
+            assertEquals(41, readChestItemCount(restored), "Every handed-off chest item must survive Master recovery");
+
+            recoveredOwner.close();
+            recoveredOwner = null;
+            requestGracefulExit(recoveredMaster);
+            assertTrue(recoveredMaster.waitFor(15, TimeUnit.SECONDS), "Recovered Master did not stop cleanly");
+            assertEquals(0, recoveredMaster.exitValue(), "Recovered Master should exit successfully");
+        } finally {
+            closeClient(recoveredOwner);
             stopIfRunning(recoveredMaster);
         }
     }
