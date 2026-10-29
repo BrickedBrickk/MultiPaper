@@ -1,0 +1,422 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/elibo/.gradle/wrapper/dists/gradle-9.8.0-bin/3m7h6ceboy5k31n8kzwzuxssm/gradle-9.8.0/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :
+paperweight-patcher v2.0.0-beta.24 (running on 'Windows 11')
+
+> Configure project :multipaper-server
+paperweight-core v2.0.0-beta.24 (running on 'Windows 11')
+
+> Task :multipaper-master:clean
+
+Note: D:\ProjectsV3\Minecraft Mods\MultiPaper-Fork\MultiPaper-MasterMessagingProtocol\src\main\java\puregero\multipaper\mastermessagingprotocol\MessageBootstrap.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+> Task :multipaper-mastermessagingprotocol:compileJava
+
+> Task :multipaper-master:compileJava
+Note: D:\ProjectsV3\Minecraft Mods\MultiPaper-Fork\MultiPaper-Master\src\main\java\puregero\multipaper\server\handlers\CallDataStorageHandler.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :multipaper-master:processResources
+> Task :multipaper-master:classes
+> Task :multipaper-master:jar
+> Task :multipaper-mastermessagingprotocol:processResources NO-SOURCE
+> Task :multipaper-mastermessagingprotocol:classes
+> Task :multipaper-mastermessagingprotocol:jar
+
+> Task :multipaper-master:shadowJar
+'META-INF/annotations.kotlin_module' is matched by com.github.jengelman.gradle.plugins.shadow.transformers.KotlinModuleMetadataTransformer_Decorated but its DuplicatesStrategy is EXCLUDE — duplicates may be silently dropped before the transformer processes them.
+Set it to INCLUDE or WARN to ensure all duplicates are processed by the transformer.
+See https://gradleup.com/shadow/configuration/merging/#handling-duplicates-strategy for more details.
+
+> Task :multipaper-master:assemble
+> Task :multipaper-master:compileTestJava
+> Task :multipaper-master:processTestResources NO-SOURCE
+> Task :multipaper-master:testClasses
+
+> Task :multipaper-master:test
+
+ContainerTransactionManagerTest > reloadsPendingTransactionsAndPerChunkProgressFromDisk() PASSED
+
+ContainerTransactionManagerTest > recoversInventoryEntitySnapshotsFromSeparateEntityChunkFiles() PASSED
+
+ContainerTransactionManagerTest > preservesRepeatedTransfersAcrossMasterRecoveryAndChunkPersistence() PASSED
+
+ContainerTransactionManagerTest > doesNotResurrectAContainerRemovedWhileTransferIsPending() PASSED
+
+ContainerTransactionManagerTest > preservesNewInventoryEditsWhileApplyingAnOlderPendingTransfer() PASSED
+
+ContainerTransactionManagerTest > restoresCommittedTransactionWhenProgressReplacementWasInterrupted() PASSED
+
+ContainerTransactionManagerTest > discardsUncommittedInitialTransactionStageAfterRestart() PASSED
+
+ContainerTransactionManagerTest > appliesTransactionsInCommitOrderAndPersistsTheNewestSnapshot() PASSED
+
+ContainerTransactionManagerTest > replaysPostTransferBlockEntitiesUntilBothChunksArePersisted() PASSED
+
+FileLockerTest > keepsCommittedFileAndDiscardsUncommittedStagingFile(Path) PASSED
+
+FileLockerTest > writesAndReplacesFileContents(Path) PASSED
+
+FileLockerTest > restoresPreviousFileAfterInterruptedFallbackReplacement(Path) PASSED
+
+MasterIntegrationTest STANDARD_OUT
+    [MultiPaperMaster] Listening on 0.0.0.0:0
+    Connection from /127.0.0.1:51554 (server-a)
+    Connection from /127.0.0.1:51555 (server-b)
+
+MasterIntegrationTest > handshakeDeliversMasterSecret() PASSED
+
+MasterIntegrationTest > pingIsAcknowledged() PASSED
+
+MasterIntegrationTest > startCreatesBidirectionalPeerConnections() STANDARD_OUT
+    Setting server-a's host to 127.0.0.1 with port 25565
+    server-a (127.0.0.1:25565) has started, announcing connected servers...
+    Setting server-b's host to 127.0.0.1 with port 25566
+    server-b (127.0.0.1:25566) has started, announcing connected servers...
+
+MasterIntegrationTest > startCreatesBidirectionalPeerConnections() PASSED
+
+MasterIntegrationTest > proxyBackendPortsAreRegisteredWithMaster() PASSED
+
+MasterIntegrationTest > firstLockerBecomesChunkOwner() PASSED
+
+MasterIntegrationTest > chunkOwnedByAnotherServerIsRedirected() PASSED
+
+MasterIntegrationTest > chunkOwnershipCanBeRequestedForcedTransfer() STANDARD_OUT
+    Connection from /127.0.0.1:51556 (server-c)
+
+MasterIntegrationTest > chunkOwnershipCanBeRequestedForcedTransfer() PASSED
+
+MasterIntegrationTest > writtenChunkIsReadableAndVisibleAsLoaded() STANDARD_OUT
+    /127.0.0.1:51556 (server-c) closed
+
+MasterIntegrationTest > writtenChunkIsReadableAndVisibleAsLoaded() PASSED
+
+MasterIntegrationTest > willSaveLaterBlocksReadersUntilTheChunkIsWritten() PASSED
+
+MasterIntegrationTest > entitiesChunksAreStoredPerChunk() PASSED
+
+MasterIntegrationTest > forcedEntityReadWaitsForPendingEntityWrite() PASSED
+
+MasterIntegrationTest > levelDatIsSharedThroughTheMaster() PASSED
+
+MasterIntegrationTest > playerDataIsSharedThroughTheMaster() PASSED
+
+MasterIntegrationTest > playerCanOnlyConnectToOneServerAtATime() STANDARD_OUT
+    /127.0.0.1:51555 (server-b) closed
+    Connection from /127.0.0.1:51557 (server-b)
+
+MasterIntegrationTest > playerCanOnlyConnectToOneServerAtATime() PASSED
+
+MasterIntegrationTest > delayedOldOwnerChunkSnapshotCannotOverwriteNewOwnerSnapshot() PASSED
+
+MasterIntegrationTest > delayedFormerOwnerWriteIsRejectedBeforeNextOwnerClaimsChunk() PASSED
+
+MasterIntegrationTest > crashRecoveryFreesOwnershipAndSubscriptions() STANDARD_OUT
+    /127.0.0.1:51554 (server-a) closed
+
+MasterIntegrationTest > crashRecoveryFreesOwnershipAndSubscriptions() PASSED
+
+MasterIntegrationTest > chunkDataRemainsReadableAfterOwnerCrash() PASSED
+
+MasterIntegrationTest > entityIdBlocksSkipTheReservedZeroEvenWhenPersistedStateIsZero() PASSED
+
+MasterIntegrationTest > failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk() PASSED
+
+MasterIntegrationTest > savedDataUsesSharedWorldRelativePathsAcrossBackends() STANDARD_OUT
+    Connection from /127.0.0.1:51558 (saved-data-peer)
+    /127.0.0.1:51558 (saved-data-peer) closed
+
+MasterIntegrationTest > savedDataUsesSharedWorldRelativePathsAcrossBackends() PASSED
+
+MasterIntegrationTest > abruptBackendSocketResetDoesNotBreakPeerConnections() STANDARD_OUT
+    Connection from /127.0.0.1:51561 (reset-peer)
+    /127.0.0.1:51561 (reset-peer) closed
+
+MasterIntegrationTest > abruptBackendSocketResetDoesNotBreakPeerConnections() PASSED
+
+MasterIntegrationTest > forcedChunkReadWaitsForEveryOverlappingWrite() STANDARD_OUT
+    Connection from /127.0.0.1:51562 (overlapping-chunk-reader)
+    /127.0.0.1:51562 (overlapping-chunk-reader) closed
+
+MasterIntegrationTest > forcedChunkReadWaitsForEveryOverlappingWrite() PASSED
+
+MasterIntegrationTest > forcedEntityReadWaitsForEveryOverlappingWrite() STANDARD_OUT
+    Connection from /127.0.0.1:51564 (overlapping-entity-reader)
+    /127.0.0.1:51564 (overlapping-entity-reader) closed
+
+MasterIntegrationTest > forcedEntityReadWaitsForEveryOverlappingWrite() PASSED
+
+MasterIntegrationTest > disconnectingWriterReleasesPendingChunkRead() STANDARD_OUT
+    Connection from /127.0.0.1:51565 (disconnecting-chunk-writer)
+    Connection from /127.0.0.1:51566 (disconnecting-chunk-reader)
+    /127.0.0.1:51565 (disconnecting-chunk-writer) closed
+    /127.0.0.1:51566 (disconnecting-chunk-reader) closed
+
+MasterIntegrationTest > disconnectingWriterReleasesPendingChunkRead() PASSED
+
+MasterIntegrationTest > disconnectingWriterReleasesPendingEntityRead() STANDARD_OUT
+    Connection from /127.0.0.1:51567 (disconnecting-entity-writer)
+    Connection from /127.0.0.1:51568 (disconnecting-entity-reader)
+    /127.0.0.1:51567 (disconnecting-entity-writer) closed
+    /127.0.0.1:51568 (disconnecting-entity-reader) closed
+
+MasterIntegrationTest > disconnectingWriterReleasesPendingEntityRead() PASSED
+
+MasterIntegrationTest > unownedChunkSubscribersDoNotRedirectReadsToEachOther() STANDARD_OUT
+    Connection from /127.0.0.1:51569 (unowned-subscriber)
+    Connection from /127.0.0.1:51570 (unowned-reader)
+    /127.0.0.1:51569 (unowned-subscriber) closed
+    /127.0.0.1:51570 (unowned-reader) closed
+
+MasterIntegrationTest > unownedChunkSubscribersDoNotRedirectReadsToEachOther() PASSED
+
+MasterIntegrationTest > entityReadersDoNotRedirectToBackendWaitingForFirstRead() STANDARD_OUT
+    Connection from /127.0.0.1:51571 (entity-startup-first)
+    Connection from /127.0.0.1:51572 (entity-startup-second)
+    /127.0.0.1:51571 (entity-startup-first) closed
+    /127.0.0.1:51572 (entity-startup-second) closed
+
+MasterIntegrationTest > entityReadersDoNotRedirectToBackendWaitingForFirstRead() PASSED
+
+MasterIntegrationTest > concurrentChunkLocksAreAllReleasedWhenOneBackendDisconnects() STANDARD_OUT
+    Connection from /127.0.0.1:51575 (lock-bookkeeping-first)
+    Connection from /127.0.0.1:51576 (lock-bookkeeping-second)
+    /127.0.0.1:51575 (lock-bookkeeping-first) closed
+
+MasterIntegrationTest > concurrentChunkLocksAreAllReleasedWhenOneBackendDisconnects() PASSED
+
+MasterIntegrationTest > acknowledgedJsonWriteIsReadBackThroughMasterStorage() STANDARD_OUT
+    /127.0.0.1:51576 (lock-bookkeeping-second) closed
+    Connection from /127.0.0.1:51577 (json-storage-reader)
+    /127.0.0.1:51577 (json-storage-reader) closed
+
+MasterIntegrationTest > acknowledgedJsonWriteIsReadBackThroughMasterStorage() PASSED
+
+MasterIntegrationTest > worldUidIsCreatedOnceAndSharedAcrossBackends() STANDARD_OUT
+    Connection from /127.0.0.1:51578 (uid-storage-reader)
+    /127.0.0.1:51578 (uid-storage-reader) closed
+
+MasterIntegrationTest > worldUidIsCreatedOnceAndSharedAcrossBackends() PASSED
+
+MasterIntegrationTest > transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures() STANDARD_OUT
+    Connection from /127.0.0.1:51579 (transient-write-failure-reader)
+    /127.0.0.1:51579 (transient-write-failure-reader) closed
+
+MasterIntegrationTest > transientEntitySnapshotsReplaceMovedEntitiesAndAcknowledgeFailures() PASSED
+
+MasterIntegrationTest > durableSameOwnerPlayerTransactionIsIdempotentAndValidatesOwnership() STANDARD_OUT
+    Connection from /127.0.0.1:51580 (transaction-editor)
+    Connection from /127.0.0.1:51581 (transaction-target)
+    Connection from /127.0.0.1:51582 (transaction-unowned)
+    /127.0.0.1:51582 (transaction-unowned) closed
+    /127.0.0.1:51580 (transaction-editor) closed
+    /127.0.0.1:51581 (transaction-target) closed
+
+MasterIntegrationTest > durableSameOwnerPlayerTransactionIsIdempotentAndValidatesOwnership() PASSED
+
+MasterIntegrationTest > oneOwnerCannotCommitAnotherOwnersPlayerdataSnapshot() STANDARD_OUT
+    Connection from /127.0.0.1:51583 (transaction-editor-a)
+    Connection from /127.0.0.1:51584 (transaction-target-b)
+    /127.0.0.1:51583 (transaction-editor-a) closed
+    /127.0.0.1:51584 (transaction-target-b) closed
+
+MasterIntegrationTest > oneOwnerCannotCommitAnotherOwnersPlayerdataSnapshot() PASSED
+
+MasterIntegrationTest > delayedFormerOwnerWriteIsRejectedAfterLastSubscriberUnsubscribes() STANDARD_OUT
+    Connection from /127.0.0.1:51585 (last-subscriber-former-owner)
+    Connection from /127.0.0.1:51586 (last-subscriber-next-owner)
+    /127.0.0.1:51585 (last-subscriber-former-owner) closed
+    /127.0.0.1:51586 (last-subscriber-next-owner) closed
+
+MasterIntegrationTest > delayedFormerOwnerWriteIsRejectedAfterLastSubscriberUnsubscribes() PASSED
+
+MasterIntegrationTest > playerReadWaitsForEarlierQueuedSave() STANDARD_OUT
+    Connection from /127.0.0.1:51587 (ordered-player-read-owner)
+    /127.0.0.1:51587 (ordered-player-read-owner) closed
+
+MasterIntegrationTest > playerReadWaitsForEarlierQueuedSave() PASSED
+
+MasterIntegrationTest > unacknowledgedMasterBoundPeerCannotCommitPlayerDataTransaction() STANDARD_OUT
+    Connection from /127.0.0.1:51588 (transaction-legacy-peer)
+    Connection from /127.0.0.1:51588 (transaction-legacy-peer)
+    /127.0.0.1:51588 (transaction-legacy-peer) closed
+
+MasterIntegrationTest > unacknowledgedMasterBoundPeerCannotCommitPlayerDataTransaction() PASSED
+
+MasterIntegrationTest > repeatedHelloRequiresFreshPlayerDataCapabilityAcknowledgement() STANDARD_OUT
+    Connection from /127.0.0.1:51589 (transaction-renegotiating-peer)
+    Connection from /127.0.0.1:51589 (transaction-renegotiating-peer)
+    /127.0.0.1:51589 (transaction-renegotiating-peer) closed
+
+MasterIntegrationTest > repeatedHelloRequiresFreshPlayerDataCapabilityAcknowledgement() PASSED
+
+MasterIntegrationTest > chunkOwnershipDoesNotTransferBeforePreannouncedChestSaveIsPersisted() STANDARD_OUT
+    Connection from /127.0.0.1:51590 (pending-save-owner)
+    Connection from /127.0.0.1:51591 (pending-save-waiter)
+    /127.0.0.1:51591 (pending-save-waiter) closed
+    /127.0.0.1:51590 (pending-save-owner) closed
+
+MasterIntegrationTest > chunkOwnershipDoesNotTransferBeforePreannouncedChestSaveIsPersisted() PASSED
+
+MasterIntegrationTest > concurrentForcedChestReadsWaitForPendingSaveAndReturnExactSameInventory() STANDARD_OUT
+    Connection from /127.0.0.1:51592 (concurrent-chest-owner)
+    Connection from /127.0.0.1:51593 (chest-reader-0)
+    Connection from /127.0.0.1:51594 (chest-reader-1)
+    Connection from /127.0.0.1:51595 (chest-reader-2)
+    Connection from /127.0.0.1:51596 (chest-reader-3)
+    Connection from /127.0.0.1:51597 (chest-reader-4)
+    Connection from /127.0.0.1:51598 (chest-reader-5)
+    Connection from /127.0.0.1:51599 (chest-reader-6)
+    Connection from /127.0.0.1:51600 (chest-reader-7)
+    /127.0.0.1:51593 (chest-reader-0) closed
+    /127.0.0.1:51594 (chest-reader-1) closed
+    /127.0.0.1:51595 (chest-reader-2) closed
+    /127.0.0.1:51596 (chest-reader-3) closed
+    /127.0.0.1:51597 (chest-reader-4) closed
+    /127.0.0.1:51598 (chest-reader-5) closed
+    /127.0.0.1:51599 (chest-reader-6) closed
+    /127.0.0.1:51600 (chest-reader-7) closed
+    /127.0.0.1:51592 (concurrent-chest-owner) closed
+
+MasterIntegrationTest > concurrentForcedChestReadsWaitForPendingSaveAndReturnExactSameInventory() PASSED
+
+MasterIntegrationTest > livePlayerSessionEpochRequiresNegotiatedCurrentOwnerAndIsClearedOnDisconnect() STANDARD_OUT
+    Connection from /127.0.0.1:51601 (session-epoch-owner)
+    Connection from /127.0.0.1:51602 (session-epoch-legacy-owner)
+    Connection from /127.0.0.1:51603 (session-epoch-next-owner)
+    /127.0.0.1:51601 (session-epoch-owner) closed
+    /127.0.0.1:51602 (session-epoch-legacy-owner) closed
+    /127.0.0.1:51603 (session-epoch-next-owner) closed
+
+MasterIntegrationTest > livePlayerSessionEpochRequiresNegotiatedCurrentOwnerAndIsClearedOnDisconnect() PASSED
+
+MasterIntegrationTest > forcedOwnershipTransferMustNotStealChunkWhileFormerOwnersSaveIsInFlight() STANDARD_OUT
+    Connection from /127.0.0.1:51604 (forced-handoff-old-owner)
+    Connection from /127.0.0.1:51605 (forced-handoff-next-owner)
+    /127.0.0.1:51604 (forced-handoff-old-owner) closed
+    /127.0.0.1:51605 (forced-handoff-next-owner) closed
+
+MasterIntegrationTest > forcedOwnershipTransferMustNotStealChunkWhileFormerOwnersSaveIsInFlight() PASSED
+
+MasterIntegrationTest > failedFinalChestWriteMustNotReleaseChunkToWaitingOwner() STANDARD_OUT
+    Connection from /127.0.0.1:51606 (server-a)
+
+MasterIntegrationTest > failedFinalChestWriteMustNotReleaseChunkToWaitingOwner() PASSED
+
+MasterIntegrationTest > disconnectClearsFailedChunkWriteWithoutDeferredUnlock() STANDARD_OUT
+    Connection from /127.0.0.1:51607 (failed-write-owner)
+    /127.0.0.1:51607 (failed-write-owner) closed
+
+MasterIntegrationTest > disconnectClearsFailedChunkWriteWithoutDeferredUnlock() PASSED
+
+MasterIntegrationTest STANDARD_OUT
+    /127.0.0.1:51606 (server-a) closed
+
+Gradle Test Executor 2 STANDARD_OUT
+    /127.0.0.1:51557 (server-b) closed
+
+MasterProcessRestartPersistenceTest > populatedChestHandoffSurvivesAbruptMasterTerminationAfterAcknowledgedWrite() PASSED
+
+MasterProcessRestartPersistenceTest > worldAndPlayerDataSurviveGracefulShutdownAndMasterJarRestart() PASSED
+
+MasterProcessRestartPersistenceTest > worldUidSurvivesGracefulAndCrashMasterRestarts() PASSED
+
+MasterProcessRestartPersistenceTest > populatedChestChunkSurvivesMasterRestartAndNewOwnerClaim() PASSED
+
+MasterProcessRestartPersistenceTest > worldAndPlayerDataSurviveUnexpectedMasterTerminationAfterWriteAcknowledgement() PASSED
+
+MasterProcessRestartPersistenceTest > pendingContainerTransactionSurvivesAbruptMasterRestart() PASSED
+
+MasterProcessRestartPersistenceTest > populatedChestChunkSurvivesAbruptMasterTerminationAfterAcknowledgedWrite() PASSED
+
+MasterProcessRestartPersistenceTest > pendingEntityInventoryTransactionSurvivesAbruptMasterRestart() PASSED
+
+PlayerDataOperationQueueTest > cancellingSinglePlayerWaiterDoesNotLetLaterWorkOvertakeEarlierReservation() PASSED
+
+PlayerDataOperationQueueTest > failedAcknowledgementReleasesTheParticipantsForLaterWork() PASSED
+
+PlayerDataOperationQueueTest > overlappingTransactionsWithReverseParticipantOrderDoNotDeadlock() PASSED
+
+PlayerDataOperationQueueTest > cancellingCallerHandleDoesNotReleaseAnOutstandingReservation() PASSED
+
+PlayerDataOperationQueueTest > runsOperationsForOnePlayerInSubmissionOrder() PASSED
+
+PlayerDataOperationQueueTest > cancellingMultiPlayerWaiterDoesNotLetLaterWorkOvertakeEarlierReservation() PASSED
+
+PlayerDataOperationQueueTest > asynchronousMultiPlayerOperationKeepsAllParticipantBarriersUntilAcknowledged() PASSED
+
+PlayerDataOperationQueueTest > multiPlayerOperationWaitsForBothOwnersAndFencesLaterWrites() PASSED
+
+PlayerDataTransactionManagerTest > interruptedBatchRollsForwardBeforeAnyPlayerRead() PASSED
+
+PlayerDataTransactionManagerTest > randomizedTransfersPreserveAggregateItemsAcrossJournalCrashCuts() PASSED
+
+PlayerDataTransactionManagerTest > rejectsReusingTransactionIdForDifferentSnapshots() PASSED
+
+PlayerDataTransactionManagerTest > everyParticipantWriteCrashCutRecoversTheWholeBatch() PASSED
+
+PlayerDataTransactionManagerTest > randomizedStaleContenderCannotDuplicatePlayerdataTransfer() PASSED
+
+PlayerDataTransactionManagerTest > requiresAtLeastTwoPlayersToAvoidTreatingASingleFileWriteAsATransaction() PASSED
+
+PlayerDataTransactionManagerTest > concurrentOverlappingCommitsNeverExposeAMixedPlayerPair() PASSED
+
+PlayerDataTransactionManagerTest > duplicateCommitIsIdempotentAndCannotRestoreOlderSnapshots() PASSED
+
+WriteLockManagerTest > asyncChunkBarrierCompletesOnlyAfterAnnouncedSaveFinishes() PASSED
+
+WriteLockManagerTest > disconnectMustNotReleaseBarrierForAlreadyAcceptedAsyncWrite() PASSED
+
+WriteLockManagerTest > chunkReadWaitsUntilEveryOutstandingWriteHasFinished() PASSED
+
+WriteLockManagerTest > activeWriteWithoutAnnouncementStillFencesReadAndDisconnect() PASSED
+
+WriteLockManagerTest > disconnectStillReleasesAnAnnouncementThatNeverBecameAWrite() PASSED
+
+WriteChunkHandlerTest > transientSnapshotDeduplicatesRepeatedRecords() PASSED
+
+WriteChunkHandlerTest > transientSnapshotDeduplicatesItsCurrentEntityRecords() PASSED
+
+HelloPacketTest > addsAddressToOrdinaryHandshakeWithoutExistingForwardingData() PASSED
+
+HelloPacketTest > waitsUntilTheCompleteHandshakeFrameArrives() PASSED
+
+HelloPacketTest > preservesFloodgateStyleNulDelimitedHandshakeData() PASSED
+
+RegionFileCachePersistenceTest > fragmentedRegionKeepsLatestChunkDataAfterRepeatedReplacementAndReopen() PASSED
+
+RegionFileCachePersistenceTest > slowTaskWarningMustNotReleaseLaterRegionFileOperations() PASSED
+
+RegionFileCachePersistenceTest > closePreventsNewRegionFileTasksFromStartingAfterTheFileIsClosed() PASSED
+
+RegionFileCachePersistenceTest > sameSizedReplacementIsWrittenToNewSectorsBeforeTheOldSectorsAreReused() PASSED
+
+RegionFileCachePersistenceTest > externalChunkSidecarCanBeReadAfterCachedRegionFilesAreClosedAndReopened() PASSED
+
+RegionFileCachePersistenceTest > closeDrainsPreviouslyAcceptedRegionFileTasksBeforeClosing() PASSED
+
+RegionFileCachePersistenceTest > chunkDataCanBeReadAfterCachedRegionFilesAreClosedAndReopened() PASSED
+
+> Task :multipaper-master:check
+> Task :multipaper-master:build
+
+[Incubating] Problems report is available at: file:///D:/ProjectsV3/Minecraft%20Mods/MultiPaper-Fork/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 48s
+9 actionable tasks: 9 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.0/userguide/configuration_cache_enabling.html

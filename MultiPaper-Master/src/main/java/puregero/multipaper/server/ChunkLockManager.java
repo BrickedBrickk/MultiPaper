@@ -17,6 +17,10 @@ public class ChunkLockManager {
     private static final Map<ChunkKey, ServerConnection> failedWrites = new ConcurrentHashMap<>();
     private static final Map<ChunkKey, Set<ServerConnection>> deferredUnlocks = new ConcurrentHashMap<>();
 
+    static boolean hasFailedWrite(ChunkKey key) {
+        return failedWrites.containsKey(key);
+    }
+
     public static void lockUntilWrite(ServerConnection connection, String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
         synchronized (ChunkLock.getChunkLock(key)) {
@@ -98,7 +102,9 @@ public class ChunkLockManager {
 
     public static CompletableFuture<Void> releaseAll(ServerConnection connection) {
         return locks.releaseAll(connection).whenComplete((ignored, failure) -> {
-            for (ChunkKey key : new HashSet<>(deferredUnlocks.keySet())) {
+            Set<ChunkKey> keys = new HashSet<>(deferredUnlocks.keySet());
+            keys.addAll(failedWrites.keySet());
+            for (ChunkKey key : keys) {
                 synchronized (ChunkLock.getChunkLock(key)) {
                     Set<ServerConnection> waiting = deferredUnlocks.get(key);
                     if (waiting != null) {

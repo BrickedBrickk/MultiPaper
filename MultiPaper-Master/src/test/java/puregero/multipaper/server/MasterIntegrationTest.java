@@ -1741,4 +1741,43 @@ class MasterIntegrationTest {
                 "The new owner must receive the exact snapshot that was rejected before the retry");
         RegionFileCache.closeAll();
     }
+
+    @Test
+    @Order(41)
+    @Timeout(30)
+    void disconnectClearsFailedChunkWriteWithoutDeferredUnlock() throws Exception {
+        String world = Files.createTempDirectory("multipaper-failed-write-disconnect-").toString();
+        int chunkX = 43;
+        int chunkZ = -51;
+        ChunkKey key = new ChunkKey(world, chunkX, chunkZ);
+        TestServerClient failedOwner = TestServerClient.connect(port, "failed-write-owner");
+        try {
+            failedOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            failedOwner.request(new PingMessage());
+            assertEquals("failed-write-owner", pollUntilOwner(failedOwner, chunkX, chunkZ, "failed-write-owner").owner);
+
+            failedOwner.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            failedOwner.request(new PingMessage());
+            RegionFileCache.getRegionFile(Path.of(world, "region").toFile(), chunkX, chunkZ).close();
+            BooleanMessageReply failed = (BooleanMessageReply) failedOwner.request(
+                    new WriteChunkMessage(world, "region", chunkX, chunkZ, chestChunk(5)));
+            assertFalse(failed.result);
+            assertTrue(ChunkLockManager.hasFailedWrite(key), "The failed save should be tracked while its owner is connected");
+
+            failedOwner.close();
+            long deadline = System.currentTimeMillis() + 5_000;
+            while (ServerConnection.getConnections().stream()
+                    .anyMatch(connection -> "failed-write-owner".equals(connection.getBungeeCordName()))
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);
+            }
+            assertFalse(ServerConnection.getConnections().stream()
+                    .anyMatch(connection -> "failed-write-owner".equals(connection.getBungeeCordName())));
+            assertFalse(ChunkLockManager.hasFailedWrite(key),
+                    "Disconnect cleanup must remove failed-write entries even when no unlock was deferred");
+        } finally {
+            failedOwner.close();
+            RegionFileCache.closeAll();
+        }
+    }
 }
