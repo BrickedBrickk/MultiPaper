@@ -2,6 +2,12 @@
 
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
 
+### RC5 source checkpoint — commit a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0
+
+- The tracked source/test set for Master session fencing, Ender Chest revision ordering, chunk-unload persistence fencing, gamerule synchronization, and fail-closed remote inventory clicks was committed and fast-forward-pushed to the owner-controlled `fork/feature/port-26.3` branch. The remote tip was verified equal to the commit. `origin` remains PaperMC/Paper and was not used.
+- Build evidence for this source state is `performance-results/rc5-ender-chest-revision-fence-20261029.md`: two clean Java 25 builds, each 10,785 tests (0 failures/errors, 88 skipped), all nine JAR outputs byte-identical. This verifies compilation and the test suite, not paired Ender Chest reorder behavior or functional InvSee++ item conservation.
+- RC5-01 chest integrity remains P0 `TESTING`; RC5-02 InvSee++ remains P0 `BLOCKED`, with remote edits fail-closed. Do not install or publish RC5. The substantial unrelated/older unstaged worktree changes were preserved and not included in the commit.
+
 ### RC5 blocked review package v32 — 2026-10-29
 
 - Refreshed the review ZIP after the exact packaged-pair chest runtime and compatibility-matrix correction. Archive SHA-256 `06ae8892065869730afa2038d8398969cbdf3c19b800d4ad63e3dbe89f1db8c3`; all 48 payload hashes matched, 50 entries, zero unsafe world/region/playerdata/log/database/key paths, and zero private-key/literal-RCON pattern files. Full audit: `performance-results/rc5-blocked-local-bundle-20261028.md`.

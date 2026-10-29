@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 source commit and push — 2026-10-29
+
+Committed the reviewed 39-file source/test set as `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0` (`Fence cross-backend inventory and chunk synchronization`) and verified `fork/feature/port-26.3` points to that exact commit. The matching Java 25 clean-build evidence is `performance-results/rc5-ender-chest-revision-fence-20261029.md`: two clean runs, 10,785 tests each, 0 failures/errors, 88 skipped, nine identical JARs. This does not close the P0 InvSee++ conservation blocker or chest-loss attribution gate. No release was published or installed; unrelated dirty files remain untouched.
+
 ## RC5-01 packaged-pair chest handoff regression — 2026-10-29
 
 The exact packaged Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692` + Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, Java 25, passed the 273-read delayed stale-owner chest schedule in both A→B and B→A directions. Exact single/double chest contents survived new-owner backend and graceful Master restarts. Result/log hashes and bounded scope: `performance-results/rc5-packaged-pair-chest-race-20261029.md`. This closes the artifact-pair gap only for those schedules; the live chest incident remains unattributed. RC5-01 stays P0 TESTING; RC5-02 remains P0 BLOCKED. All test ports/processes closed.
