@@ -209,7 +209,10 @@ class Monitor:
         # The digest detects copy-truncate/rewrite rotations that retain an inode and
         # grow back to at least the old size before the next poll.
         self.offsets: dict[str, tuple[int, int, bytes]] = {}
-        self.last_net: tuple[float, int, int] | None = None
+        # Host counters are sampled once per configured server. Keep a separate
+        # time baseline per server so sequential samples do not consume one
+        # another's byte delta (PC1 commonly has Master, backend, and Geyser).
+        self.last_net: dict[str, tuple[float, int, int]] = {}
         self.session_start = utc_now()
         self.last_summary_day: str | None = None
         self.active_alerts: set[tuple[str, str]] = set()
@@ -278,14 +281,15 @@ class Monitor:
                 metrics["rcon_available"] = False
         rx, tx = metrics.get("network_rx_bytes"), metrics.get("network_tx_bytes")
         now = time.monotonic()
-        if isinstance(rx, int) and isinstance(tx, int) and self.last_net:
-            elapsed = max(0.001, now - self.last_net[0])
-            metrics["network_rx_bytes_per_sec"] = max(0, rx - self.last_net[1]) / elapsed
-            metrics["network_tx_bytes_per_sec"] = max(0, tx - self.last_net[2]) / elapsed
+        previous_net = self.last_net.get(server["id"])
+        if isinstance(rx, int) and isinstance(tx, int) and previous_net:
+            elapsed = max(0.001, now - previous_net[0])
+            metrics["network_rx_bytes_per_sec"] = max(0, rx - previous_net[1]) / elapsed
+            metrics["network_tx_bytes_per_sec"] = max(0, tx - previous_net[2]) / elapsed
         else:
             metrics["network_rx_bytes_per_sec"] = None
             metrics["network_tx_bytes_per_sec"] = None
-        if isinstance(rx, int) and isinstance(tx, int): self.last_net = (now, rx, tx)
+        if isinstance(rx, int) and isinstance(tx, int): self.last_net[server["id"]] = (now, rx, tx)
         for p in server.get("data_paths", []):
             try:
                 du = shutil.disk_usage(p)

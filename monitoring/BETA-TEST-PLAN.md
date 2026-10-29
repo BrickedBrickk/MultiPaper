@@ -1,4 +1,6 @@
-# RC4 evaluation beta plan (14 days)
+# RC5 evaluation beta plan (14 days)
+
+**Current state: NOT AUTHORIZED.** RC5 has an unresolved P0 InvSee++ item-conservation blocker; RC5-01 chest regressions are verified only in isolated fixtures and do not recover or attribute the live incident. Keep the live SMP on RC4. This checklist is for later use only after RC5 blockers, exact-stack tests, and the owner-approved maintenance window are complete.
 
 Use a private allowlist with 5–20 invited participants. Keep the Master, both backends, and Geyser on the same reviewed candidate/configuration throughout a test window. Before every planned fault injection, take and verify a restorable backup of Master world data plus both backend configs/plugins. No test should expose backend game ports, coordination, RCON, or Floodgate keys to the Internet.
 
@@ -8,7 +10,7 @@ Use a private allowlist with 5–20 invited participants. Keep the Master, both 
 - Restore/initialize one Master data directory and two separate backend directories; never let both backends share local world files.
 - Configure the Master listener and player TCP proxy. Restrict the coordination port to the two backend hosts. Backend game ports and RCON stay private; RCON binds loopback.
 - Install the identical tested plugin stack on both backends. Set matching forwarding/authentication settings. Preserve the Floodgate key privately and check hashes without printing key contents.
-- Route Playit Java TCP only to the Master Java proxy, and Bedrock UDP only to the PC1 Geyser listener. Set Geyser's Java target to the Master. Keep PC2's backend reachable over the private LAN/Tailscale path.
+- Route Playit Java TCP only to the Master Java proxy. For Bedrock NetherNet, route both Geyser TCP signaling and UDP gameplay; the prior UDP-only tunnel is insufficient. Confirm the selected Playit TCP/UDP capability and public route, then test with a real allowed Bedrock account before admitting Bedrock players. Set Geyser's Java target to the Master. Keep PC2's backend reachable over the private LAN/Tailscale path.
 - Start Master, Backend A, Backend B, then Geyser. Verify each readiness log, backend registration, plugin enable, RCON loopback, port bindings, disk headroom, monitor freshness, and a fresh successful backup.
 - Use an authenticated test Java account first. Confirm name/identity, movement, permissions, inventory, and reconnect. Add Bedrock only after its Floodgate identity and reconnect are verified.
 

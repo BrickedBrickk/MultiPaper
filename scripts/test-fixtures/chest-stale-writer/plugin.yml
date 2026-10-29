@@ -1,0 +1,7 @@
+name: RC5StaleChestWriter
+version: 1.0
+main: rc5.chest.RC5StaleChestWriter
+api-version: '26.3'
+commands:
+  rc5stalechest:
+    description: Disposable stale chest chunk writer regression probe

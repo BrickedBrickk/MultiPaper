@@ -1,8 +1,157 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5-01 packaged-pair chest handoff regression — 2026-10-29
+
+The exact packaged Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692` + Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, Java 25, passed the 273-read delayed stale-owner chest schedule in both A→B and B→A directions. Exact single/double chest contents survived new-owner backend and graceful Master restarts. Result/log hashes and bounded scope: `performance-results/rc5-packaged-pair-chest-race-20261029.md`. This closes the artifact-pair gap only for those schedules; the live chest incident remains unattributed. RC5-01 stays P0 TESTING; RC5-02 remains P0 BLOCKED. All test ports/processes closed.
+
+The compatibility matrix and blocked review package now reflect this evidence accurately. Current review-only ZIP v32: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v32-20261029.zip`, SHA-256 `06ae8892065869730afa2038d8398969cbdf3c19b800d4ad63e3dbe89f1db8c3`; full audit in `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+## RC5-01 Crafty1 current-source path recheck — 2026-10-29
+
+Rechecked the no-local-holder region read path at HEAD `dd4756dcc7262225e5cd54411eae08274c77c605`. It still routes to Master storage under the Master chunk lock; source hashes, existing 273-read/bidirectional chest regression references, and limitations are recorded in `performance-results/rc5-crafty1-noholder-current-source-recheck-20261029.md`. The newly referenced upload itself was unavailable and no fresh parse is claimed. No live environment was accessed. RC5-01 remains P0 TESTING; RC5-02 remains P0 BLOCKED.
+
+Refreshed the blocked documentation review ZIP to v29 with this source recheck; 47 payload hashes match and the archive is explicitly NOT FOR INSTALLATION OR DISTRIBUTION. SHA-256 and full audit: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+## RC5 session-epoch Master/protocol rerun — 2026-10-29
+
+On the current dirty source tree, forced Java 25 recompilation and ran `MasterIntegrationTest` (**40/40**) and `ProtocolRoundtripTest` (**6/6**) with zero failures/errors/skips using isolated Gradle home `D:\multipaper-tests\gradle-home-rc5-session-check-20261029`. Session epoch negotiation, owner validation, disconnect clearing, stale-owner chest fences, and wire IDs/markers passed. This is Master/protocol groundwork only: Paper sender runtime and cross-owner InvSee++ transaction integration remain unverified. RC5-02 is P0 `BLOCKED`; RC5-01 remains P0 `TESTING`. Full hashes and evidence: `performance-results/rc5-session-epoch-master-protocol-rerun-20261029.md` and `docs/RC5_BUG_TRACKER.md`.
+
+## Current-worktree Master integration rerun — 2026-10-28
+
+Temurin Java 25.0.3+9 / Gradle 9.8.0 current dirty-tree `:MultiPaper-Master:test` passed **75/75 across 10 suites** (0 failures/errors/skips), including restart and transaction journal crash-cut/concurrency tests; the separate changed wire-protocol round-trip suite passed **6/6**. Chest pending-save ownership ordering, stale-owner fences, transaction/session checks, stable wire IDs, and capability markers passed. Master JAR hash remains `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, same as the two-clean-build pair. This is Master/protocol evidence only; no Paper/Moonrise lifecycle or InvSee cross-owner conservation claim. RC5-01 P0 `TESTING` and RC5-02 P0 `BLOCKED` remain release gates. See `performance-results/rc5-current-master-integration-rerun-20261028.md` and `docs/RC5_BUG_TRACKER.md`.
+
+Patch 0154 also reverse/forward round-tripped byte-exactly over a retained disposable copy of its two target files. This verifies patch text application on that base, not a clean Paperweight patch-stack or runtime. Report: `performance-results/rc5-chest-patch-roundtrip-0154-20261028.md`; RC5-01 remains P0 TESTING.
+
+Provenance check confirms the exact 0154 patch and its target Java files match both clean-build input manifests; the exact-source `MultiPaperChunkHandlerTestSuite` passed 7/7, including durable-write ordering and failure-retention cases. This strengthens candidate verification but does not attribute live chest loss. See the round-trip report; RC5-01 remains P0 TESTING.
+
+## RC5 chest zero-delay stale-owner race — 2026-10-28
+
+Ran one additional A→B isolated chest integrity schedule against the exact twice-clean-built Java 25 pair with zero configured barrier warmup and write delay. Four no-holder Master reads observed the new owner's x17 chest snapshot, the stale former-owner x32 write was rejected, and exact single/double chest contents persisted through backend and graceful Master restarts. Result SHA-256 `CBA6F4F033D055B09A010852117C9FB3DBBD05EE7D1E0C912D3863B0EF1CEBFA`; full evidence and all hashes: `performance-results/rc5-chest-zero-delay-race-20261028.md`. All fixture listeners closed; no fixture Java process remained. This narrows tested timing variance but does not classify live chest reports; RC5-01 remains P0 TESTING and RC5-02 InvSee++ remains P0 BLOCKED.
+
+Refreshed the local blocked review ZIP to v4 (`release-staging/MultiPaper-26.3-RC5-blocked-current-source-v4-20261028.zip`, SHA-256 `23AF6272B20FCFBA8D3D4BF417E5E91562A8E9F60C5322EF2AF817FB826E0CC1`) with current bug tracker and regression report; all 23 embedded payload hashes verified. It remains NOT FOR INSTALLATION/DISTRIBUTION and is not a public release. See `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+The complementary B→A zero-delay chest race also passed on the exact same Java 25 artifact pair. Four Master fallback reads completed, stale former-owner x32 was rejected, and exact x17 single-chest plus double-chest stacks survived backend A and graceful Master restarts. Result SHA-256 `C739F49A3DA04E021ACCF2C1D0705CCC6DD8343F4F77E0DDEE1D2DAE21838615`; all fixture ports/processes closed. Full evidence: `performance-results/rc5-chest-zero-delay-reverse-race-20261028.md`. RC5-01 remains P0 TESTING at live incident scope.
+
+Refreshed the blocked review archive to v5 with both zero-delay ownership directions and current tracker. ZIP SHA-256 `86FBA06F0856ADBD19A939A1E3CAB3177151B4C0F3679CB7AD271F6BCE9B7A59`; all 24 embedded payload checksums matched, with no unsafe entries. Still not for install/distribution. Details: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+V6 refresh includes the current compatibility matrix with both zero-delay chest race schedules. Archive SHA-256 `DED406BD41AF73AE3BE45D0F76DD5ED9E4EF70522D1905E609C34CD70787731F`; all 24 payloads verified directly from ZIP bytes. Still blocked/not for installation or distribution.
+
+## RC5-10 exact current-pair gamerule persistence — 2026-10-28
+
+The exact twice-clean-built Java 25 Paperclip/Master pair passed a fresh disposable two-backend runtime check: gamerules set on either backend converged on its peer and stayed consistent after graceful backend and Master restarts. Result SHA-256 `D1077FCF4942BCFE7D1B5C20B349B95E577300DDA59AED6471BC82F77CE3B04C`; transcript SHA-256 `5A5E3ABECE7B23757C0D0922C9410D9D19189424F1FB52A9FC3CB3F09C1AE266`. All six fixture ports closed. This replaces manual class injection as runtime evidence for this subset; locator bar, player sleeping thresholds and wider command state remain untested. RC5-10 stays P1 TESTING. Details: `performance-results/rc5-gamerules-cleanpair-runtime-20261028.md`.
+
+Refreshed local blocked review bundle to v7 with the current tracker, matrix and exact-pair gamerule report. ZIP SHA-256 `0D613FB8B2EC01C106E57E387640AB1A17DB24C14B4D56496BF58F42F22EE84F`; all 25 payloads verified, unsafe-entry scan zero. Not for install/distribution.
+
+## RC5-03 exact clean-pair boat/passenger ownership runtime — 2026-10-28
+
+The exact twice-clean-built Java 25 Paperclip/Master pair passed fresh disposable mount/dismount/remount, A→B chunk ownership transfer, and post-transfer movement checks with one matching boat and pig UUID/passenger relation on both backends. Result SHA-256 `2F2EC06C1AA1BA97D7E89A03B77FDBA106A6D6ABB604C32DB86F2A197154F71F`; RCON SHA-256 `848EA6B704C532CA343C9801C7AA9E9D236D2E0638697EBA22D4F12DB6173CCF`. All six fixture ports and Java processes closed. The runner's BOMless UTF-8 arrows broke Windows PowerShell 5.1 parsing before startup; converting only those labels to ASCII fixed parsing. Client-rendered riding, restart/dimension travel, and deliberate original exception generation remain open. RC5-03 stays P1 TESTING; details: `performance-results/rc5-boat-cleanpair-runtime-20261028.md`.
+
+The blocked review archive is refreshed to v8 with the current tracker and this exact-pair boat evidence: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v8-20261028.zip`, SHA-256 `BEAEB9FF5AFA4B3F4C9C431644A4FD7EA455DA7833EA627639F87127BBB0727F`. All 26 payload hashes passed; unsafe-entry scan returned zero. Still not for installation/distribution.
+
+## RC5 Paper sender validation and monitor repeat — 2026-10-28
+
+The current Paper session-registration/inventory sources were overlaid into a copied known-good fixture with matching SHA-256s, but the clone inherited Paperweight cache Git pointers to shared worktree metadata. Java 25 / Gradle 9.8 `applyAllPatches` failed at `filterPaperApiFromPaper` with `RepositoryNotFoundException`; **0 tests ran**. This does not verify the Paper sender path. Detailed evidence: `performance-results/rc5-session-backend-paperweight-attempt-20261028.md`; do not repeat until task-cache repos are truly isolated. Independently, the beta monitor's current 7 Python tests passed and synthetic overhead was 21.875 ms CPU per poll / 0.2188% estimated single-core at a 10 s interval; this is development-host-only, not target-PC data (`performance-results/beta-monitor-overhead-20261026.md`).
+
+Follow-up validated the failure against the original registered Paperweight fixture too. Direct `:multipaper-server:compileJava` failed before backend compile because `multipaper-api` lacked the generated Bukkit API classpath (100 errors); explicit `applyAllPatches` failed at the missing `filterPaperApiFromPaper` cache repo. **0 tests/JARs**. Earlier fixture test outputs were copied aside before current sources were overlaid. This is a repeated setup gate; reconcile the cache repository before another Paper build. Same report.
+
+## RC5-02 session-registration ordering audit — 2026-10-28
+
+Read-only source trace confirms new Master session registration happens after successful ownership grant; reconnect restores online player ownership, then re-registers session epochs after capability negotiation. Master serializes registration and any future transaction through the same per-player queue and rejects sessions from a non-owner. This is identity/fencing groundwork only: there is no Paper/Master runtime regression for negotiation/reconnect registration and InvSee++ clicks still do not invoke a cross-owner transaction. Keep remote clicks fail-closed and RC5-02 P0 BLOCKED. Tracker details: `docs/RC5_BUG_TRACKER.md`.
+
+## 2026-10-28 current-candidate villager mirror check
+
+The disposable Java 25 villager probe now accepts only recorded matched artifact pairs and was run on Paperclip `6C65DDC42663B9924566B568153AEA6EF77B63648566850C3170B392AE0CBC4F` + Master `E50B82443F1A1303258B5013DB156F9094CDAA372B043A25A0862462057233DE`. One UUID remained visible on both backends with sleeping/SLEEPING state, then awake/STANDING state and the teleported position after wake and bed removal. Runner result SHA-256 `A7D08CFC14B8B1F1E5ECC61439A235000F553456FC34D1EC750991AFE4B792E8`; RCON SHA-256 `198A4BE0AC53A54644522ABDF28783A8CAB22028B0EB21191FCC3EBBE7B0706F`. This is controlled mirror behavior only; RC5-05 remains P1 REPORTED because the spontaneous walking-while-sleeping symptom, natural AI and client rendering remain untested. Fixture listeners closed and no Java process remained. See `docs/RC5_BUG_TRACKER.md`.
+
+## RC5-02 InvSee ender-menu containment audit — 2026-10-28
+
+The exact InvSee++ 0.31.22 artifact exposes separate main and ender inventory classes under shared `SpectatorInventory`; the prior temporary remote-click gate checked only the main marker. Updated the predicate to inspect the shared parent and added ender/main remote/local/unresolved regression coverage with test API stubs matching the inspected hierarchy. The focused Java 25 inventory suite passed 9/9 (0 failures/errors/skips), XML hash `D003772E04954302471827D492B8AFD1545A37F385A4285F92FDBFC6F97300A8`. Two sequential clean Java 25 full builds then each passed 10,770 tests (0 failures/errors, 88 skipped) and all nine JARs matched; new Paperclip `DDA53FCCC3DB05E3B13A75043D53DBA6E303F1257E2E855BD85DA43EAD2A672B`, server `8BA20DAB187456600028755F7D9300A48871E7E9A930748A0646A47AFAF8683C`. Evidence: `performance-results/rc5-invsee-ender-containment-20261028.md`. This is containment only; remote edits remain disabled and RC5-02 stays P0 BLOCKED. No exact-plugin ender click runtime after this delta. Live SMP untouched.
+
+## RC5-02 Ender Chest owner-source fence attempt — 2026-10-28
+
+Added a source check in `PlayerInventoryUpdatePacket` requiring Ender Chest updates to come from the backend named as that player session's owner; added owner-match/non-owner/unknown-source and main-inventory compatibility assertions. Focused Java 25 test was attempted once, but paperweight stalled before compilation at `applyPaperMinecraftResourcePatches` while copying the generated tree into an archive. Thread dump and command evidence: `performance-results/rc5-ender-owner-fence-20261028.md`. Zero tests ran; no verification is claimed. RC5-02 remains P0 BLOCKED until the focused regression and matched two-backend runtime test pass, in addition to the unresolved main-inventory transaction/cursor conservation work. No live services/worlds were accessed.
+
+### Owner-source fence focused test follow-up — 2026-10-28
+
+Copied only the two changed Java files into the known aligned, disposable C: Paperweight fixture. The current source/test compiled and `RequestChunkPacketTestSuite` passed 15/15 (0 failures/errors/skips); `PlayerInventoryUpdatePacketTest` passed 7/7. XML SHA-256 `3A343937F7D6D42372C5528DC45E426051B46A8B457FB08FD4EA94F6C3BDEB62`, compiled packet class SHA-256 `5F415E33333C380C6F74A84D35782B2FC6EEC6510BBE460F60DE2EF47F46A8DF`. This supersedes the prior zero-test attempt but remains unit-only; matched runtime owner acceptance/rejection and overall InvSee item conservation are not verified. RC5-02 stays P0 BLOCKED. Details and excluded filter attempt: `performance-results/rc5-ender-owner-fence-20261028.md`.
+
+## RC5-02 click-to-owner source trace — 2026-10-28
+
+Current InvSee source sends a target mirror's per-slot before/after image but no editor/session, click/window ID, cursor state or transaction ID. The authoritative target owner can reject/resync a stale target slot but cannot reverse the editor's already-mutated cursor/inventory. This matches the exact-RC4 16→32 protocol-valid reproduction and stock Paper 16-item control. Report: `performance-results/rc5-invsee-editor-provenance-source-trace-20261028.md`. No code change; 0153 remains temporary containment, journal is not wired, RC5-02 remains P0 BLOCKED.
+
+## RC5-02 journal crash-cut regression — 2026-10-28
+
+Added a Master-local crash-cut matrix for `PlayerDataTransactionManager`: all 20 cut points after participant writes for 2–6 player snapshots roll forward to a complete batch on the next read. A seeded concurrency regression also ran 128 overlapping two-player commits across eight workers and verified the final pair was not mixed. Added `PlayerDataOperationQueue.submitAll` plus a two-owner ordering test. The full Java 25 Master module passed 67/67 tests (0 failures/errors/skips across 10 suites) in two sequential clean no-build-cache runs; shaded JARs matched at 19,194,359 bytes, SHA-256 `6BB6D8043EDF9D13DA1BB14C87AFA5C80A32B2149B593B64081B522E6EA10F8D`. This does not wire the transaction to InvSee or prove cross-backend item conservation; RC5-02 remains P0 BLOCKED. Details: `performance-results/rc5-playerdata-transaction-crash-cuts-20261028.md`; source of truth: `docs/RC5_BUG_TRACKER.md`.
+
+## Current-source isolated Paper build gate — 2026-10-28
+
+Recreated a clean C: worktree at `d1346b445`, overlaid current Paper source/test/patch inputs, cloned the exact nested Paper/Purpur commits, and seeded the task-cache repositories/remotes. The Java 25 focused `MultiPaperChunkHandlerTestSuite` run reached `applyPurpurMinecraftSourcePatches` then failed with 220/526 hunks unapplied; 0 tests ran. A second clean-source run with corrected local remote topology reproduced it. This is a patch-base gate, not an assertion failure; do not keep retrying until the Purpur/Mache source and cache refs are reconciled against the known passing clean-build provenance. Full details: `performance-results/rc5-paperweight-clean-worktree-attempt-20261028.md`; RC5-01 stays P0 TESTING.
+
+## Current-worktree Master rerun — 2026-10-28
+
+Forced an uncached Java 25 execution of the Master module: **64 tests passed, 0 failures/errors/skips across 10 suites**. A prior uncached attempt had a single graceful-restart subprocess startup timeout (63/64); the focused restart test then passed 1/1 and the full rerun passed all tests. Treat the first result as a transient, unexplained failure, not erased history. Current shaded Master JAR remains 19,193,294 bytes, SHA-256 `30FAAD9B806E00BE3DA061A0FF1853655F4964238B398146BEA4E86596D43439`. This covers Master only; Paper unload lifecycle tests remain unrun and RC5-01 stays P0 TESTING. Details: `performance-results/rc5-master-full-rerun-20261028.md`; tracker: `docs/RC5_BUG_TRACKER.md`.
+
+## RC5 current-worktree verification — 2026-10-28
+
+Re-ran the Master ownership integration class on Temurin 25.0.3+9 / Gradle 9.8 against current source: 32/32 tests passed, 0 failures/errors/skips, including stale former-owner chest writes, ownerless-gap fencing and pending-read barriers. Shaded Master JAR SHA-256 remains `30FAAD9B806E00BE3DA061A0FF1853655F4964238B398146BEA4E86596D43439`. This is not Paper unload lifecycle or full-project verification; RC5-01 remains P0 `TESTING`, InvSee++ RC5-02 remains P0 `BLOCKED`. Details: `performance-results/rc5-master-integration-rerun-20261028.md`; tracker: `docs/RC5_BUG_TRACKER.md`.
+
+The focused Paper `MultiPaperChunkHandlerTestSuite` attempt with both generated checkout tasks excluded still stalled in Paperweight `applyPaperMinecraftResourcePatches`: after five minutes the worker was in native `FileDispatcherImpl.write0` during `Files.write`, before any test class or JUnit result. Stopped only its single-use Gradle daemon/launcher. **No Paper test result**; RC5-01 remains P0 `TESTING`. Details: `performance-results/rc5-chunk-handler-test-attempt-20261028.md`.
+
+## RC5 chest final-unsubscribe fence follow-up — 2026-10-28
+
+Source review found that final unsubscribe removed the previous-owner write tombstone, permitting a connected former backend's delayed region snapshot to be accepted as bootstrap. Master now retains the actual prior-owner fence until that connection disconnects, while first-ever unowned writes remain supported. The exact stale chest regression and unowned bootstrap control passed. After final owner-attribution changes, two sequential Java 25 clean Master-module runs passed 70/70 each; two shaded JARs matched at SHA-256 `2BE4B169A570543A5AFBCC7B80767336F27ACE8AFAD74EAF5E855853CD3D35DE`. Details: `performance-results/rc5-ownerless-last-unsubscribe-fence-20261028.md`. RC5-01 remains P0 `TESTING`: this is Master-only coverage, not Paper/Moonrise lifecycle verification, and the live chest incident remains unattributed. InvSee remains the P0 release blocker.
+
+### 2026-10-28 Crafty1-scale Master fallback stress
+
+The exact clean-built current RC5 pair (Paperclip `6C65DDC42663B9924566B568153AEA6EF77B63648566850C3170B392AE0CBC4F`, Master `E50B82443F1A1303258B5013DB156F9094CDAA372B043A25A0862462057233DE`) passed a disposable 273-request no-holder `ForceReadChunk` stress test against populated single/double chests. All reads waited behind the pending Master save barrier and returned the exact NBT; contents persisted through chunk load, backend restart and graceful Master restart. All six fixture ports closed. The first harness attempt hit its incorrectly sized readiness latch before issuing the burst; corrected runner/plugin and failed attempt are retained. Full hashes and limits: `performance-results/rc5-crafty1-273-noholder-read-stress-20261028.md`. This reproduces the warning-scale read volume but does not change ownership during stress or attribute the live loss; RC5-01 remains P0 TESTING.
+
+### 2026-10-28 fresh Paper test-fixture audit
+
+A later pristine C: fixture `:multipaper-server:test` invocation reached `compileJava` without Paperweight-generated project build files, Minecraft sources, or dependency classpath; **0 tests ran**. Its task graph omitted source setup/patch tasks. This is an invalid test setup, distinct from the earlier actual `applyPurpurMinecraftSourcePatches` failure (220/526 hunks unapplied). Do not repeat direct `test` in a pristine fixture. Reconcile patch setup against known passing clean-build provenance first. Evidence: `performance-results/rc5-paperweight-fresh-fixture-unprepared-test-20261028.md`; issue source of truth: `docs/RC5_BUG_TRACKER.md`.
+
+A second variant skipping only the Paper resource patch also stopped before tests, this time in `runPurpurSetup`'s JGit `AddCommand` / `FileTreeIterator` access to the generated checkout. Both attempts produced zero test results. No further identical Paperweight retries until the generated-tree IO issue changes. Manual Crafty installation/rollback instructions are now in `docs/RC5_MANUAL_UPDATE_PLAN.md`; this is not authorization to deploy the current blocked RC5 candidate.
+
+## RC5 continuation — 2026-10-27
+
+The authoritative issue list and status are in [`docs/RC5_BUG_TRACKER.md`](docs/RC5_BUG_TRACKER.md); read it before resuming. A focused isolated runtime check now passes boat/pig spawn, mount relation, matching UUID and one-entity counts on both backends, plus peer-observed boat movement. Exact artifact/log hashes and remaining lifecycle limits are in `performance-results/rc5-boat-passenger-runtime-20261027.md`. RC5-03 remains `TESTING`; no live SMP access. The P0 chest and InvSee++ blockers remain open.
+
+### 2026-10-28 playerdata socket-close ordering
+
+Master now captures player-save ownership at ordered message receipt so `channelInactive` cannot invalidate an already-received asynchronous save; explicit disconnects are marked before queued ownership removal. A deterministic queue-blocked socket-close regression, full `MasterIntegrationTest` 32/32, and complete packaged Master module 64/64 across 10 suites pass on Java 25. Two sequential clean shaded Master builds (second with build cache disabled) match at 19,193,294 bytes and SHA-256 `30FAAD9B806E00BE3DA061A0FF1853655F4964238B398146BEA4E86596D43439`. Paper server/full-project tests remain outstanding. See `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-master-module-builds-20261028.md`; this is not an InvSee++ conservation fix, and RC5-02 remains blocked.
+
+### 2026-10-28 Crafty1 no-holder reads
+
+New read-only input `C:\Users\elibo\Downloads\latest.log` (SHA-256 `920B665985CB2066D2199F0A6795C438D268FEADE91E8BE1246EAEA00CCA25D1`) contains 273 no-holder region-read warnings. Source trace shows this exceptional path uses `ForceReadChunkMessage` to fetch Master region data under the Master chunk lock; it is not a backend-local storage bypass. It does not establish data freshness or prove chest conservation. Same log confirms 119 movement, 8 UUID collision, 13 premature entity NBT, 10 removal-routing, and 3 stale inventory replacement warnings. Exact count notes and missing isolated chest regression: `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`. Tracker `docs/RC5_BUG_TRACKER.md` updated; RC5-01 remains P0 `TESTING`, and no live service/world was accessed.
+
+A follow-up disposable plugin asserted a loaded world with null holder at chunk (32,32), then passed four concurrent `readRegionFileNBT` reads through `forceReadChunk`/Master with exact single/double chest stacks (32 diamonds, 17 emeralds, 23 gold ingots), followed by chunk load, graceful Backend B restart and Master restart with a fresh Backend B read. A 21:09 follow-up sent the production `WillSaveChunkLaterMessage`, launched four concurrent null-holder reads, asserted all were still pending, then wrote the exact captured NBT snapshot. All reads completed after Master persisted it, and exact single/double chest contents survived chunk load, Backend B restart, Master restart and a fresh Backend B read. Five target warnings occurred (baseline plus four readers). Master exited gracefully; six fixture ports/processes closed. Delayed stale-owner/new-owner write ordering and ownership handoff during the race remain open; RC5-01 stays `TESTING`. RESULT SHA-256 `3C20B52DF77BDE9AF3AE48683ED7075795E7733F33CC46F2B62318F74D996D7E`: `D:\multipaper-tests\system-temp\rc5-noholder-chest-20261027-203932\fallback-probe-20261027-210906`; hashes/details in tracker/report.
+
+### 2026-10-28 Master stale-owner chest-write regression
+
+The Master integration test reproduced the delayed former-owner write: after B acquired ownership and persisted 17 diamond items in a chest, Master accepted A's late 32-item snapshot and would overwrite it. `ChunkSubscriptionManager` now serializes region-write authorization/enqueue with per-chunk ownership; stale non-owner writes are rejected and their pending-save read barrier is released, while unowned bootstrap writes remain supported. The integration suite passed **31/31** and the complete Master module passed **58/58** tests, 0 failures/errors/skips on Java 25. Two clean Master-module builds produced byte-identical JAR SHA-256 `6C7A05021D9C55E9891ABCC8F2FBF2124C984F727DAADFE9A6CFDD156CD705F7`. The test asserts exact compressed chest NBT and retained item count. This is a Master protocol regression, not yet an actual Paper two-backend chest handoff plus repeated-restart run. It does not identify the live incident cause. RC5-01 stays P0 `TESTING`; details in `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`. Full-project clean builds remain pending: Paperweight `applyAllPatches` stalled in Windows JGit `FileDescriptor.close0` while updating only the disposable generated Paper checkout; that disposable task was stopped after confirming no other task was progressing.
+
+### 2026-10-28 fenced-Master chest runtime follow-up
+
+Fresh disposable two-backend fixture `D:\multipaper-tests\system-temp\rc5-chest-master-fence-20261028-rc5evidence` passed exact chest checks using Paperclip `296F6DE5E3A4B9193BE1C7E825971B2EAC2F4334C7BE0464A2022D2E928288F0` and fenced Master `6C7A05021D9C55E9891ABCC8F2FBF2124C984F727DAADFE9A6CFDD156CD705F7`. Diamond x32 persisted through Backend B handoff/restart and Master restart; the double chest retained emerald x17 and gold x23 after Master restart. Result SHA-256 `DD2A923FF4B3878F7639D93FE5D87BA627A3C7E1286A1242634116E7AB6B3F51`. The run did not observe the no-holder branch (zero warnings); direct branch coverage is the separate forced-null-holder probe already documented. Graceful shutdown completed and all fixture ports closed. This still does not inject the stale former-owner write into the real Paper handoff path; tracker remains P0 `TESTING`.
+
+### 2026-10-28 end-to-end stale-owner chest-write regression
+
+Extended the disposable two-backend runner with a Java 25 plugin that captures actual Master-backed chest chunk NBT on backend A, unloads A's chunk, saves a newer 17-diamond chest on owner B, then injects A's stale snapshot through production `MultiPaper.writeRegionFileNBT`. Old Master `E122A819950C50FF504CDC6600D6E5C4970CD9D25F45AC19ED974F9D194134B7` accepted it; after only disposable B was force-stopped and restarted, it loaded 32 stale diamonds, which remained after Master restart. Baseline result SHA-256 `014D68FF3E1C60DD4DB2D80E6B8298C05F9F042B260F246B9260F1ACA471DF95`.
+
+With fenced Master `6C7A05021D9C55E9891ABCC8F2FBF2124C984F727DAADFE9A6CFDD156CD705F7`, the same stale write was rejected; B retained 17 diamonds through graceful restart and Master restart, and double-chest emerald x17 / gold x23 remained intact. Candidate result SHA-256 `542670590C0FBB68D270D42E4BDC6412D302FF201D265CB2675280182BEAA985`. Both used Paperclip `296F6DE5E3A4B9193BE1C7E825971B2EAC2F4334C7BE0464A2022D2E928288F0`; listeners closed. Neither run observed the no-holder branch. This verifies the stale-owner race fix in a runtime Paper/Master path, but RC5-01 remains P0 `TESTING` pending repeated/inverse ordering, no-holder plus stale-write interleavings, and attribution of the live incident.
+
+Copied only the old disposable synthetic fixture into `D:\multipaper-tests\system-temp\rc5-noholder-chest-fenced-20261028`, replaced the copy's Master JAR with the fenced candidate, and reran the direct forced-null-holder/pending-save probe. Four production fallback reads waited behind an announced Master save and returned exact single/double chest stacks; contents survived chunk load, Backend B restart, and Master restart. Five target warnings were observed; all listeners closed and Master stopped gracefully. Result SHA-256 `0B71E7FDBD3B841D26DB55ED9285EAE67466D88402C3A86DF832A217B2BB03BF`. This still does not race a stale former-owner write during the no-holder read. RC5-01 remains `TESTING`; exact details in tracker and fallback report.
+
 This is the concise durable handoff. Preserve all existing dirty and untracked workspace content. Detailed chronology is retained in `RELEASE_CHECKPOINT.md` and the prior handoff in `PROJECT_CHECKPOINT_HISTORY_20261025.md`.
 
 ## 2026-10-27 RC5 continuation
+
+- Latest supplied real-backend evidence is analyzed in `performance-results/rc5-real-backend-log-analysis-20261027.md`. Crafty2 `1latest.log` has 18 Boat→Mob cast failures (14:59:38–15:20:29), 65 unloaded-entity-NBT warnings, 9 duplicate UUID attempts, 26 removal-to-owner route failures, 489 invalid-entity skips, and two brushable-block NBT/state mismatches. Crafty1 `2latest.log` has 13 unloaded-entity-NBT warnings, five invalid-entity skips, and three stale InvSee replacement guards between Crafty2's two `/inventorysee wuzbeq` commands. The logs contain no chest-specific error or NBT evidence; they do not classify live empty chests. Both logs' exact hashes and the no-chat review scope are in the report.
+- A non-Mob entity-link guard and boat/passenger/leash focused tests are present in the working tree and canonical patch. Java 25 `:multipaper-server:test --tests puregero.multipaper.MultiPaperEntitiesHandlerDependencyTestSuite` passed 3/3 (0 failures/errors/skips) in isolated C:-temp worktree `C:\Users\elibo\AppData\Local\Temp\multipaper-rc5-boatlog-20261027`; `applyAllPatches` passed first. Generated patched source matches. Boat status is `TESTING` pending runtime cross-backend boat/passenger verification. The earlier D: task stalled at Windows `FileDescriptor.close0` and was stopped; a first C: attempt failed before setup because `applyAllPatches` had not run. No other product-source fix has been made for chest persistence, concurrent InvSee, unloaded entity updates, duplicate UUIDs, or removal routing. Live Crafty servers and production worlds remain untouched.
+
+- Follow-up reproducibility gate passed: two sequential clean Java 25 / Gradle 9.8 builds in the same isolated C: worktree each passed 10,749 tests, 0 failures/errors, 88 skipped; all five JAR output hashes matched. Exact hashes and build command: `performance-results/rc5-boat-fix-reproducible-builds-20261027.md`. These RC4-named local artifacts are not an RC5 package. No cross-backend runtime boat test has run; tracker `docs/RC5_BUG_TRACKER.md` remains the status authority.
+
+- Chest code review correction: Master `ChunkLockManager` gates reads while writes are pending; it does not serialize/reject writes. `WriteChunkHandler` does not check current chunk ownership, while `RegionFileCache` queues writes per region. A stale snapshot overwrite is plausible but not proven; no chest patch was made. Full note is in `performance-results/rc5-critical-chest-persistence-repro-20261027.md` and the RC5 tracker.
+
+- InvSee protocol-valid repeat: two cross-owner clients picked up the same target stack with correct 26.3 hashed-slot predictions. After closing both views, disconnect, save, and graceful backend stop, Master-backed NBT held 16 diamonds on each editor and zero on the target. Backend B logged one stale replacement rejection. Exact hashes and NBT evidence: `performance-results/rc5-invsee-protocol-valid-concurrency-20261027.md`. The earlier empty-prediction run is retained but caveated. Source currently rejects the stale target replacement and resyncs only that target slot, leaving the originating editor transaction/cursor uncorrected; this is a strong root-cause lead, not a fix. Keep RC5-02 P0 until a regression and source correction pass.
 
 - New RC5 blocker reproduced in a disposable exact-RC4 pair: after the paired chunk `(1000,1000)` unload sequence, Master-backed NBT no longer contained the single/double chest block entities' item lists; querying after a backend restart returned empty `Items`. Single-backend unload/reload and a separate 41-diamond chest through a B-only restart passed. Root ordering/source not yet proven, no fix was made, and the live report is not classified. Mona visibility remains untested in an exact-candidate controlled run. Treat both chest loss and player visibility as RC5 blockers alongside simultaneous cross-owner InvSee++ duplication. Details: `performance-results/rc5-critical-chest-persistence-repro-20261027.md`.
 - One follow-up RCON query implementation initially parsed the valid short authentication reply as malformed; corrected query then verified the post-B-restart chest results. B and A received clean stops after saving, no listener remained on ports 33251–33262, and no disposable fixture process remained. All fixture worlds/logs were retained. No source, live world, release binary, or release artifact changed in this investigation.
@@ -62,3 +211,467 @@ Completed durable scheduled-tick handoff and entity synchronization must not be 
 7. Do not access Crafty or production, publish stable/public beta, change RC3 assets, or repeat completed investigations. No human-test request is pending.
 
 The main worktree is already dirty with prior source, scripts, reports, fixtures, and staging; preserve all of it. `PROJECT_CHECKPOINT_HISTORY_20261025.md` is the preserved earlier summary. The older source/artifact streams in `RELEASE_CHECKPOINT.md` are historical and must not be conflated with these current-tip hashes.
+
+### RC5 continuation — Master persistence test scope (2026-10-27)
+
+- Temurin 25.0.3.9 isolated focused Master test run passed 14/14 for `ContainerTransactionManagerTest` and `MasterProcessRestartPersistenceTest`; details in `docs/RC5_BUG_TRACKER.md` and `OVERNIGHT_HANDOFF.md`.
+- The tests validate the existing WAL/restart baseline, not the paired single/double chest NBT loss. `WriteChunkMessage` lacks an owner generation and fixture logs do not identify the final per-chunk writer. Keep the root cause open; no storage patch was made.
+
+## Update — 2026-10-27 — reusable InvSee concurrency probe
+
+- `scripts/Probe-InvSeeConcurrent.js` now preserves the valid dual-view pickup flow as parameterized test tooling. Syntax and dependency/argument validation pass; no server integration was run in this turn. Procedure and hash: `performance-results/rc5-invsee-protocol-valid-concurrency-20261027.md`. It does not verify a fix; RC5-02 remains an open P0 blocker. Consult `docs/RC5_BUG_TRACKER.md` before continuing.
+
+## Update — 2026-10-27 — fresh concurrent InvSee reproduction
+
+- The repository probe was fixed to dispatch both captured valid pickup packets in one event-loop turn after its first run proved sequential. Corrected runner reproduced exact-RC4 saved item duplication on a fresh disposable world: target 0, each editor 16 diamonds, aggregate 16→32. Evidence and SHA-256: `performance-results/rc5-invsee-protocol-valid-concurrency-20261027.md`.
+- No product source fix yet. RC5-02 remains an open P0 blocker. Disposable clients, backends, Master and ports have exited/closed; live SMP remains untouched. Continue from `docs/RC5_BUG_TRACKER.md`.
+
+## Update — 2026-10-27 — chest unload ordering candidate
+
+- This update supersedes older checkpoint lines saying the chest cause was unproven/no patch. Instrumented disposable tracing confirmed MultiPaper serialized an already-unloaded chunk after Paper's durable async save, and Master accepted that empty block-entity snapshot over the image containing 32 diamonds. Candidate waits for the completed chunk-write future before releasing the Master lock/unsubscribing; failed writes retain the lock.
+- Isolated Java 25 tests: chunk-handler focused suite 4/4. Two subsequent clean full builds each passed 188 suites / 10,748 tests / 0 failures / 0 errors / 88 skipped; Paperclip/bundler/server/Master artifact hashes matched. Post-fix runtime candidate retained a 32-diamond single chest through unload and two restart cycles, with both backend reads and Master NBT agreeing. Exact evidence and scoped limitations: `performance-results/rc5-critical-chest-persistence-repro-20261027.md` and `docs/RC5_BUG_TRACKER.md`.
+- RC5-01 remains `TESTING`/P0: double chest, inverse owner order and delayed concurrent-save runtime cases remain open, and the real players' chest reports have not been inspected/classified. RC5-02 InvSee duplication is still reproduced and unfixed. No RC5 package/release is ready; no live service/world was accessed or modified.
+
+## Update — 2026-10-28 — InvSee stock Paper differential
+
+- Fresh loopback-only stock Paper 26.3 build 227 control, same InvSee++ 0.31.22 hash as exact RC4 runs. Two synthetic viewers saw the same target 16-diamond slot and sent client-valid same-turn pickup packets. After close and graceful shutdown, stock Paper NBT totaled 16 (target 0, viewer A 16, viewer B 0); the exact-RC4 MultiPaper cross-backend run totals 32. This supports a MultiPaper cross-backend path defect for this scenario, but isn't a human-client or broad plugin certification.
+- Exact API build/JAR/plugin/probe/playerdata/log hashes and shutdown caveat: `performance-results/rc5-invsee-stock-paper-control-20261028.md`. Fixture Paper stopped gracefully; 33553/33561 closed. No source fix was made. RC5-02 remains P0 reproduced and unfixed; continue from `docs/RC5_BUG_TRACKER.md`.
+
+## Update — 2026-10-27 — combined no-holder / stale-owner chest race
+
+- Extended the disposable two-backend chest runner to force four null-holder Master reads to overlap former-owner A's delayed 32-diamond snapshot after B saved 17. Old Master E122... accepted it; all reads returned 32 and persisted state remained 32 after disposable B crash/restart and Master restart. Fenced Master 6C7... rejected it; all reads returned 17 and that exact state survived graceful B/Master restarts. Both double-chest stacks persisted.
+- Candidate result SHA-256 `50A662801D41482571F00E81E7F2C833059D4ED3DC28E4A6AA2E925D1805F2E3`; baseline `C01418E57DB11D65FB6E3A2E369D72B7602B2DBD4AA6544F813926905BB140B5`. Four target no-holder warnings appeared in each run; all fixture ports/processes closed. Full trace in `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`.
+- RC5-01 remains P0 `TESTING`; inverse/repeated schedules and real-incident attribution remain open. No live environment was accessed.
+
+## Update — 2026-10-27 — reverse-order fenced chest regression
+
+- Reran the combined no-holder/stale-owner integration with Backend B as the old owner and Backend A as the new owner. The delayed stale x32 write was rejected while four fallback reads were in flight; all reads observed x17 and exact single/double chest stacks persisted through graceful Backend A and Master restarts.
+- Result SHA-256 `31255B61C022A2C7CDD2DD6A0ED0AD4B8C4656F608CE44943C4D43F800E42068`; runner SHA-256 `CA9E5B127112F6B2B37D962C711F4A115B55796005104422C49440B392763C02`; all fixture ports/processes closed. Full hashes and limitations are in `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`.
+- RC5-01 remains P0 `TESTING`; repeated schedules, old-Master reverse-order control, and live incident attribution are still open.
+
+## Update — 2026-10-27 — reversed old-Master chest control
+
+- Reverse-order old Master reproduced the stale overwrite: B as former owner submitted x32 after A saved x17; all four null-holder reads returned x32, and it persisted after disposable A crash/restart plus graceful Master restart. The double chest remained emerald x17 / gold x23.
+- Result SHA-256 `A1E7D3935F7D31123FB62A6EC145725AC1161192839A3E8EE9AE4A34078C01A8`. Both owner orders now have old-Master and fenced-Master coverage. Repeated timing schedules and live incident attribution remain open; RC5-01 stays P0 `TESTING`.
+
+## Update — 2026-10-28 — repeated RC5 chest race schedules
+
+- Read the active full objective and current checkpoint/tracker files. The objective attachment is stored as `C:\Users\elibo\.codex\attachments\4a487b74-593f-45bf-a659-5233edb2d0c5\goal-objective.md` (directory name ends in `...b2d0c5`, without an extra trailing `d`).
+- Added bounded timing parameters to the disposable chest stale-writer harness. Three fresh Java 25 candidate fixtures at 0/0 ms, 150/50 ms and 500/1000 ms save-barrier/read-to-stale-write delays each passed: four no-holder Master reads agreed on 17 diamonds, the stale former-owner 32-diamond write was rejected, and single/double chest stacks remained exact after backend and graceful Master restarts. Result hashes: `B79F1E835977C6963D000D55CFBDCD3B922D61ABCC062F3137162F1E2603490E`, `A440FAB8B76F740D335E6A79143AA0378191630FFE832D009BA3349A787E6506`, `3DB5606E8BCC5D15FEE91F4F1E5C9A4FCFF2EF06708553B6BAFAB8DC142264FB`. All six listeners closed after each run. Details in the tracker and `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`.
+- RC5-01 remains P0 `TESTING`: these repetitions cover one ownership direction and do not close the exact-RC4 empty post-unload serialization failure across all required lifecycle schedules or attribute live reports. Next prioritize RC5-02 InvSee++ item conservation, still reproduced and unfixed.
+
+## Update — 2026-10-28 — InvSee++ containment candidate
+
+A temporary unverified gate now rejects clicks in menus detected as backed by remote `ExternalPlayer` inventory slots and sends a menu resync. It has a canonical server patch and one unit test for owner classification only. It blocks cross-backend InvSee editing and is not the required vanilla-parity fix. RC5-02 is `FIX IN PROGRESS` / P0; exact-RC4 duplication and the stock-Paper 16-item control remain authoritative. No build or runtime validation was run. Continue with owner-validated transactions, capability negotiation, conditional rollback and durable save/restart conservation before closing this blocker. Full source trace: `performance-results/rc5-invsee-transaction-identity-source-trace-20261027.md`.
+
+
+### 2026-10-28 Reverse-order chunk-load stall
+
+A new disposable reverse-order candidate fixture `D:\multipaper-tests\system-temp\rc5-chest-reverse-handoff-diagnostic-20261028` stalled before seeding: `/forceload add 512 512` blocked in synchronous chunk load; watchdog recorded chunk `(32,32)` stuck at `structure_starts`/`INACCESSIBLE` with no generation task. No chest assertions or `RESULT.txt` were produced. This is a separate unresolved chunk-progress finding, not chest corruption evidence; an earlier reverse-order run passed. Evidence and backend-B log hash `C61E10B9F212AA439718CBC8CFE6D67B58F660B7798B83B1998557922911F438` are in `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`. Fixture processes stopped, six ports closed. RC5-01 remains P0 `TESTING`; no live SMP was accessed.
+### 2026-10-28 additional chest timing attempt
+
+A new isolated fenced-Master timing schedule (50 ms warmup / 450 ms stale-write delay) stalled before chest seeding after 184.188 seconds of fresh dimension generation. It produced no RCON transcript or result assertions. The disposable Master waited on async tasks after the runner was interrupted; all six ports are now closed and no fixture Java process remains. Treat as incomplete only. Report and retained log hashes: `performance-results/rc5-chest-fenced-timing-attempt-20261028.md`. To avoid repeating this startup stall, prepare a reusable synthetic-world template for later schedules. RC5-01 remains P0 `TESTING`; no live server/world access.
+## 2026-10-28 beta monitor recheck
+
+The current Python monitor suite passed 6/6 under CPython 3.11.6. The repeated synthetic 200-poll workload measured 16.25 ms CPU per poll, 0.1625% estimated one-core use at 10-second polling, and peak RSS 23,412,736 bytes with RCON disabled. This remains a local synthetic Windows measurement; deployed Debian/Crafty overhead is unverified. See performance-results/beta-monitor-overhead-20261026.md.
+### 2026-10-28 prepared-world reverse-owner chest regression
+
+Added an opt-in prepared synthetic world source to the disposable runner to avoid repeated empty-world generation. A fresh copied fixture passed the combined null-holder/four-reader/stale-write race in the reverse ownership direction: B former owner, A new owner, x17 persisted, stale x32 rejected, single/double chest exact after backend and Master restart. Result hash AD07E36A6C3514F9CABAED8C00012E757B64F0B6295D0C581FD7A65E162E8912. Full evidence: performance-results/rc5-chest-fenced-reverse-timing-20261028.md. RC5-01 remains P0 TESTING; no live data or service accessed.
+
+## Update — 2026-10-28 — fenced chest race schedule 4
+
+Disposable prepared-world A→B schedule (1,000 ms save-barrier warmup / 0 ms read-to-write delay) passed: `holder=null`, four concurrent reads x17, stale x32 rejected, and single/double chest counts exact after Backend B and Master restarts. Result hash `6493B3E86E837BA4D9243CAD088CD9DDE6B47D2CA8B218361C3AB738A0D3C7D8`; details and all evidence hashes in the RC5 tracker. The fixture-copy helper was optimized and parser-checked. RC5-01 remains P0 TESTING; source incident remains unknown. No live environment was touched.
+
+## Authoritative RC5 issue state — 2026-10-28
+
+Use `docs/RC5_BUG_TRACKER.md` as the current status source. RC5-02 InvSee++ is **P0 BLOCKED**, not merely FIX IN PROGRESS: exact-RC4 simultaneous clicks duplicate 16→32, the temporary remote-click gate is unverified and breaks remote editing, and no owner-validated durable transaction exists. RC5-01 chest persistence is **P0 TESTING** after four successful A→B race schedules plus reverse-order coverage; broad unload lifecycle and attribution of live player loss remain open. No RC5 artifact/release is ready.
+
+## Update — 2026-10-28 — reverse chest timing schedule 5
+
+The 1,000/0 ms fenced-Master null-holder/stale-write schedule also passed in reverse B→A ownership: four reads x17, stale x32 rejected, and exact single/double chest contents persisted through Backend A and graceful Master restart. Result hash `647B84BFA8089AC55C03AA85CDF47E9BD9D9554EC5FE05B267D400651770E014`. This complements schedule 4; RC5-01 remains P0 TESTING pending broader unload/save lifecycle and real incident attribution. Fixture ports closed; no live processes/worlds accessed.
+
+## Update — 2026-10-28 — exact chest NBT regression
+
+The prepared A→B chest runner now compares complete `Items` lists exactly at seed, after actual ticket removal/unload and handoff, after stale-write rejection, backend restart, and graceful Master restart. The 500/1000 ms run passed; four no-holder reads returned exact x17, stale x32 was rejected, and both double-chest stacks remained exact. RESULT SHA-256 `C8077C7DECC35351D234516D1480C442E3753969A2206ACA1C8376D4F0FC83F3`. RC5-01 remains P0 TESTING; live reports remain unattributed.
+
+### 2026-10-28 InvSee transaction continuation
+
+The exact-RC4 protocol-valid two-viewer pickup still reproduces 16→32 persisted items; stock Paper control retains 16. A brief Hello capability-bit edit was withdrawn before testing because it advertised transaction support without a transaction protocol or fail-closed packet sender. No Hello wire change remains. The only Gradle task started for that bitmask test stalled at Paperweight's generated `server-work\paper\src\minecraft\resources` Git reset; after confirming the exact generated-tree cwd, the owned test task was stopped. It produced no test result. RC5-02 remains P0 BLOCKED, not fixed; the click-denial patch is unverified and reduces functionality. Continue the full owner-validated transaction design and persistence boundary, or take another independent RC5 issue while preserving the fail-closed gate.
+
+### 2026-10-28 current-worktree Master regression rerun
+
+Forced execution of `:multipaper-master:test --rerun-tasks` on Temurin Java 25.0.3.9 / Gradle 9.8 passed 58 tests across 8 suites, 0 failures/errors/skips. The Master shadow JAR hash remained `6C7A05021D9C55E9891ABCC8F2FBF2124C984F727DAADFE9A6CFDD156CD705F7` (19,181,802 bytes). This rechecks the stale-owner fence and Master persistence tests; full Paper build gates and live incident attribution remain open. See `docs/RC5_BUG_TRACKER.md`.
+
+### 2026-10-28 focused Paperweight server-test state
+
+A main-worktree Java 25 focused server-test attempt initially encountered a stale zero-byte index lock from the prior interrupted task in Paperweight's generated resources checkout; preserved/renamed it after confirming no active Git mutation, then reset only that clean generated checkout to its recorded `upstream/main` commit. A second attempt advanced through reset, then stalled for about two minutes inside Windows `CreateFile0` while DiffPatch read a file. I captured `%TEMP%\rc5-paperweight-jstack-current.txt` (SHA-256 `ACCE256809B45ADD05B91C47F30DBB86A062E84C73523872D0ABB4206F989368`) and stopped only the owned build task. It ran no server tests.
+
+The same six source/test files exactly match the already-tested C: isolated worktree by SHA-256; its existing JUnit XML has 9 passes (chunk 4, entity dependency 3, gamerule 2), no failures/errors/skips. This is reused evidence, not a fresh D: test. The Master forced rerun passed 58/58. See the tracker; next full server rebuild should use the established isolated C: route, not repeat the current D: file-read stall.
+
+### 2026-10-28 RC5 inventory containment patch and isolated build state
+
+The temporary cross-backend remote-player click gate now exists in persistent patch `patches/server/0153-Fail-closed-on-remote-player-inventory-clicks.patch`, not only generated Java. Its handler hunk was checked against the reconstructed `0024` base and the complete patch parses. SHA-256 `3A908FD16A6C658C6911B2626A936A60CC1746BD478C85C63385F4776CD444DF`. It still blocks InvSee editing and is not a fix; no runtime verification ran. `RC5-02` remains P0 BLOCKED.
+
+The isolated Java 25 `applyAllPatches` retry in `D:\multipaper-tests\rc5-focused-shared-clone-20261028` again stalled in Paperweight DiffPatch at `:purpur:applyPurpurPaperApiFilePatches` (`Files.write` / `FileDescriptor.close0`). Dump and hash are in the tracker. Only that clone task was interrupted; no tests ran, its root remains `d1346b445`, and main D: HEAD stayed `d1346b445`. Avoid repeating this same environment path. RC5 remains unpublished and full Paper builds are still a release gate.
+
+### 2026-10-28 isolated rerun safety note
+
+A forced focused rerun in the established C: worktree stopped before tests at `checkoutPurpurRepo` (`git checkout -f FETCH_HEAD`, exit 1). Inspection shows the nested Paperweight `upstreams/purpur` path resolves to the whole C: source worktree, so avoid forcing this task until its path is isolated; stderr did not reveal the exact rejection reason. The failed checkout moved the isolated C: worktree HEAD to `004981010` and removed its tracked MultiPaper source files; old test XML/logs remain in untracked build output, and reflog retains `d1346b445`. The authoritative D: worktree is unchanged. Do not restore/reset the C: tree or force another checkout. Its 9/9 results are historical matching-source evidence only; full clean builds remain open. See tracker.
+
+## RC5-01 isolated Master fence regression — 2026-10-28
+
+A fresh disposable Java 25.0.3+9 / Gradle 9.8 run in `D:\multipaper-tests\rc5-master-fence-clean-20261028` passed `:multipaper-master:test --rerun-tasks --no-daemon --console=plain`: 58 passed, 0 failures/errors/skips, 8 suites. The delayed former-owner snapshot regression passed. Master JAR SHA-256: `6C7A05021D9C55E9891ABCC8F2FBF2124C984F727DAADFE9A6CFDD156CD705F7`. This is module-level verification; it does not close RC5-01 or broader Paper build/release gates. The current authoritative status and full limits are in `docs/RC5_BUG_TRACKER.md`.
+
+## RC5-03 boat lifecycle runtime — 2026-10-28
+
+The isolated two-backend lifecycle runner now passes mounted pig replication, matching dismount/remount state, actual A→B chunk ownership transfer, and movement observed by new owner B plus reloaded non-owner A. Paperclip SHA-256 `D8C015EFE458CADA31113C606AB2541AF809A932ADBA514D267B55DD66B6393E`; Master `E122A819950C50FF504CDC6600D6E5C4970D9D25F45AC19ED974F9D194134B7`. No Boat→Mob cast exception appeared. This is synthetic server state, not player riding/client rendering, and does not test restart/dimension travel or deliberately invoke the original exception path. RC5-03 remains P1 TESTING. Full evidence: `performance-results/rc5-boat-passenger-runtime-20261027.md`.
+
+### 2026-10-28 InvSee cursor escrow blocker
+
+Independent read-only audit confirms the RC5-02 fix must protect the menu cursor as durable escrow. The click path reads `containerMenu.getCarried()`, but the synchronized player-file path uses `player.saveWithoutId(...)`; normal playerdata slots do not capture an in-flight cursor stack. A crash-safe ACK requires a journaled, idempotent escrow/recovery path spanning the target and editor playerdata, with forced-stop regression cuts before and after each commit/write/ACK stage. No code or test was added in this audit; RC5-02 remains P0 `BLOCKED`. See `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-invsee-transaction-identity-source-trace-20261027.md`.
+
+## RC5-05 controlled villager probe — 2026-10-28
+
+A pinned RC4 Java 25 isolated two-backend test explicitly asserted chunk ownership/subscribers, forced owner sleep, verified the non-owner mirror saw the same sleep pose, woke the villager, removed the bed, teleported it and verified both backends reported awake/standing at the new position. Result SHA-256: `0BFA28E3D2BD6AD415BFE3DB08A7866B06ACEDC53179FDD22DAB650D5465B38E`. This validates only a forced state sequence on the pinned RC4 artifact, not the natural AI/bed POI symptom, client rendering, handoff/restart or the current RC5 candidate. RC5-05 remains P1 `REPORTED`; the full test scope is in `docs/RC5_BUG_TRACKER.md` and `OVERNIGHT_HANDOFF.md`.
+
+## RC5-02 local-menu click attribution — 2026-10-28
+
+Current source trace confirms `handleContainerEvent` forwards only when `player.openContainer` is a MultiPaper remote-container session. The locally opened InvSee++ menu does not use that route; its click reaches vanilla handling and later inventory deltas are coalesced without editor/action identity. The temporary 0153 click gate runs pre-mutation but remains unverified against InvSee++ slot wrappers and disables remote editing rather than implementing parity. Durable target/editor/cursor commit and ACK/NACK work remains outstanding; RC5-02 is still P0 `BLOCKED`. See tracker.
+
+### RC5 chest unload callback follow-up — 2026-10-28
+
+Read-only source review found an unload consistency gap: if scheduled-tick persistence refused release, the callback still unsubscribed while Master retained ownership. Candidate now gates unsubscribe on confirmed ownership release and adds three focused server tests. Canonical patch draft `patches/server/0154-Fence-chunk-unload-subscription.patch` reverse-checks against the current edited source. The focused server test task stalled in Paperweight nested Git checkout before tests; no passing server test is claimed. A separate audit found the Master fence still allows ownerless writes after a prior owner, outside the existing handoff regression. RC5-01 remains P0 TESTING; details and next isolated tests: `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-chunk-unload-unsubscribe-fence-20261028.md`.
+
+The Java 25 focused Master test for `PlayerDataTransactionManager` passed 4/4 after excluding `shadowJar`. This validates only the unconnected Master journal file/replay methods, not the durable InvSee transaction or cursor escrow; RC5-02 remains P0 BLOCKED.
+
+### 2026-10-28 Master stale-owner ownerless-gap regression
+
+Java 25 full Master module run completed successfully: 63 tests, 9 suites, 0 failures/errors/skips. Added regression `delayedFormerOwnerWriteIsRejectedBeforeNextOwnerClaimsChunk`; the prior Master accepted stale x32 in the ownerless gap after B saved x17, while candidate rejects it and preserves x17. First-ever unowned bootstrap write remains supported. Shaded Master JAR SHA-256: `8C8E8BCD3B8D41282A470DCB482BBDEBEFDC65DABBFB439BCB0EE3C7557A1BB7`. This verifies Master-level ownership/storage only. Paper unload lifecycle tests remain unrun; RC5-01 is P0 TESTING and chest incident attribution remains open. See tracker and `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`.
+
+### 2026-10-28 Master former-owner playerdata write fence
+
+Added a current-owner and live-connection check to Master playerdata writes, serialized with connect/disconnect; added a regression for a delayed former-owner save after ownership transfer. Focused Java 25 MasterIntegrationTest: 32/32 passed. The change protects against one stale player-file write path, but is not an InvSee transaction fix, durable cursor escrow, full Master module verification after this change, or live RC5 validation. See `docs/RC5_BUG_TRACKER.md`.
+
+### 2026-10-28 Master module after stale playerdata write fence
+
+Full Java 25 Master module passed: 63 tests across 9 suites, 0 failures/errors/skips. Restart fixtures now register player ownership before playerdata writes. This verifies Master-level persistence and former-owner save rejection only; it does not close InvSee++ conservation or Paper server validation. See `docs/RC5_BUG_TRACKER.md`.
+
+### 2026-10-28 ordered player persistence follow-up
+
+The early disconnect ownership release in patch 0012 was removed; `PlayerList.remove` releases after its final save. Master serializes connection ownership changes and playerdata writes per UUID. The queue's focused regression and full Master module passed, 64/64 across 10 suites. The full server build/runtime ordering and InvSee++ click/cursor transaction remain open; RC5-02 stays P0 BLOCKED. See tracker.
+
+### 2026-10-28 player ownership after Master reconnect
+
+Candidate server code re-registers each online real player on Master channel reconnect so later saves pass the new owner fence. Compile and disposable reconnect/final-save runtime tests remain outstanding; this is not verified. RC5 remains blocked pending that lifecycle and the InvSee transaction.
+
+## 2026-10-28 Master transaction endpoint clean verification
+
+Two sequential clean Java 25 / Gradle 9.8 runs of the protocol and Master modules passed 74/74 tests (6 protocol, 68 Master; zero failures/errors/skips). The shaded Master outputs matched at 19,201,589 bytes and SHA-256 `2FE552687F84A597C40DB63C8DD3382058F22921C744BC7176813E1A5DE6D396`. Full details/JUnit XML: `performance-results/rc5-master-transaction-protocol-clean-builds-20261028.md`. This is Master/protocol groundwork only; no Paper/InvSee caller or live cursor/editor reconciliation exists, so RC5-02 remains P0 BLOCKED.
+
+## 2026-10-28 exact InvSee++ menu safety-gate audit
+
+Inspection of InvSee++ 0.31.22 (artifact SHA-256 `01F3E053A814F76D46513EBF65A38747DF11DF81C577D12BED108B353D7775F9`) found that its 26.3 `MainNmsInventory` is a generic `Container`, not player `Inventory`; the temporary 0153 gate missed it. The public Bukkit inventory implements `MainSpectatorInventory` and exposes the target UUID. Updated the candidate gate to detect that marker and added remote/local/ordinary/error regression cases plus canonical patch 0153. Server tests have not run because the known Paperweight patch-base failure remains; RC5-02 is P0 BLOCKED and the temporary gate is unverified. See `performance-results/rc5-invsee-plugin-26_3-gate-audit-20261028.md`.
+
+## 2026-10-28 InvSee Master endpoint trust boundary
+
+Current Master integration validates both current backend owner names and journals/replays two participant after-images; its integration test covers persistence and duplicate-ID behavior. Source audit found that the sender may still supply the remote participant's complete after-image without that owner validating its live session or target before-image. The packet also has no click identity or cursor escrow. Do not wire this endpoint directly to `PlayerInventoryUpdatePacket`; it is durable storage groundwork, not a safe cross-owner click transaction. Details and required gates: `performance-results/rc5-invsee-master-endpoint-trust-boundary-audit-20261028.md` and `docs/RC5_BUG_TRACKER.md`. Exact-RC4 16→32 remains P0 BLOCKED.
+
+### 2026-10-28 isolated Paperweight pinned-baseline retry stopped before tests
+
+Revalidated the exact isolated task handle from the previous turn (`:multipaper-server:test` in `D:\multipaper-builds\MultiPaper-26.3-final-2265a5a-20261025`) and confirmed it was still live but silent. The Java 25 dump captured after 473.67 seconds shows Gradle's file-hash cache worker in native `RandomAccessFile.writeBytes0` against that D: worktree's `.gradle\9.8.0\fileHashes`; another included-build worker was in native `FileDescriptor.close0`. Stopped only that single-use task with Ctrl+C; it exited 1 and produced no test output. Jstack SHA-256 `94F664246259232B32EC96869AD021697B8DAA6DD1F9F2DDD5037E5F6C70AD8D` at `C:\Users\elibo\AppData\Local\Temp\rc5-paperweight-pinned-baseline-jstack-20261028.txt`. This is an environment I/O stall before test execution, not a test failure or pass. Do not repeat this D: task path; use a genuinely isolated cache/worktree route and do not overlap Gradle jobs. Live SMP and worlds untouched.
+
+### 2026-10-28 Master transaction endpoint fail-closed owner check
+
+Changed `CommitPlayerDataTransactionHandler` so a sender must own every participant before its two playerdata images can be journaled. A participant owner-name claim from the other backend is not treated as consent. Added a regression proving owner A cannot commit target owner B's after-image and neither player file is written; same-owner durable commit/idempotent replay remains covered. Temurin Java 25.0.3.9 / Gradle 9.8 command: `:MultiPaper-Master:test --tests puregero.multipaper.server.MasterIntegrationTest -x shadowJar --no-daemon --max-workers=2 --console=plain --offline`; result **34 passed, 0 failures/errors/skips**. JUnit XML SHA-256 `D4BE8A52205FEC1BA5B91B3AAD3829CC2219DFD5571529FBC8E2F66CC6C82375`. A prior attempt including `shadowJar` stalled five minutes in packaging and was stopped without a result; test run excluded packaging. This closes only the endpoint's immediate trust flaw. Cross-backend InvSee still lacks owner prepare/attestation, click identity, cursor escrow, live reconciliation and crash/reconnect conservation; RC5-02 stays P0 BLOCKED.
+
+### 2026-10-28 Master transaction guard full verification
+
+After the fail-closed owner check, Temurin Java 25.0.3.9 / Gradle 9.8 full `:MultiPaper-Master:test` completed **69/69 tests across 10 suites**, zero failures/errors/skips, including all five process-restart tests. Evidence XML is retained under `performance-results/rc5-master-owner-guard-test-evidence-20261028/`. Two consecutive clean `:MultiPaper-Master:clean :MultiPaper-Master:shadowJar --no-build-cache` builds produced identical 19,201,595-byte JARs, SHA-256 `BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C`. Report: `performance-results/rc5-master-transaction-owner-guard-clean-builds-20261028.md`. This verifies Master persistence code only; RC5-02 cross-backend click/cursor conservation remains P0 BLOCKED and no Paper/release build was made.
+
+## 2026-10-28 Paperweight setup recovered; focused server tests passed
+
+Aligned only the disposable C: validation fixture's nested Paperweight caches to the retained known-good October 25 cache. `applyAllPatches` then passed with expected patch counts. Corrected a `ServerPlayer.getServer()` compile error in the temporary InvSee safety gate and canonical patch `0153` to resolve the server through `MinecraftServer.getServer()`. The corrected Java 25 / Gradle 9.8 focused server run passed **50/50 tests across 14 suites**, zero failures/errors/skips; inventory marker detection, chunk handler, boat dependency and gamerule tests are included. JUnit hashes, exact scope and limitations: `performance-results/rc5-paperweight-cache-alignment-20261028.md`. These tests do not prove InvSee item conservation, full release readiness, chest incident attribution or broad chest lifecycle coverage. RC5-02 remains P0 BLOCKED; RC5-01 remains P0 TESTING. The newly named Downloads log attachments remain unavailable; preserve the prior Crafty1 hash and do not claim fresh bytes. No live SMP access.
+
+## 2026-10-28 full isolated Paper server test suite
+
+Prepared current source compiled and `:multipaper-server:test` completed on Temurin Java 25.0.3.9 / Gradle 9.8.0 in the disposable C: fixture: **10,211 tests, 0 failures, 0 errors, 86 skipped across 141 JUnit XML files**; build successful in 12m44s. Relevant chest, inventory, entity dependency/removal/NBT, player-inventory packet and gamerule suites passed; hashes/report: `performance-results/rc5-paper-server-full-test-20261028.md`. This is not the whole project or a release build. RC5-01 remains TESTING and RC5-02 remains BLOCKED. No live SMP access and no product artifact built.
+
+## 2026-10-28 RC5 versioned clean builds and chest runtime verification
+
+Changed the project version input to `26.3-RC5`. Two sequential clean Java 25 full-project builds including `:multipaper-server:createPaperclipJar` and `:multipaper-server:createBundlerJar` passed: each parsed **10,770 tests, 0 failures/errors, 88 skipped** across API, Master, protocol, server and checkstyle; all nine produced JARs are byte-identical. Master/Paperclip hashes and complete manifest are in `performance-results/rc5-current-candidate-chest-runtime-20261028.md` and the build evidence at `%TEMP%\rc5-validation-current-upstream-20261028\repro-build-evidence\rc5-pass1` / `rc5-pass2`.
+
+Ran the exact current RC5 Paperclip/Master candidate through isolated A→B and B→A chest unload/handoff/no-holder/stale-write races. Both rejected the delayed stale 32-diamond snapshot, preserved exact 17-diamond single chest and 17-emerald/23-gold double chest through backend and graceful Master restarts, and logged four target fallback warnings. RC5-01 is now VERIFIED for those reproduced regressions; the live SMP incident remains unattributed and no recovery occurred. RC5-02 InvSee++ remains P0 BLOCKED; do not publish or install RC5. See `docs/RC5_BUG_TRACKER.md`.
+
+## 2026-10-28 RC5 status reconciliation
+
+The current-source clean Java 25 candidate has two reproducible full builds (10,770 tests each; 0 failures/errors; 88 skipped; all nine JAR outputs byte-identical). The exact Paperclip/Master pair passed isolated chest NBT unload/handoff/stale-write/backend-restart/Master-restart regressions A→B and B→A. RC5-01 is verified for those reproduced paths only; the live chest-loss incident remains unattributed. See docs/RC5_BUG_TRACKER.md and performance-results/rc5-current-candidate-chest-runtime-20261028.md.
+
+InvSee++ RC5-02 remains P0 BLOCKED: protocol-valid RC4 duplication 16→32 is reproduced; current Master transaction/journal tests and the compiled 0153 marker guard do not provide functional owner-coordinated click/cursor conservation. Do not publish/install this candidate. The blocked local evidence bundle is `release-staging/MultiPaper-26.3-RC5-blocked-not-for-install-20261028-validated.zip` (82,446,873 bytes; SHA-256 `D84643EC728477FDDB3199C55951A4669EFD148BD911DF36E58BF3970E1A837F`). Its first same-date ZIP is malformed (188 bytes) and must not be distributed.
+
+## 2026-10-28 exact InvSee plugin runtime attempt
+
+An isolated clone booted both exact RC5 backends with InvSee++ 0.31.22, but the orchestration stalled before client-probe startup. No item assertion ran; count this as incomplete only. Exact evidence and logs: `performance-results/rc5-invsee-exact-plugin-runtime-attempt-20261028.md`. Test ports closed and test Java processes exited. RC5-02 remains P0 BLOCKED.
+
+## 2026-10-28 exact InvSee click failure and active-gate fix
+
+A later exact-RC5 protocol-valid InvSee click test reproduced target loss from 16 diamonds to empty. Compiled listener inspection showed that the 0153 guard was absent from active Paperweight generated source; 0153 and old source patch 0022 were inactive inputs. Added active generated-source patch `multipaper-server/minecraft-patches/sources/0080-MultiPaper-reject-unsafe-remote-inventory-clicks.patch` and idempotent compile dependency `applyRemoteInventoryClickGatePatch` in `multipaper-server/build.gradle.kts`. Two sequential Java 25 clean full builds passed 10,770 tests each (0 failures/errors; 88 skipped) with identical nine-JAR outputs. New Paperclip SHA-256 `391D91696B8C6DBBFD1A952FABF15A5F31AA2DB5D129BC742CCC279905438349`; Master remains `BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C`. Exact InvSee++ 0.31.22 disposable runtime now rejects one remote click, shows the item-safety message, and preserves the exact 16-diamond target stack. The gate disables remote edits and is not the required transaction/cursor-conservation feature; RC5-02 remains P0 BLOCKED and the older staged ZIP is stale. Details: `performance-results/rc5-invsee-active-gate-runtime-20261028.md`; tracker: `docs/RC5_BUG_TRACKER.md`. Live SMP untouched.
+
+Reusable regression: `scripts/Test-RC5InvSeeRemoteClickGate.ps1` plus its Mineflayer protocol fixture ran a second exact-plugin pass successfully, asserting target count 16 and the client-visible denial. This checked-in runner requires a marked synthetic fixture and verifies candidate hashes; test ports closed afterward.
+
+### 2026-10-28 persistent InvSee gate patch and clean rebuilds
+
+The active remote-click safety gate is now persistent through a clean checkout: task definition and JavaCompile wiring are in tracked `multipaper-server/build.gradle.kts.patch`, and the listener hook is in tracked Minecraft source patch `0080`. In the disposable C: fixture, deleted only its ignored generated Gradle script, regenerated it from the tracked patch, and ran `applyAllPatches` successfully. Two sequential clean Java 25 full builds then passed **10,770 tests each, 0 failures/errors, 88 skipped**, and all nine JARs matched. Current Paperclip `391D91696B8C6DBBFD1A952FABF15A5F31AA2DB5D129BC742CCC279905438349`; Master `BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C`. Logs, timing and manifest: `performance-results/rc5-invsee-active-gate-runtime-20261028.md`.
+
+This verifies that the tested containment gate is included in cleanly regenerated RC5 builds. The matching exact InvSee runtime denied one protocol-valid remote click and preserved the target's 16 diamonds. It still disables cross-backend remote edits; no owner-coordinated transaction, cursor escrow, or broad click/crash matrix exists. RC5-02 remains P0 `BLOCKED`; do not publish/install. All commands ran in the marked disposable C: fixture; live services/worlds untouched.
+
+### InvSee carried-stack denial resync — 2026-10-28
+
+A disposable exact-plugin run of `scripts/Test-RC5InvSeeRemoteClickGate.ps1` now asserts the clientbound full-menu carried stack. Run `D:\multipaper-tests\system-temp\rc5-invsee-gate-runtime-20261028\rc5-gate-runtime-logs-reusable-113308` passed: state ID 19 had the original 16-diamond target slot and empty carried stack; authoritative target stayed at 16. Assertion/probe hashes and exact limitations are in `performance-results/rc5-invsee-active-gate-runtime-20261028.md`. Six fixture ports were closed and no process from the fixture remained. This verifies denial resynchronization only; cross-backend InvSee parity/cursor escrow is still a P0 blocker.
+
+### RC5-03 exact-current-candidate boat rerun — 2026-10-28
+
+The current Paperclip/Master pair passed the disposable two-backend boat lifecycle runner: one matching boat/pig, mount-dismount-remount, A→B chunk ownership transfer, and movement visible on both backends including the non-owner observer after transfer. No Boat→Mob `ClassCastException` appeared. The focused current-source entity-dependency suite passed 3/3. Logs, hashes, fixture and scope limits: `performance-results/rc5-boat-passenger-runtime-20261027.md`; issue status remains P1 `TESTING` because no player-rendered view or deliberate reproduction of the original link packet has passed.
+
+## 2026-10-28 current-input RC5 no-holder chest revalidation
+
+Against exact persistent-input RC5 Paperclip `391D91696B8C6DBBFD1A952FABF15A5F31AA2DB5D129BC742CCC279905438349` and Master `BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C`, fresh A→B and B→A disposable chest races passed no-holder Master reads, four concurrent reads, delayed stale-owner rejection, and exact single/double chest items across backend and Master restarts. Results and hashes are in `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-crafty1-moonrise-fallback-log-analysis-20261028.md`. RC5-01 remains P0 TESTING: the newly referenced upload itself is not mounted for fresh byte comparison; live loss remains unattributed and no restoration was attempted.
+
+## RC5-10 gamerule hook isolated runtime — 2026-10-28
+
+Direct Java 25 compilation of the generated patched `CraftEventFactory.java` succeeded (13 existing deprecation/unchecked warnings; class SHA-256 `2C8CE6DB835AC779A0D10CA641ABD75E7B47E1F494DC995958D09C6296E9A7D6`). A first injection attempt was invalid because Paperclip overwrote the class. The corrected marked fixture injected it after extraction and launched the exact runtime JAR directly. Two-backend convergence passed for `advance_time`, `random_tick_speed` and `spawn_mobs`; all three persisted across graceful backend and Master restarts. Result/transcript hashes and the injection limitation: `performance-results/rc5-gamerule-hook-compile-runtime-attempt-20261028.md`. This is runtime proof for the compiled hook, not proof of persistent Paperweight patch application or reproducible product builds. RC5-10 is P1 TESTING; other RC5 release blockers remain open.
+## 2026-10-28 MasterBound transaction message wire compatibility
+
+Moved the in-progress playerdata transaction message to the end of `MasterBoundProtocol`. It had been inserted mid-list even though IDs are list ordinals, which shifted existing messages for mixed RC4 peers. Regression pins legacy IDs and new ID 44; the focused protocol suite passed 4/4. Two authoritative sequential clean Java 25 builds then each passed 10,771 tests (0 failures/errors, 88 skipped), and all nine direct module JAR outputs matched. Packaged Master bytecode confirms message order. Hashes and evidence-copy correction are in `performance-results/rc5-protocol-wire-id-compatibility-20261028.md`. This does not wire the transaction to InvSee or fix item loss/duplication; RC5-02 remains P0 BLOCKED. Build outputs match this source, but no release bundle is cleared.
+
+### 2026-10-28 exact InvSee EnderSee containment runtime
+
+The current Paperclip/Master and exact InvSee++ 0.31.22 passed a disposable two-backend `/endersee` click-denial check: target EnderItems diamond x16 remained x16; client resync restored slot x16 and empty cursor. Exact evidence/hashes: `performance-results/rc5-invsee-ender-click-runtime-20261028.md`. This verifies marker detection/containment only. RC5-02 remains P0 BLOCKED because remote edits still do not work as a coordinated transaction.
+
+## 2026-10-28 final-unsubscribe stale chest write — matched Paper runtime
+
+A clean-built matched baseline (Paperclip `6C65DDC42663B9924566B568153AEA6EF77B63648566850C3170B392AE0CBC4F`, Master `E50B82443F1A1303258B5013DB156F9094CDAA372B043A25A0862462057233DE`, corrected protocol `E238…`) reproduced the exact Paper unload gap: after Backend A's force-loaded chunk unloaded, the plugin asserted `holder=null`, waited for a Master Ping barrier, then called production `writeRegionFileNBT`; Master accepted the stale x32 snapshot after A's final unsubscribe. Backend B loaded x32. Current fenced Master `2BE4B169A570543A5AFBCC7B80767336F27ACE8AFAD74EAF5E855853CD3D35DE` with the same Paperclip/protocol rejected that write; B read x32, saved x17, and exact single/double chest state persisted through B restart and graceful Master restart. Four concurrent no-holder reads returned x17 and active-owner stale writes were rejected. Result hashes and exact logs are in `performance-results/rc5-ownerless-last-unsubscribe-fence-20261028.md`; `docs/RC5_BUG_TRACKER.md` is authoritative.
+
+The earlier attempted Paperclip F546 + Master 2BE4 run is excluded: F546 bundles the obsolete/mismatched protocol artifact D789 while the current Master uses corrected E238, causing LockChunk decode and reconnect errors before chest assertions. Matched test fixtures shut down and all six disposable ports closed. The reproduced final-unsubscribe defect now has both baseline and candidate Paper runtime evidence; RC5-01 remains P0 TESTING overall because live chest-loss reports are still unattributed and unrecovered. RC5-02 remains P0 BLOCKED; no release is authorized.
+
+## RC5-02 capability gate focused test — 2026-10-28
+
+The current worktree now implements the MasterBound transaction capability challenge/ACK using common envelope marker `Integer.MIN_VALUE`: Master sends existing `SetSecretMessage`, backend ACKs with existing `HelloMessage`, and Master rejects transaction messages unless the ACK is seen. The Paper connection withholds transaction ID 44 until negotiation. Added focused envelope round-trip coverage plus Master integration tests for no-ACK refusal/non-persistence and repeated-Hello renegotiation. Review found and fixed a stale-grant edge by clearing support on every new Hello. Java 25 / Gradle 9.8 focused suites passed protocol 8/8 and `MasterIntegrationTest` 37/37, zero failures/errors/skips. XML hashes and command: `performance-results/rc5-masterbound-capability-handshake-tests-20261028.md`.
+
+This makes a protocol safety boundary possible but does not connect the endpoint to Paper/InvSee++. Cross-owner attestation, editor/cursor reconciliation, reconnect and mixed-version runtime regressions remain missing; RC5-02 remains P0 `BLOCKED`, and duplication is not fixed. The first uncached run stalled in `shadowJar` archive traversal under Windows file IO; focused tests passed excluding that one packaging task. Do not repeat the same shadowJar path until the I/O condition changes. Live SMP remains untouched.
+
+### RC5-02 Ender Chest packet-handler regression follow-up — 2026-10-28
+
+Added mocked handler-level acceptance/rejection coverage for the owner-source fence: owner update reaches normal completion, non-owner update is refused before inventory mutation. In the aligned disposable Java 25 fixture, the four-class protocol suite passed **17/17**, and `PlayerInventoryUpdatePacketTest` passed **9/9** (0 failures/errors/skips). XML SHA-256 `C3830C67770CD5D7F2E5DB3EF1DD35781F669DE3580E63DCF11FE2A5441F4707`; test-source SHA-256 `153DF1820131BE890C7BAEC93E479EAB573F5B0D5B48240954D7F64B39ADB88C`. This uses mocks and is not a peer runtime test; the Ender Chest fence remains `TESTING`, and the main cross-backend InvSee++ item-conservation blocker remains P0 `BLOCKED`. No live processes or worlds were accessed. See `performance-results/rc5-ender-owner-fence-20261028.md`.
+
+### RC5 playerdata queued-read ordering fix — 2026-10-28
+
+A deterministic Master integration test reproduced a stale playerdata read overtaking a queued save (old handler returned byte `1` instead of saved byte `7`). `ReadPlayerHandler` now uses `PlayerDataOperationQueue`, serializing reads with saves, transactions, and ownership changes for the UUID. In a disposable Java 25 worktree, two sequential clean Master module runs each passed 73/73 tests across 10 suites; identical shaded JARs: 19,202,357 bytes, SHA-256 `29140A8B49ADBDE1277A9E8BB5C01CC6834C0471664093EFC81402E8746F9766`. Report and limits: `performance-results/rc5-player-read-after-save-ordering-20261028.md`. This supports item/playerdata consistency but does not fix cross-backend InvSee++ click/cursor conservation; RC5-02 remains P0 BLOCKED. Live SMP untouched.
+
+### Master integrity subset committed and pushed — 2026-10-28
+
+Commit `31c5d4c128038f34406f9a25cd6b5c6f501346b9` (`Fence Master chunk and playerdata operations`) was pushed as a normal fast-forward to `fork` / `BrickedBrickk/MultiPaper` branch `feature/port-26.3`; remote tip was verified at the same hash. The commit contains only `MultiPaper-Master` and `MultiPaper-MasterMessagingProtocol` changes: stale former-owner chunk-write fencing, per-player serialization for reads/writes/connect/disconnect, durable Master-local multi-player journal groundwork, and associated tests/protocol capability checks. Two sequential clean disposable Java 25 Master-module runs passed 73/73 tests with identical shaded JAR SHA-256 `29140A8B49ADBDE1277A9E8BB5C01CC6834C0471664093EFC81402E8746F9766`.
+
+This does not wire the transaction to InvSee++ clicks, provide target-owner prepare/attestation or editor cursor escrow, or demonstrate accepted cross-backend item conservation. RC5-02 remains P0 `BLOCKED`; RC5 is not cleared for release. No unrelated staged boat/tracker changes were included, and no live server/world was accessed.
+
+### Beta monitor same-inode copy-truncate fix — 2026-10-28
+
+Found and reproduced a log-tail data gap: a same-inode rewrite that had grown back to the saved size caused the offset-only reader to skip new events. Added a rolling 256-byte boundary fingerprint and byte-exact offset handling; regression confirms copy-truncate detection and ordinary append without duplicate events. Disposable Python 3.11.9 suite passed 7/7. Synthetic 200×20-event overhead at an assumed 10-second interval measured 17.031 ms CPU per poll, estimated 0.1703% of one core, peak RSS 23,924,736 bytes, RCON disabled. This Windows synthetic result does not certify target Debian/Crafty hosts or replace the required deployed 15-minute overhead check. Details/hashes: `performance-results/beta-monitor-copytruncate-rotation-20261028.md`. No live logs/services accessed.
+
+### RC5 InvSee transaction before-image compare-and-commit — 2026-10-28
+
+The capability-gated Master playerdata transaction message now requires each participant's SHA-256 before-image and a distinct version-2 capability marker, leaving earlier after-image-only peers fail-closed. Master compares all participant images atomically under its transaction lock before journaling, rejects the whole batch if any image is stale, and still acknowledges an exact committed transaction replay idempotently. Explicit Java 25/Gradle 9.8 fresh focused rerun passed 46/46 (protocol 8/8, MasterIntegrationTest 38/38), including stale batch/no writes, previous-marker rejection and current before-image/fresh commit. Evidence and full failure caveat: `performance-results/rc5-invsee-beforeimage-master-fence-20261028.md`. A broader test attempt's five process-restart failures followed an interrupted `shadowJar` stall; no clean package build is claimed. This endpoint still has no InvSee caller, cross-owner attestation or cursor reconciliation. RC5-02 remains P0 BLOCKED and no release is cleared.
+
+Monitor copy-truncate fix commit `c97973b42da97d7bd4425dabb9b613b33f1152d5` was pushed as a normal fast-forward to the verified owner fork `fork/feature/port-26.3`; the fork had pointed to its direct parent `31c5d4c12`. No other dirty or staged files were pushed.
+
+The tested transaction before-image change was committed as `b59bf615d` (`Fence playerdata transactions with before-images`) and pushed as a fast-forward to the same verified owner fork from `c97973b42`. It contains only the Master/protocol transaction code, focused tests and evidence report; unrelated staged/dirty files were preserved. This remains safety groundwork, not an InvSee fix or release build.
+
+### 2026-10-28 cleanup manifest recovery recheck
+
+Rehashed only the four explicitly named local cleanup candidates and rechecked all 15 ZIP members against the unpacked siblings; all source hashes/sizes and member contents still match the existing manifest. The prior E: recovery folder was absent. Recreated four verified copies plus `SHA256SUMS.txt`/`RECOVERY.txt` on the separate E: volume at `E:\MultiPaper-Recovery\RC5-cleanup-preapproval-20261028`; all copy hashes match. No deletion or overwrite occurred, no Crafty host or Temp tree was accessed. Exact details and recovery steps: `performance-results/multipaper-inventory-and-proposed-cleanup-20261026.md`. All proposed removals remain pending review.
+
+
+## RC5-01 Master ownership handoff barrier — 2026-10-28
+
+Added a focused Master-side guard so UnlockChunkMessage waits for the connection’s preannounced chunk save to complete before ownership changes. Regression passed 1/1 on Temurin 25 / Gradle 9.8: waiting backend remained non-owner, prior owner’s chest snapshot persisted, then ownership transferred and exact 17-item NBT was read by the new owner. Full Master suite and two clean post-change builds remain outstanding. Tracker: docs/RC5_BUG_TRACKER.md; do not attribute the real chest incident based on this isolated test.
+
+
+### RC5-01 Master unlock barrier build/test result — 2026-10-28
+
+The new Master save-order barrier is covered by a fresh-world two-peer chest regression; it asserts pending Master reads wait until the announced write completes, ownership transfers afterward, and all 17 items persist exactly. Focused test 1/1, full MasterIntegrationTest 39/39, and nine non-restart Master classes 69/69 passed on Java 25. The restart tests need a valid shaded Master JAR; shadowJar stalled in Shadow FileInputStream.readBytes/remap. Thread dump and invalid partial JAR are retained in performance-results/; no new package or two-build hash comparison is claimed. Read docs/RC5_BUG_TRACKER.md; RC5-01 remains P0 TESTING.
+
+### RC5 Master clean-build recovery — 2026-10-28
+
+The D: Shadow archive-read stall was bypassed with a fresh detached C: worktree containing the exact current Master source/test files (their SHA-256 values matched D:). Two sequential clean Java 25 / Gradle 9.8 `shadowJar + test` runs both passed 74/74 across 10 suites, including process-restart tests. Matching Master JARs: 19,203,426 bytes / SHA-256 `62F5F83B58BE9BDDDAFA8BAD3B928B0937459E2A12426664353F12A5FA538506`. JARs and JUnit XML are in `performance-results/rc5-master-unlock-barrier-reproducible-builds-20261028/`. This supersedes the prior Master-only package limitation; the full Paper/project release gates and InvSee P0 remain open. Tracker: `docs/RC5_BUG_TRACKER.md`.
+## Commit and owner-fork push — 2026-10-28
+
+The pending chunk unlock barrier and its red/green Master regression were committed as `6adff719ecf1821bb940347c31c2650ab988b2c7` (`Wait for chunk writes before releasing ownership`), parent `b59bf615da0f9ce64104273d3b3ef49b607545d9`. Commit scope is only `MultiPaper-Master/src/main/java/puregero/multipaper/server/handlers/UnlockChunkHandler.java` and `MultiPaper-Master/src/test/java/puregero/multipaper/server/MasterIntegrationTest.java`. It was pushed as a normal fast-forward to verified `fork` (`https://github.com/BrickedBrickk/MultiPaper.git`), branch `feature/port-26.3`; no force push or `origin`/upstream push. Two clean Master builds matched at 19,203,426 bytes / SHA-256 `62F5F83B58BE9BDDDAFA8BAD3B928B0937459E2A12426664353F12A5FA538506`, and both full Master suites passed 74/74. This is not an RC5 release; Paper/full-project gates and InvSee P0 remain open.
+## RC5 continuation — entity-link commit and leash probe — 2026-10-28
+
+Commit `06a355cf1c93ef09c6046e6a7943b0053b31f038` (`Guard entity link updates for non-mob vehicles`) was pushed as a fast-forward to verified owner fork `fork/feature/port-26.3`; remote tip was confirmed equal. Its scoped changes are the Boat→Mob `ClassCastException` guard, three dependency regressions, exact patch, isolated runtime harness and evidence. Focused source tests are 3/3 passing; two clean Java 25 full builds each passed 10,749 tests with 88 skipped; current-candidate two-backend mount/dismount/remount and ownership-transfer probe passed. RC5-03 remains `TESTING` because client-rendered/player riding and direct real leash-link reproduction remain open.
+
+A fresh isolated current RC5 leash fixture (Paperclip SHA-256 `F5462FDA66732D7226920B04B89F8DB45D4125746B51F4BD90BDB3D8A46167B9`; Master `BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C`) passed wolf leash state/position across A→B chunk ownership transfer. This does not reproduce the reported lead disappearance; RC5-06 is `TESTING`, not `VERIFIED`. Result and diagnostic hashes are in `performance-results/rc5-boat-passenger-runtime-20261027.md` and `docs/RC5_BUG_TRACKER.md`.
+
+All disposable listeners on ports 33451–33454 and 33461–33462 were confirmed closed; no leash fixture process remained. Live Crafty/SMP was not accessed. Remote InvSee editing remains fail-closed and P0 RC5-02 remains unresolved; this branch is not release-ready.
+
+### RC5-06 restart test harness follow-up — 2026-10-28
+
+The leash test runner gained an optional Backend B graceful-restart assertion, but a fresh disposable attempt stalled while copying its prepared template, before service startup. Runner was stopped; partial fixture retained; all configured test ports closed. Parser passed; restart assertions did not run. See `performance-results/rc5-boat-passenger-runtime-20261027.md`. Leads remain TESTING and reported loss remains unreproduced.
+
+## RC5 beta-monitor PC2 launcher — 2026-10-28
+
+Added `monitoring/start-monitor-pc2.sh` with Python 3.10/config checks, added its `.gitignore` exception, and retained a validation report. Monitor unit tests passed 7/7; PC1 PowerShell and PC2 POSIX wrappers passed isolated `--once` smoke runs with synthetic configs and temporary output paths. PC2 used Git Bash plus a temporary Python 3.11 shim because this Windows host lacks native `python3`. No Debian/systemd or target-host overhead certification is claimed. Commits `2ae0e506764f57f3b20327ec69f7943692931605` and `0cab1559ca21d8cc4f43bd8302e7df0215ec3386` are pushed to the verified owner fork branch; remote tip equals local HEAD. Details: `performance-results/beta-monitor-launch-wrapper-validation-20261028.md`.
+
+## RC5 InvSee session-epoch groundwork — 2026-10-28
+
+Master now has a separately negotiated session-registration message, owner/capability checks, and disconnect cleanup. Detached Java 25 Master/protocol clean suites passed 84/84 twice with identical shaded Master JAR SHA-256 `01497631DCC2F3522241D38837E9A4C9909C4B50E56C7C4375FCD371ED4D9BB2`. The backend sender code is present but has not yet been Paperweight-compiled or validated in a two-backend runtime; the session registry is not yet part of a transaction request. Cross-owner InvSee remains fail-closed and P0 BLOCKED. See `performance-results/rc5-player-session-epoch-registration-20261028.md` and `docs/RC5_BUG_TRACKER.md`.
+
+### RC5-02 transaction epoch enforcement — 2026-10-28
+
+Extended the Master-bound playerdata participant format with the registered `PlayerSyncSession` UUID and made Master validate each live epoch before durable commit. The transaction capability advanced to `Integer.MIN_VALUE + 3`; old `+1` peers cannot authorize the new participant schema, while wire IDs 44/45 remain stable. Java 25 verification: MasterIntegrationTest 40/40 and protocol suite 9/9 passed; same-backend reconnect rejects the old epoch without changing either saved image, and current epochs remain eligible. The full Master task remains incomplete because Shadow JAR packaging stalled and the packaging-excluded run's five process-restart tests could not start the child Master; report and thread dumps: `performance-results/rc5-invsee-master-session-fence-20261028.md`. This still does not wire InvSee clicks, owner prepare/attestation or cursor conservation. Keep RC5-02 P0 BLOCKED.
+
+### Current-source registered-worktree setup stall — 2026-10-28
+
+A fresh properly registered D: worktree reached Paperweight `SetupMinecraftSources` and materialized 9,883 generated Minecraft resource files, then spent about 62 minutes inserting them into the generated JGit cache. Only 8 cache objects were added in the final roughly two minutes. Stopped only its Gradle launcher/daemon; port 55807 closed. **0 tests, compile, or JAR build completed.** This does not compile the backend session-registration sender; RC5-02 remains P0 `BLOCKED`. Retain this isolated worktree/cache and do not repeat the same slow Paperweight setup absent a changed I/O route. Thread dump/report: `performance-results/rc5-paperweight-registered-worktree-setup-stall-20261028.md`.
+
+The D: build path is the USB external volume labeled `5TB ExHDD`; C: NVMe had only 18.2 GB free. Slow storage is a plausible setup contributor, not a proven sole cause. No retry was started on C: to avoid consuming its limited free capacity. Captured thread dump SHA-256: `2905D87DCFD54226F16DD84715D00FA2CF64D08259F9ECE1B697CD08E5F8D323`.
+
+### RC5-02 backend sender compile and packet-handler regression follow-up — 2026-10-28
+
+A clean registered C: NVMe worktree completed Paperweight `applyAllPatches` in 11m17s and compiled the current server source using Java 25.0.3 / Gradle 9.8, resolving the prior external-HDD setup bottleneck for compile/test work. The focused inventory suite passed 47/47, including the registered `PlayerInventoryUpdatePacketTest` at 9/9 after adding Minecraft registry bootstrap and a `*TestSuite` wrapper required by this repository's Gradle include convention. This makes the backend session sender compile-verified and validates its unit-level tests, but not paired runtime integration, active-owner handshake, an InvSee transaction caller or accepted cross-owner conservation. RC5-02 remains P0 BLOCKED; no JAR or release package is cleared. Full evidence and XML hash: `performance-results/rc5-paperweight-nvme-and-inventory-test-followup-20261028.md`.
+### Current-source full server test suite on NVMe — 2026-10-28
+
+In the fresh registered C: NVMe Paperweight worktree, the configured Java 25.0.3 / Gradle 9.8 `:multipaper-server:test` task passed **10,215 tests**, 0 failures/errors, 86 skipped across 141 XML reports with no duplicate class reports. Focused relevant suites include inventory owner/session packet tests (9/9), Boat/entity dependency (3/3), entity NBT (5/5), removal routing (3/3) and chunk handler (7/7). All XML and task logs plus hashes are preserved in `performance-results/rc5-paperweight-full-server-suite-20261028/`. This is not a full multi-module clean build, JAR comparison, paired runtime or release package; chest attribution and cross-owner InvSee conservation remain unresolved. RC5-01 stays TESTING, RC5-02 BLOCKED, and no live SMP/world was accessed.
+
+### Current-source two-clean RC5 builds — 2026-10-28
+
+Two sequential clean full builds in the registered C: NVMe worktree passed on Temurin Java 25.0.3+9 / Gradle 9.8.0, offline/no build cache/single worker. Each passed 10,783 tests (0 failures/errors, 88 skipped); all 9 JAR outputs matched byte-for-byte. Current Paperclip SHA-256 `99B24AE11909C246C040D137CD3528A6C3F6EBC052244C523AE2250A9CED5E85`, Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`, protocol `A5F55D3DADCAB6997EAE6C4FA71EDC10357352D6DFBADD9FB36F3171D9645B22`. `javap` confirms the backend session-registration sender is in the Paper server output. Build artifacts, 192 XML files per pass, logs, source-input and SHA manifests: `performance-results/rc5-current-source-clean-builds-20261028/`. This is reproducible build evidence only; paired runtime, live chest attribution, InvSee cross-owner conservation, and release gates remain open. RC5-01 P0 TESTING; RC5-02 P0 BLOCKED.
+
+### Latest clean-pair chest ownership runtime — 2026-10-28
+
+Ran the current twice-clean-built Java 25 Paperclip/Master pair through fresh A→B and B→A disposable stale-owner chest races. Both rejected the former owner's delayed chest snapshot, served four concurrent no-holder Master reads, and preserved exact single/double chest NBT after backend and graceful Master restarts. Runner/artifact/result hashes and test boundaries: `performance-results/rc5-current-source-chest-runtime-20261028.md`. All six fixture ports closed; no run Java process remained. This proves these synthetic schedules only; the live chest reports remain unattributed and unrestored. RC5-01 stays P0 TESTING; RC5-02 remains BLOCKED, so no RC5 release/install is cleared.
+
+### RC5 local blocked review ZIP — 2026-10-28
+
+Prepared, hashed, and archive-verified local review bundle `release-staging/MultiPaper-26.3-RC5-blocked-current-source-20261028.zip` (SHA-256 `05C6A41C9E1ED3D788D4FC1AAA78F1EBA62D05B82CF30584AF72B5DF6DC5405F`). It contains current exact Master/Paperclip, versioned compatibility references, Crafty/monitor documentation and validation summaries. Payload hashes were independently recomputed from the archive; secret/world/log/chat exclusions were checked. It is explicitly not for distribution or installation. InvSee P0 and six-stack/auth/route/capacity gates are open, so no pre-release is published. Full bundle evidence: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+Latest local bundle supersedes v1 for review: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v2-20261028.zip`, SHA-256 `79F6E665489CF1D171A79107797766FE2D55C7AEAAF07E1BD9B5EF556B9F8D5A`. V2 adds the exact 34-input build provenance manifest and monitor overhead report; all 20 payload hashes verified from the ZIP. It remains blocked/not for installation or distribution. No public release or live update occurred.
+
+### Latest RC5 InvSee++ exact-pair containment checks — 2026-10-28
+
+Using the current clean-built Paperclip/Master pair and the pinned InvSee++ 0.31.22 artifact, fresh disposable exact-plugin runtime checks passed one remote main-inventory click and one remote Ender Chest click. Targets retained diamond x16; the clients received the safety denial and matching-state empty-cursor/menu resync. The runner needed a bounded asynchronous log wait, now fixed. These checks prove the fail-closed containment paths only; they do not implement or verify cross-owner item conservation. RC5-02 remains P0 BLOCKED. Evidence and hashes: `performance-results/rc5-current-pair-invsee-containment-20261028.md`. The disposable ports 33151–33162 are closed.
+
+### Latest exact-pair InvSee++ contention result — 2026-10-28
+
+The exact current Java 25 candidate also passed a protocol-valid simultaneous owner/remote main-inventory click test with exact InvSee++ 0.31.22: 16 diamonds became owner viewer 16, remote viewer 0, target 0 (total remained 16), while remote click was denied and the client resynced. Single remote main and Ender click containment passed too. Evidence: `performance-results/rc5-current-pair-invsee-containment-20261028.md`. This only validates fail-closed containment, not remote editing or the required durable transaction; RC5-02 remains P0 BLOCKED. All disposable ports closed.
+
+Latest bundle v3 is authoritative for local review: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v3-20261028.zip`, SHA-256 `F78352ED9AC038E411C3868150DB0EC0A86EAC082A0456EC0CEED38AFFF6AF94`. It adds exact-current-pair InvSee++ containment evidence and the updated compatibility matrix; all embedded payload hashes passed archive verification. It remains blocked/not for install. No public release or live update occurred. See `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### InvSee transaction boundary and blocked review ZIP v10 — 2026-10-28
+
+The current tracker now records the exact-plugin fail-closed runtime checks (remote main, Ender Chest, and one owner/remote contention schedule) separately from the unresolved exact-RC4 16→32 bug. Read-only boundary analysis found no safe direct caller for the Master playerdata journal: ordinary InvSee clicks lack click ID, editor/cursor after-image and target-owner live attestation; do not remove the safety gate. RC5-02 remains P0 BLOCKED. Details: `performance-results/rc5-invsee-current-transaction-boundary-audit-20261028.md`; source of truth: `docs/RC5_BUG_TRACKER.md`.
+
+Refreshed local blocked review artifact: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v10-20261028.zip`, SHA-256 `ED373816202664C4B77B719E9DA673A2440D7AA7293890889FF0DD524DFA29DD`. All 30 payload hashes matched direct ZIP hashing; unsafe-entry and private-key/RCON-secret scans returned zero. This is not for installation/distribution. No product build/test or live access occurred during this audit/package refresh.
+
+### Component availability and Bedrock transport refresh — 2026-10-28
+
+Official APIs/releases were checked and downloaded hashes matched for Geyser 2.12.1 build 1276, ViaVersion 5.12.2, ViaBackwards 5.12.2, and GrimAC Bukkit 2.3.75-1299a2a. Floodgate 2.2.5 build 141 and InvSee++ 0.31.22 remain current. The newer set has not been tested as one runtime stack on the RC5 pair. Geyser NetherNet requires TCP signaling and UDP gameplay; Playit's support docs say its combined TCP/UDP tunnel is Premium. The documented UDP-only Bedrock route is insufficient, and neither account-route capability nor an authenticated Bedrock login is verified. Updated the compatibility matrix and manual/monitor routes; exact artifact hashes and official source links: `performance-results/rc5-official-component-availability-20261028.md`. Latest blocked local review bundle v11: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v11-20261028.zip`, SHA-256 `B49951108AE457A63E7981C0D0493E82BBA43D842C007196DC7F7781817F2942`; all 31 payloads rehashed from ZIP bytes and matched, unsafe-entry scan 0. This is not installable/distributable. InvSee P0 and other release/authentication/capacity gates remain open.
+### RC5 blocked review bundle v12 — Crafty1 no-holder evidence — 2026-10-28
+
+Refreshed the local blocked review ZIP from v11: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v12-20261028.zip`, 82,662,015 bytes, SHA-256 `5bedf71356b4276258aa3193591e9da899b422d1aa5375cf2065677734280dbd`. It carries the current `docs/RC5_BUG_TRACKER.md` plus detailed Crafty1 fallback-source and 273-read stress reports; all 33 payload hashes were rechecked from archive bytes and matched. Unsafe path scan and 32-file text scan found no unsafe data paths or private-key/literal RCON-password patterns. It remains explicitly blocked/not for installation or distribution. RC5-01 P0 TESTING; RC5-02 P0 BLOCKED. No live SMP/Crafty operation occurred. Details: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+### RC5 chest handoff stress harness attempt — 2026-10-28
+
+Parameterized the isolated chest stale-owner read probe to support up to 512 reads using no more than 32 workers. In the fresh disposable fixture, Java 25 compiled the probe, but Backend A failed before readiness with a native 1,454,568-byte allocation error while the host had about 1.5 GiB free physical memory; no chest command/read/write ran. No fixture process/listener remains; retained crash/result hashes and limits: `performance-results/rc5-chest-handoff-273-read-attempt-20261028.md`. This is environment-blocked, not a product regression result. Existing separate 273-read and A↔B handoff tests remain passing; RC5-01 P0 TESTING and the combined schedule is unverified.
+
+### RC5 blocked review ZIP v13 — combined chest test attempt — 2026-10-28
+
+Latest local blocked review archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v13-20261028.zip`, 82,664,599 bytes, SHA-256 `201bcfc965bea31a388bb3839f737d65dc0676e344ccff95970ac035271a588d`. It contains the updated tracker plus the retained combined 273-read chest/handoff attempt. All 34 payload hashes verified from archive bytes; 36 entries total; unsafe path scan zero and blocked label present. The test attempt ended before chest commands because backend JVM native allocation failed during startup; this is not a product result. RC5-01 remains P0 TESTING; RC5-02 remains P0 BLOCKED. Report: `performance-results/rc5-chest-handoff-273-read-attempt-20261028.md`.
+
+### RC5 chest follow-up — capped retry and no-save call-path audit — 2026-10-28
+
+A capped Java 25 retry seeded and saved exact single/double chest contents in a disposable backend, then the next backend and Master hit native allocation failures before the 273-read handoff/restart checks. Result and both crash hashes are in `performance-results/rc5-chest-handoff-273-read-attempt-20261028.md`; fixture processes and ports were verified closed. No product binaries or live data changed. A source audit traced the separate `unloadChunkNowNoSave` callback to unexpected non-empty peer chunk responses and confirmed its caller avoids force-unloading a current `LevelChunk`; this narrows the chest-specific concern but is not runtime evidence. RC5-01 remains P0 TESTING; see `docs/RC5_BUG_TRACKER.md`.
+
+Refreshed the blocked review ZIP to v14 so its tracker/evidence matches this continuation. Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v14-20261028.zip`, 82,666,393 bytes, SHA-256 `a9b3f01d08d7ba47755cec90e80d43f2d1405c9d3dcd268e781f1f87f82d1d75`; 34/34 payload hashes verified from archive bytes, sensitive-path and secret-pattern scans zero, still blocked/not installable. See package audit `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### RC5-03 Boat regression evidence correction and v15 bundle — 2026-10-28
+
+Reconciled the tracker against commit `06a355cf1c93ef09c6046e6a7943b0053b31f038`: the non-Mob Boat leash/entity-link cast is guarded, and `MultiPaperEntitiesHandlerDependencyTest` directly exercises Boat + `ClientboundSetEntityLinkPacket`, plus boat passengers and Mob leash attach/detach. The exact suite passed 3/3 in both clean Java 25 suite runs; the clean-pair two-backend runtime also passed mount, dismount, remount, ownership transfer and post-transfer movement. Overall RC5-03 remains P1 TESTING for client-rendered riding, dimension/restart and broader lifecycle coverage. Refreshed blocked review ZIP v15 with tracker/runtime report: SHA-256 `8cd4f391f400ba2acdbac8bef812be5a4d133c1694e8e51e5cc8537c95b09e40`, 34/34 direct ZIP payload hashes pass; not for install/distribution.
+
+### RC5-09/10 sleeping-threshold setting runtime — 2026-10-28
+
+Extended the disposable global-gamerule runner with bounded JVM options and assertions for `players_sleeping_percentage`. On the exact twice-clean-built Java 25 pair, setting 50 on B propagated to A and remained 50 on both after graceful backend and Master restarts. Result `BD1404CF591B33FC5758D92F56B1E52A5AE1BE2A5D06A1FDAEB834B1E26B82DE`; transcript `F5DEFACA5356F7E66D3CDEC21D10CEA82A45A92ECAB75EAEBE780BC894AFD4DF`. This is gamerule sync/persistence only; no sleeping players or quorum/night-skip behavior were exercised. RC5-09 remains P1 REPORTED, RC5-10 P1 TESTING. Updated local review ZIP v16: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v16-20261028.zip`, SHA-256 `a22cbaa6922626c6a45579efc541fdee05d665dad526e5eaaf9b1b2307701311`, all 35 payload hashes verified.
+
+Updated the compatibility matrix with that distinction and refreshed the blocked review archive to v17, SHA-256 `6c06da504a5e1bf21d6016e8d26ca734c962e01ef6234f795a9f704d5d003750`; 35/35 payloads verified from ZIP bytes, sensitive-path scan zero, blocked label intact.
+
+### Beta monitor host-network sampling correction — 2026-10-28
+
+Fixed the monitor's single shared host-network counter baseline, which caused later server entries on a multi-process PC to report misleadingly low rates. Each configured server now has an independent interval baseline; the README clarifies that samples are host-wide rather than per-process. Deterministic monitor suite passed 8/8. Evidence: `performance-results/rc5-monitor-host-network-baseline-fix-20261028.md`. No live host/server was contacted; target-PC overhead remains unmeasured.
+
+### Read-only local cleanup manifest recheck — 2026-10-28
+
+Rehashed the four proposed candidate files and four off-volume E: recovery copies. All hashes and byte counts match the manifest; recovery note still instructs verify-before-restore/no-overwrite. No deletion, move, or source modification occurred; no Crafty host, active Java workload, world/backup, or Temp directory was accessed. Full record: `performance-results/multipaper-inventory-and-proposed-cleanup-20261026.md`.
+
+### Combined chest no-holder/handoff regression — 2026-10-28
+
+The exact current clean-built Java 25 pair passed a fresh disposable A→B test combining the Crafty1-scale 273 production no-holder reads, delayed stale former-owner chest write, new-owner backend restart, and graceful Master restart. Master rejected A's stale write; single chest diamond x17 and double chest emerald x17/gold x23 remained exact. Result SHA-256 `8C6817FE3C027632F0DDA429963553C79121DA6A396AAE8E674CBE3EEF1BFCE0`; transcript `A61926AF0E7ED3E681125563BC4368E586E3DB042C6B5FD1688CD36B65CB3BAC`. All six fixture ports/processes closed. This covers A→B only, not full Moonrise lifecycle or live loss attribution; RC5-01 stays P0 TESTING. Details in `performance-results/rc5-chest-handoff-273-read-attempt-20261028.md`.
+
+The complementary B→A combined 273-read schedule also passed on the same exact artifact pair and timing. Master rejected B's stale snapshot; diamond x17, emerald x17 and gold x23 persisted after Backend A and graceful Master restarts. Result SHA-256 `781AE6C64C055A480D718277DFD2E333B55812E811DE9E47387F54C898D87A08`; transcript `F0EE2DDA96FF749FF5D965C66D32BA66CA0D0E35A7AD6DFFC32D5F4C86495E62`. Both fixture ports/processes closed. Live chest-loss attribution/recovery and broader lifecycle remain open; RC5-01 P0 TESTING.
+
+Refreshed the local blocked review bundle to v19 with both combined chest schedules, the current tracker/matrix and monitor fix. Archive SHA-256 `8666080D6B447767180E0A409EF732766D7877D7B554B5CE476971FBAF32027D`; all 36 payload hashes were checked from ZIP bytes, 38 entries, zero unsafe data paths or secret patterns. The malformed intermediate v18 is preserved but superseded. V19 remains NOT FOR INSTALLATION OR DISTRIBUTION while P0 gates are open. Details: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### RC5-02 Master source/test provenance audit — 2026-10-28
+
+Current Master/protocol Java source was reconciled with the previously tested disposable worktree. All 78 Master Java files match after newline normalization; protocol source differs only in a `MasterBoundProtocol` documentation comment across 92 files. Existing Java 25 results (MasterIntegrationTest 40/40, protocol 9/9, two clean paired Master/protocol runs 84/84) cover this current safety groundwork; no tests were rerun. The click path still has no owner prepare/attestation or cursor transaction and cross-owner InvSee remains disabled. RC5-02 stays P0 BLOCKED. Evidence: `performance-results/rc5-invsee-session-source-equivalence-20261028.md`.
+### RC5 current-source reproducible-build provenance rechecked — 2026-10-28
+
+The current checkout still has HEAD at the twice-clean-built base commit, and all 34 modified product code/patch/build inputs match the source manifest exactly. All 204 pass-2 hashes verify, including 9 JARs and 192 test reports (10,783 tests, 0 failures/errors, 88 skipped). No Gradle rerun was performed. This preserves build provenance but does not close the RC5-01 chest attribution or RC5-02 InvSee item-conservation gates. See `performance-results/rc5-current-source-manifest-recheck-20261028.md`.
+### RC5 review bundle refresh v21 — 2026-10-28
+
+The local blocked review ZIP now carries the current Crafty1/Moonrise analysis in `docs/RC5_BUG_TRACKER.md`. Archive SHA-256 `3B04626CFECD418D2DA279AC52E80B627CDA9FACBD327BBE4582A39961539EF2`; 38 payload hashes, manifest, detached archive sidecar, pinned binary hashes, and zero unsafe paths/secret patterns verified. It remains a blocked review artifact only. RC5-01 P0 TESTING and RC5-02 P0 BLOCKED; no public release or live-server action. See `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### RC5-01 current-source bidirectional 273-read persistence tests — 2026-10-29
+
+The exact twice-clean-built current Paperclip/Master pair passed isolated 273-read stale-owner chest races in both A→B and B→A directions, including unload/ownership transfer, backend restart, and graceful Master restart. Exact single/double chest NBT persisted and Master rejected each delayed former-owner write. Results: `AE9E891F7AFBC83F80CDA393A57C9AC1D59250F01DE83BD404CEB146635A2512` and `45C9E2A0373C986C27CD1A7250BE2566E233966C06051EB57CFA2530A54937DC`. Full report: `performance-results/rc5-current-source-chest-273-bidirectional-20261029.md`. This does not attribute live chest reports or cover every crash/save window. RC5-01 remains P0 TESTING. No live data was accessed or changed.
+
+### RC5 review package v22 — 2026-10-29
+
+Latest local blocked review ZIP is `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v22-20261029.zip`, SHA-256 `7D8ACEB50A914F6F1F5281BF1878EE385E7830F49114E1D82FD84089C9BFFC6D`. It includes the current tracker, bidirectional current-source 273-read chest regression report, and updated blocked README. All 39 payload hashes and checksum layers passed; 41 unique entries; path/secret scans clear. No binary changed. Do not install or distribute; InvSee conservation and live chest attribution/recovery remain open. See `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### Local blocked review bundle v23 — 2026-10-29
+
+V23 includes the current compatibility matrix and exact-current-source bidirectional 273-read chest report. Archive `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v23-20261029.zip`, SHA-256 `FAEC2D19E7438D495BAFCC60984C0E7BC28AA9D8AACCBD5BAC9399EAA38BD5E2`; all 39 payload hashes, embedded/detached checksums, pinned JAR hashes, and blocked label verified. Path/secret scans clear. Still blocked; no public release. See package audit and tracker.
+
+### RC5-01 single-chest handoff follow-up — 2026-10-29
+
+A separate six-component disposable probe seeded diamond x17 in a loaded chest. Backend B read the exact stack after Backend A stopped. Diagnostic Master output attributed 8 other rejected shutdown chunk writes to the former owner after it relinquished ownership. The B restart started, but the exact post-restart chest assertion did not complete, so this run is not a clean persistence pass. Temporary diagnostics were removed and Master `shadowJar` rebuilt on Java 25; output hash matches the retained clean-built current-source Master (`1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E`). Details and stream hashes: `performance-results/rc5-current-sixcomponent-chest-single-restart-probe-20261029.md`. RC5-01 remains P0 TESTING; live worlds untouched.
+
+A follow-up opt-in shutdown race now mutates a loaded chest to diamond x29 after Backend A's `save-all flush`; Master rejected a late ownerless write for that exact chest chunk after A relinquished ownership, but Backend B read x29 after handoff and again after B restart. One other chunk write was also rejected. Exact evidence: `performance-results/rc5-current-sixcomponent-chest-single-restart-probe-20261029.md`. Chest checks pass in this timing; strict clean-log gate fails because expected fail-closed rejection errors remain. This does not close RC5-01 or attribute live reports. Runner support lives in `scripts/Test-RC5CurrentSixComponentStack.ps1`; all fixture ports/processes were closed. Live SMP untouched.
+
+### RC5 Crafty1 latest.log evidence recheck — 2026-10-29
+
+The newly referenced upload was not mounted in this session, so no fresh byte-level hash or warning recount is claimed. Reused the preserved read-only Crafty1 digest `920B665985CB2066D2199F0A6795C438D268FEADE91E8BE1246EAEA00CCA25D1`. Source trace confirms the 273 Moonrise no-holder reads route to Master region storage under the chunk lock; this is not backend-local disk access, though a previously stale Master image remains possible. Existing bounded 273-read and stale-owner handoff fixtures preserve exact chest NBT in selected schedules; live empty-chest attribution/recovery remains open. The same log's movement/entity/removal/inventory warnings remain separate and are summarized in `performance-results/rc5-crafty1-upload-recheck-20261029.md`. No live server/world was touched. RC5-01 remains P0 TESTING; RC5-02 remains P0 BLOCKED; RC5-13 remains REPRODUCED pending lifecycle regressions.
+
+### RC5-02 session sender compile provenance correction — 2026-10-29
+
+A retained successful NVMe Paperweight run already compiled the current backend session sender; the earlier fresh-fixture setup failures did not describe all later attempts. Rechecked current `MultiPaper.java`, `MultiPaperConnection.java`, inventory handler, packet and test hashes against the NVMe fixture manifest, then inspected compiled `MultiPaper`/`MultiPaperConnection` bytecode for the session registration sender and call site. Existing focused Java 25 inventory tests passed (47/47; packet/handler suites 9/9 each). This is compile/unit evidence only: no paired runtime registration acknowledgement/readiness test, owner attestation, click transaction or cursor escrow. RC5-02 remains P0 BLOCKED. Full evidence: `performance-results/rc5-session-sender-bytecode-provenance-20261029.md`.
+
+### RC5-02 two-backend session registration runtime — 2026-10-29
+
+A fresh marked disposable runtime used exact Paperclip candidate `99B24AE11909C246C040D137CD3528A6C3F6EBC052244C523AE2250A9CED5E85` on both backends and a diagnostic Master that differed only by a temporary registration-result log line. Three synthetic players reached ready state across backend IDs `race-a` and `race-b`; Master accepted all three session-registration requests, confirming the negotiated capability/request path reaches the handler from both actual backend senders. Master-side acceptance only: backend Boolean-reply receipt and reconnect readiness remain unverified. The simultaneous InvSee safety schedule retained exactly 16 diamonds and denied the remote click. All fixture ports closed and services stopped. Full logs/hashes/limits: `performance-results/rc5-session-registration-runtime-20261029.md`. RC5-02 remains P0 BLOCKED; no live environment was accessed.
+
+## RC5 Ender Chest stale-update ordering guard — 2026-10-29
+
+Added session-scoped monotonic revisions and before-images to Ender Chest deltas; mirror receivers reject revisionless, duplicate, and lower-sequence updates. Focused inventory/packet suite passed 20/20. Two sequential clean Java 25 full builds each passed 10,785 tests (0 failures/errors, 88 skipped), with all nine JARs byte-identical; exact hashes and logs: `performance-results/rc5-ender-chest-revision-fence-20261029.md`. The new packet-delta revision itself has no paired runtime test and does not prove that this was the RC4 incident cause. RC5-02 remains P0 BLOCKED, remote InvSee edits stay gated, and the newly rebuilt Paperclip is not live-tested. Read `docs/RC5_BUG_TRACKER.md`; do not mix RC4 and RC5 backends.
+
+### Ender Chest revision reconnect hypothesis — 2026-10-29
+
+Read-only source audit found each mirror's accepted Ender Chest revision is instance-local. On `PlayerCreatePacket`, an existing mirror is disconnected and a new `ExternalPlayer` is built with the new owner/session, resetting the mirror counter. `PlayerRemovePacket` removes only when sent by the currently associated peer. This rules out only stale revision state surviving a newly constructed mirror; it is not a runtime concurrency/reorder test. Report: `performance-results/rc5-ender-chest-session-revision-reset-audit-20261029.md`. Ender update change stays TESTING; no runtime/build claim added and no live service accessed.
+
+## RC5 blocked review bundle v26 — 2026-10-29
+
+Refreshed the local blocked review bundle with the current revision-fenced Paperclip and current docs/evidence: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v26-20261029.zip`, SHA-256 `7e1c75cd2e3d22e29cd9cc736d09ea74b77659fa34da1d79c8426dae56a36ff6`. All 45 payload hashes matched, archive has 47 unique entries, artifact JAR hashes match the two-clean-build report, and path/raw-data/secret-pattern scans are clear. README now correctly separates previous Paperclip chest runtime evidence from this newly packaged candidate. V24/v25 remain preserved but superseded. Package remains BLOCKED/NOT FOR INSTALLATION OR DISTRIBUTION; no public release/install. Audit: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+
+### RC5 component stable/alpha channel recheck and bundle v27 — 2026-10-29
+
+Official metadata and local artifact SHA values were rechecked for Geyser, Floodgate, ViaVersion, ViaBackwards, InvSee++, and GrimAC. Current stable pins are recorded in the compatibility matrix; GrimAC 2.3.75-1299a2a is a 26.3-listed alpha, while 2.3.74 remains the stable release. No current exact-six-component RC5 startup was run. Report: `performance-results/rc5-official-component-availability-20261029.md`.
+
+Refreshed the blocked review ZIP to v27: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v27-20261029.zip`, SHA-256 `cdfa9a70fbb107b39fba73d01ded232fb288e9bb11575559f5c3b11a9c61740a`. All 46 payload hashes pass, 48 unique entries, candidate JAR hashes match clean-build evidence, and path/secret scans are clear. It remains blocked/not for installation or distribution; no runtime or release gate was cleared. Audit: `performance-results/rc5-blocked-local-bundle-20261028.md`.

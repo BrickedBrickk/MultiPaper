@@ -1,7 +1,12 @@
 # MultiPaper beta monitoring
 
+**RC5 activation is currently blocked.** This monitor guide is preparation only; do not connect the example configs to the live RC4 servers or start a beta before the owner installs an approved RC5 candidate.
+
 `../scripts/multipaper-beta-monitor.py` is a Python 3.10+ sidecar collector for the planned two-week, 5–20 player beta. It does not modify Minecraft files or issue game-changing commands. It tails configured log files, samples host resource use, and optionally reads `/tps`, `/mspt`, and `/list` through loopback-only RCON. Install it on each PC so metrics match the machine running the process.
 
+## Host startup wrappers
+
+Use `start-monitor-pc1.ps1 <private-config.json>` on Windows and `sh start-monitor-pc2.sh <private-config.json>` on Debian. They require Python 3.10+ and run in the foreground, which works with Task Scheduler or a systemd user service. Store the real configs outside this package/export directory with restrictive permissions; never put an RCON password in them, use the named environment variable only. The scripts start only the monitor collector and do not start or control Minecraft, Crafty, Playit, or Tailscale.
 ## Setup
 
 1. Install Python 3.10 or newer. Install `psutil` in the monitoring user's environment for CPU, RAM, and network counters on both Windows and Debian: `python -m pip install --user psutil`.
@@ -9,7 +14,7 @@
 3. RCON is optional. If enabled, set `enable-rcon=true`, `rcon.ip=127.0.0.1`, and a unique `rcon.port` in that backend's `server.properties`. Minecraft stores `rcon.password` in plaintext there, so restrict file permissions and never commit/package it. Give the same secret to the monitor process through the named environment variable (Windows: Task Scheduler action environment or a protected launcher; Debian: a root-readable systemd EnvironmentFile). The collector refuses non-loopback RCON targets and never writes command output or secrets to disk. If you cannot protect both the properties file and environment, leave RCON polling disabled.
 4. Run `python scripts/multipaper-beta-monitor.py --config C:\path\private\pc1.json` on PC1 and the corresponding private config on PC2. Use Task Scheduler on Windows or a systemd user service on Debian. Run `--once` for a smoke sample. Use `--export <path.zip>` to package the bounded metrics/events. Transfer the sanitized PC2 bundle to PC1, then run `--merge <pc2.zip>` there to add its records to PC1's `timeline.jsonl`.
 
-The examples use placeholder paths and RCON port numbers. Do not expose backend game ports publicly: Playit forwards Java TCP to the Master, Bedrock UDP to Geyser Standalone on PC1, and Tailscale is for administration. The PC2 backend communicates with the Master over the private LAN/Tailscale network. Geyser sends Java connections to the Master; Bedrock players use Floodgate identity forwarding. Preserve the existing Master/backend forwarding secret and Floodgate key when installing; do not include them in a support bundle.
+The examples use placeholder paths and RCON port numbers. Do not expose backend game ports publicly: Playit forwards Java TCP to the Master; Bedrock NetherNet needs Geyser TCP signaling plus UDP gameplay on PC1, and a UDP-only Playit route is insufficient. Playit's current support note says combined TCP/UDP requires Premium; confirm the selected account route before use. Tailscale is for administration. The PC2 backend communicates with the Master over the private LAN/Tailscale network. Geyser sends Java connections to the Master; Bedrock players use Floodgate identity forwarding. Preserve the existing Master/backend forwarding secret and Floodgate key when installing; do not include them in a support bundle.
 
 ## Data and privacy
 
@@ -19,12 +24,16 @@ Events are extracted only as categories from log lines. They cover player joins/
 
 RCON supplies TPS, MSPT, and online player count for backend entries with RCON configured. The Master has no Paper `/tps` endpoint; its host resource values are still sampled, but Master queue/transfer internals are reported only when emitted in logs. Missing RCON or OS counters remain JSON `null`, not fabricated zeroes. Alert defaults: TPS below 18, 5-second MSPT maximum above 50 ms, CPU above 90%, memory above 92%, or disk above 90%. Review the related server log and resource timeline, check LAN latency and disk space, and use `/tps` and `/mspt` before changing view distance or entity limits. These are investigation prompts, not automatic actions.
 
+Network byte counters come from the operating system and are **host-wide**, not per Minecraft process. Each configured server entry keeps its own sample baseline, so entries on a multi-process PC can show the host's rate over comparable intervals; do not add those entries together or interpret them as per-backend traffic.
+
 ## Overhead check
 
 The collector sleeps between polls, reads log tails incrementally, keeps only sanitized categories, and makes three small local RCON requests per configured backend per interval. Begin with a 10-second interval. During the first beta day, compare the server's baseline with the collector running for 15 minutes at idle and under a normal player load. Record Python CPU/RSS and Paper MSPT before/after in the beta log. Pause the collector if its sustained CPU exceeds 1% of one core or RSS exceeds 100 MiB, then increase `poll_seconds`; do not disable Minecraft safety logs to meet the target.
 
 ## Beta operation
 
-Before each session, verify all three Java services, Master reachability from both backend PCs, world backup timestamps, loopback RCON, monitoring freshness, disk headroom, and Playit TCP/UDP routes. Test over two weeks with 5–20 invited players: day/night, walking/teleports/reconnect, inventory edits and Ender Chests, farms and redstone/pistons, stasis pearls, Nether/End travel and returns, supported vehicles, Java and Bedrock identities, and backend handoff/recovery. Change one variable at a time and keep a time-stamped report. Have a fresh restorable backup before any recovery test.
+Before each session, verify all three Java services, Master reachability from both backend PCs, world backup timestamps, loopback RCON, monitoring freshness, disk headroom, Java TCP routing, and Bedrock TCP signaling plus UDP gameplay (or the separately validated signaling route). Test over two weeks with 5–20 invited players: day/night, walking/teleports/reconnect, inventory edits and Ender Chests, farms and redstone/pistons, stasis pearls, Nether/End travel and returns, supported vehicles, Java and Bedrock identities, and backend handoff/recovery. Change one variable at a time and keep a time-stamped report. Have a fresh restorable backup before any recovery test.
 
 Bug report template: date/time/timezone; candidate and component versions; Java/Bedrock client and OS; server role/backend; dimension and approximate coordinates; player-count range; exact steps and expected/actual state; whether a reconnect/handoff/restart occurred; relevant sanitized monitor bundle; matching server-log time window supplied separately by the owner after removing chat, addresses, keys, and credentials; reproducibility count; and whether the world was restored from backup.
+
+Log tailing also detects same-inode copy-truncate rewrites by comparing a short fingerprint at the last byte offset. This prevents a rewritten file that has grown back to its prior size from silently skipping new events. A disposable regression covers that case and normal append handling.
