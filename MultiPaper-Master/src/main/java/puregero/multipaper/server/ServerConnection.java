@@ -176,10 +176,16 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        ChunkLockManager.releaseAll(this);
+        java.util.concurrent.CompletableFuture<Void> chunkWritesDrained = ChunkLockManager.releaseAll(this);
         EntitiesLockManager.releaseAll(this);
         EntitiesSubscriptionManager.unsubscribeAll(this);
-        ChunkSubscriptionManager.unsubscribeAndUnlockAll(this);
+        chunkWritesDrained.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                System.err.println("Could not drain accepted chunk writes before releasing ownership for " + name);
+                failure.printStackTrace();
+            }
+            ChunkSubscriptionManager.unsubscribeAndUnlockAll(this);
+        });
 
         synchronized (connections) {
             synchronized (playerUUIDs) {

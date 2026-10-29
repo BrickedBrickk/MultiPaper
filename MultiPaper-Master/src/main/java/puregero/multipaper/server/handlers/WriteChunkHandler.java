@@ -37,7 +37,7 @@ public class WriteChunkHandler {
                     () -> writeData(connection, message, message.data));
             if (!accepted) {
                 // Release any read wait registered by the old owner's preannounced save.
-                ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+                ChunkLockManager.cancelPendingWrite(connection, message.world, message.cx, message.cz);
                 connection.sendReply(new BooleanMessageReply(false), message);
             }
             return;
@@ -47,25 +47,39 @@ public class WriteChunkHandler {
     }
 
     private static void writeData(ServerConnection connection, WriteChunkMessage message, byte[] data) {
-        RegionFileCache.putChunkDeflatedDataAsync(ReadChunkHandler.getWorldDir(message.world, message.path),
-                message.path.equals("region") || message.path.equals("entities") ? message.world : null,
-                message.path, message.cx, message.cz, data).whenComplete((ignored, failure) -> {
-            if (message.path.equals("region")) {
-                ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
-            }
-            if (message.path.equals("entities")) {
-                EntitiesLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
-            }
+        if (message.path.equals("region")) {
+            ChunkLockManager.writeStarted(connection, message.world, message.cx, message.cz);
+        } else if (message.path.equals("entities")) {
+            EntitiesLockManager.writeStarted(connection, message.world, message.cx, message.cz);
+        }
+        CompletableFuture<Void> persistence;
+        try {
+            persistence = RegionFileCache.putChunkDeflatedDataAsync(ReadChunkHandler.getWorldDir(message.world, message.path),
+                    message.path.equals("region") || message.path.equals("entities") ? message.world : null,
+                    message.path, message.cx, message.cz, data);
+        } catch (Throwable failure) {
+            finishWrite(connection, message, failure);
+            return;
+        }
+        persistence.whenComplete((ignored, failure) -> finishWrite(connection, message, failure));
+    }
 
-            if (failure != null) {
-                System.err.println("Failed to persist " + message.path + " chunk " + message.cx + "," + message.cz + " for world " + message.world);
-                failure.printStackTrace();
-                connection.sendReply(new BooleanMessageReply(false), message);
-                return;
-            }
+    private static void finishWrite(ServerConnection connection, WriteChunkMessage message, Throwable failure) {
+        if (message.path.equals("region")) {
+            ChunkLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+        }
+        if (message.path.equals("entities")) {
+            EntitiesLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+        }
 
-            connection.sendReply(new BooleanMessageReply(true), message);
-        });
+        if (failure != null) {
+            System.err.println("Failed to persist " + message.path + " chunk " + message.cx + "," + message.cz + " for world " + message.world);
+            failure.printStackTrace();
+            connection.sendReply(new BooleanMessageReply(false), message);
+            return;
+        }
+
+        connection.sendReply(new BooleanMessageReply(true), message);
     }
 
     private static void handleTransientEntities(ServerConnection connection, WriteChunkMessage message) {
@@ -79,7 +93,7 @@ public class WriteChunkHandler {
             } catch (IOException | RuntimeException failure) {
                 System.err.println("Failed to persist transient entities for chunk " + message.cx + "," + message.cz + " in world " + message.world);
                 failure.printStackTrace();
-                EntitiesLockManager.writeCompleted(connection, message.world, message.cx, message.cz);
+                EntitiesLockManager.cancelPendingWrite(connection, message.world, message.cx, message.cz);
                 connection.sendReply(new BooleanMessageReply(false), message);
             }
         });

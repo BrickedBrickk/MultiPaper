@@ -8,8 +8,16 @@ public class EntitiesLockManager {
         locks.lockUntilWrite(connection, world, cx, cz);
     }
 
+    public static void writeStarted(ServerConnection connection, String world, int cx, int cz) {
+        locks.writeStarted(connection, world, cx, cz);
+    }
+
     public static void writeCompleted(ServerConnection connection, String world, int cx, int cz) {
         locks.writeCompleted(connection, world, cx, cz);
+    }
+
+    public static void cancelPendingWrite(ServerConnection connection, String world, int cx, int cz) {
+        locks.cancelPendingWrite(connection, world, cx, cz);
     }
 
     public static void waitForLock(String world, int cx, int cz, Runnable callback) {

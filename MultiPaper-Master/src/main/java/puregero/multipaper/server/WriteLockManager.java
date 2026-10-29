@@ -3,6 +3,8 @@ package puregero.multipaper.server;
 import puregero.multipaper.mastermessagingprotocol.ChunkKey;
 
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +30,60 @@ final class WriteLockManager {
         });
     }
 
+    void writeStarted(ServerConnection connection, String world, int cx, int cz) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        locks.compute(key, (ignored, state) -> {
+            if (state == null) {
+                state = new LockState();
+            }
+            Integer announced = state.pendingWritesByConnection.get(connection);
+            if (announced != null) {
+                if (announced == 1) {
+                    state.pendingWritesByConnection.remove(connection);
+                } else {
+                    state.pendingWritesByConnection.put(connection, announced - 1);
+                }
+            } else {
+                // Also fence reads against writes that were accepted without a prior
+                // WillSaveChunkLater announcement.
+                state.pendingWrites++;
+            }
+            state.activeWritesByConnection.merge(connection, 1, Integer::sum);
+            state.activeWriteDrains.computeIfAbsent(connection, ignoredConnection -> new CompletableFuture<>());
+            return state;
+        });
+    }
+
     void writeCompleted(ServerConnection connection, String world, int cx, int cz) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        AtomicReference<CompletableFuture<Void>> completed = new AtomicReference<>();
+        AtomicReference<CompletableFuture<Void>> activeWriteCompleted = new AtomicReference<>();
+
+        locks.computeIfPresent(key, (ignored, state) -> {
+            Integer activeForConnection = state.activeWritesByConnection.get(connection);
+            if (activeForConnection == null) {
+                return state;
+            }
+
+            if (activeForConnection == 1) {
+                state.activeWritesByConnection.remove(connection);
+                activeWriteCompleted.set(state.activeWriteDrains.remove(connection));
+            } else {
+                state.activeWritesByConnection.put(connection, activeForConnection - 1);
+            }
+
+            if (--state.pendingWrites == 0) {
+                completed.set(state.completed);
+                return null;
+            }
+            return state;
+        });
+
+        complete(completed.get());
+        complete(activeWriteCompleted.get());
+    }
+
+    void cancelPendingWrite(ServerConnection connection, String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
         AtomicReference<CompletableFuture<Void>> completed = new AtomicReference<>();
 
@@ -73,16 +128,20 @@ final class WriteLockManager {
         }
     }
 
-    void releaseAll(ServerConnection connection) {
+    CompletableFuture<Void> releaseAll(ServerConnection connection) {
+        List<CompletableFuture<Void>> activeWrites = new ArrayList<>();
         for (ChunkKey key : locks.keySet()) {
             AtomicReference<CompletableFuture<Void>> completed = new AtomicReference<>();
             locks.computeIfPresent(key, (ignored, state) -> {
                 Integer pendingForConnection = state.pendingWritesByConnection.remove(connection);
-                if (pendingForConnection == null) {
-                    return state;
+                if (pendingForConnection != null) {
+                    state.pendingWrites -= pendingForConnection;
                 }
 
-                state.pendingWrites -= pendingForConnection;
+                CompletableFuture<Void> activeWrite = state.activeWriteDrains.get(connection);
+                if (activeWrite != null) {
+                    activeWrites.add(activeWrite);
+                }
                 if (state.pendingWrites == 0) {
                     completed.set(state.completed);
                     return null;
@@ -91,6 +150,8 @@ final class WriteLockManager {
             });
             complete(completed.get());
         }
+        return activeWrites.isEmpty() ? CompletableFuture.completedFuture(null)
+                : CompletableFuture.allOf(activeWrites.toArray(CompletableFuture[]::new));
     }
 
     private static void complete(CompletableFuture<Void> future) {
@@ -101,6 +162,8 @@ final class WriteLockManager {
 
     private static final class LockState {
         private final Map<ServerConnection, Integer> pendingWritesByConnection = new HashMap<>();
+        private final Map<ServerConnection, Integer> activeWritesByConnection = new HashMap<>();
+        private final Map<ServerConnection, CompletableFuture<Void>> activeWriteDrains = new HashMap<>();
         private final CompletableFuture<Void> completed = new CompletableFuture<>();
         private int pendingWrites;
     }

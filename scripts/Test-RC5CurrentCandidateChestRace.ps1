@@ -29,6 +29,7 @@ $paperHashes = @(
 $masterHash = (Get-FileHash -LiteralPath $MasterJar -Algorithm SHA256).Hash
 $fencedMasterHash = 'BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C'
 $currentSourceMasterHash = '1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E'
+$activeChunkWriteFenceMasterHash = 'E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E' # current clean-built Master with accepted async chunk-write disconnect drain fence
 $finalUnsubscribeFenceMasterHash = '2BE4B169A570543A5AFBCC7B80767336F27ACE8AFAD74EAF5E855853CD3D35DE'
 $finalUnsubscribeBaselineMasterHash = 'E50B82443F1A1303258B5013DB156F9094CDAA372B043A25A0862462057233DE'
 $baselineMasterHash = 'E122A819950C50FF504CDC6600D6E5C4970CD9D25F45AC19ED974F9D194134B7'
@@ -63,8 +64,8 @@ if ($TestAfterFinalUnsubscribe) {
     $expectedGapMasterHash = if ($ExpectedFinalUnsubscribeWrite -eq 'REJECTED') { $finalUnsubscribeFenceMasterHash } else { $finalUnsubscribeBaselineMasterHash }
     if ($masterHash -ne $expectedGapMasterHash) { throw "Final-unsubscribe gap test with ExpectedFinalUnsubscribeWrite=$ExpectedFinalUnsubscribeWrite requires Master $expectedGapMasterHash, got $masterHash." }
     if ($ExpectedStaleWrite -ne 'REJECTED') { throw 'Final-unsubscribe gap test requires ExpectedStaleWrite=REJECTED.' }
-} elseif ($masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$baselineMasterHash)) { throw "Unrecognized Master artifact: $masterHash" }
-if (-not $TestAfterFinalUnsubscribe -and (($ExpectedStaleWrite -eq 'REJECTED' -and $masterHash -notin @($fencedMasterHash,$currentSourceMasterHash)) -or ($ExpectedStaleWrite -eq 'ACCEPTED' -and $masterHash -ne $baselineMasterHash))) { throw "ExpectedStaleWrite=$ExpectedStaleWrite is incompatible with Master $masterHash." }
+} elseif ($masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash,$baselineMasterHash)) { throw "Unrecognized Master artifact: $masterHash" }
+if (-not $TestAfterFinalUnsubscribe -and (($ExpectedStaleWrite -eq 'REJECTED' -and $masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash)) -or ($ExpectedStaleWrite -eq 'ACCEPTED' -and $masterHash -ne $baselineMasterHash))) { throw "ExpectedStaleWrite=$ExpectedStaleWrite is incompatible with Master $masterHash." }
 if (-not (Test-Path -LiteralPath $Java)) { throw 'Java 25 executable not found.' }
 if (-not (Test-Path -LiteralPath $ApiJar)) { throw "RC5 API jar not found: $ApiJar" }
 foreach ($port in $ports) { if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port is already listening." } }
