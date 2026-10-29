@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -21,6 +22,17 @@ from typing import Any
 
 VERSION = "1.0.0"
 EVENTS = {
+    # Concrete MultiPaper integrity warnings are listed before generic error
+    # matching so the monitor retains the useful category without raw text.
+    "has no chunk holder for reading chunk": "chunk_read_fallback",
+    "master rejected persistence of region chunk": "chunk_write_rejected",
+    "uuid of added entity already exists": "entity_uuid_conflict",
+    "entity uuid already exists": "entity_uuid_conflict",
+    "tried to create an entity from nbt, but the entities for that chunk aren't loaded": "entity_update_unavailable",
+    "could not route removal of entity": "entity_removal_route_fallback",
+    "cannot route entity removal request": "entity_removal_route_fallback",
+    "ignoring stale inventory replacement": "inventory_stale_replacement",
+    "moved too quickly": "movement_correction",
     "joined the game": "player_join", "left the game": "player_leave",
     "logged in with entity id": "player_login", "lost connection": "player_disconnect",
     "Changing dimension": "dimension_change", "changed dimension": "dimension_change",
@@ -36,6 +48,24 @@ EVENTS = {
     "crash": "crash", "starting minecraft server": "server_start",
     "done (": "backend_ready", "recovery": "recovery",
 }
+WARNING_EVENTS = {
+    "chunk_read_fallback", "entity_uuid_conflict", "entity_update_unavailable",
+    "entity_removal_route_fallback", "inventory_stale_replacement", "movement_correction",
+}
+ERROR_EVENTS = {"error", "exception", "crash", "inventory_inconsistency", "chunk_write_rejected"}
+MERGE_EVENTS = set(EVENTS.values()) | {"alert", "alert_recovered", "metrics"}
+MERGE_NUMERIC_FIELDS = {
+    "cpu_percent", "memory_percent", "memory_used_bytes", "memory_total_bytes",
+    "network_rx_bytes", "network_tx_bytes", "process_cpu_percent", "process_rss_bytes",
+    "monitor_cpu_percent", "monitor_rss_bytes", "tps_1m", "mspt_avg_5s", "mspt_max_5s",
+    "players_online", "disk_percent", "disk_free_bytes", "network_rx_bytes_per_sec",
+    "network_tx_bytes_per_sec", "latency_ms", "value", "threshold",
+}
+MERGE_INTEGER_FIELDS = {
+    "memory_used_bytes", "memory_total_bytes", "network_rx_bytes", "network_tx_bytes",
+    "process_rss_bytes", "monitor_rss_bytes", "players_online", "disk_free_bytes",
+}
+MERGE_STRING_FIELDS = {"role", "source", "severity", "metric", "reason"}
 PLAYER_RE = re.compile(r"(?:system chat: )?([^ :\[\]]{1,32})(?:\[[^\]]+\])? (?:joined the game|left the game|logged in with entity id|lost connection)", re.I)
 TIME_RE = re.compile(r"^\[(\d{2}:\d{2}:\d{2}) (?:INFO|WARN|ERROR|FATAL)\]")
 SECRET_RE = re.compile(r"(?i)(password|passwd|secret|token|authorization|rcon(?:\.password)?)\s*[:=]\s*\S+")
@@ -89,7 +119,8 @@ def parse_log_line(line: str, server_id: str, source: str, run_salt: bytes) -> d
     t = TIME_RE.search(line)
     event = {"time": utc_now(), "log_time": t.group(1) if t else None, "server": server_id,
             "source": Path(source).name, "event": category, "subject": subject,
-            "severity": "error" if category in {"error", "exception", "crash", "inventory_inconsistency"} else "info"}
+            "severity": ("error" if category in ERROR_EVENTS else
+                         "warning" if category in WARNING_EVENTS else "info")}
     if category == "sync_latency":
         latency = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*ms\b", line, re.I)
         event["latency_ms"] = float(latency.group(1)) if latency else None
@@ -247,10 +278,13 @@ class Monitor:
                         ev = parse_log_line(line, server["id"], key, self.salt)
                         if ev:
                             self.emit(server["id"], ev)
-                            if ev["event"] in {"exception", "crash", "inventory_inconsistency", "grim_violation"}:
+                            if ev["event"] in {"exception", "crash", "inventory_inconsistency", "chunk_write_rejected", "inventory_stale_replacement",
+                                                "chunk_read_fallback", "entity_uuid_conflict", "entity_update_unavailable",
+                                                "entity_removal_route_fallback", "grim_violation"}:
                                 alert_key = (server["id"], ev["event"])
                                 now = time.monotonic()
-                                if now - self.last_event_alert.get(alert_key, 0) >= 60:
+                                last_alert = self.last_event_alert.get(alert_key)
+                                if last_alert is None or now - last_alert >= 60:
                                     self.emit(server["id"], {"time": utc_now(), "server": server["id"], "event": "alert", "reason": ev["event"], "source": ev["source"]})
                                     self.last_event_alert[alert_key] = now
                     new_offset = f.tell()
@@ -372,9 +406,90 @@ class Monitor:
         with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as z:
             for p in self.root.rglob("*"):
                 rel = p.relative_to(self.root)
-                name_ok = rel.name == "timeline.jsonl" or re.fullmatch(r"(?:events|metrics)\.jsonl(?:\.\d+)?", rel.name) or (rel.parent.name == "summaries" and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.(?:json|txt)", rel.name))
-                if p.is_file() and p.resolve() != destination.resolve() and name_ok: z.write(p, rel)
+                if not p.is_file() or p.resolve() == destination.resolve():
+                    continue
+                if rel.name == "timeline.jsonl" or re.fullmatch(r"(?:events|metrics)\.jsonl(?:\.\d+)?", rel.name):
+                    server = rel.parent.name if rel.name != "timeline.jsonl" else None
+                    z.writestr(rel.as_posix(), self._sanitize_jsonl(p, server))
+                elif rel.parent.name == "summaries" and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", rel.name):
+                    try:
+                        summary_data = json.loads(p.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        continue
+                    safe_summary = self._sanitize_summary(summary_data)
+                    if safe_summary is None:
+                        continue
+                    z.writestr(rel.as_posix(), json.dumps(safe_summary, indent=2, sort_keys=True) + "\n")
+                    z.writestr(rel.with_suffix(".txt").as_posix(), format_daily_summary(safe_summary))
             z.writestr("EXPORT-NOTES.txt", "MultiPaper beta monitor export. No raw Minecraft logs, configuration, RCON credentials, chat, IP addresses, or player names are included. Player identifiers, if present in events, are per-process salted hashes.\n")
+
+    def _sanitize_jsonl(self, path: Path, server: str | None) -> str:
+        lines: list[str] = []
+        try:
+            source_lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return ""
+        for line in source_lines:
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(item, dict):
+                continue
+            record_server = server or item.get("server")
+            if not isinstance(record_server, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,48}", record_server):
+                continue
+            safe = self._sanitize_merged_record(item, record_server)
+            if safe is None:
+                continue
+            if item.get("merged_from") == "peer-export":
+                safe["merged_from"] = "peer-export"
+            lines.append(json.dumps(safe, separators=(",", ":"), ensure_ascii=True))
+        return "\n".join(lines) + ("\n" if lines else "")
+
+    @classmethod
+    def _sanitize_summary(cls, summary: Any) -> dict[str, Any] | None:
+        if not isinstance(summary, dict):
+            return None
+        day = summary.get("date_utc")
+        generated = summary.get("generated_utc")
+        retention_days = summary.get("retention_days")
+        if not isinstance(day, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            return None
+        try:
+            dt.date.fromisoformat(day)
+            if not isinstance(generated, str) or dt.datetime.fromisoformat(generated.replace("Z", "+00:00")).tzinfo is None:
+                return None
+        except ValueError:
+            return None
+        if not isinstance(retention_days, int) or isinstance(retention_days, bool) or not 0 <= retention_days <= 3650:
+            return None
+
+        servers: dict[str, Any] = {}
+        raw_servers = summary.get("servers")
+        if not isinstance(raw_servers, dict):
+            return None
+        for server, data in raw_servers.items():
+            if not isinstance(server, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,48}", server) or not isinstance(data, dict):
+                continue
+            safe_data: dict[str, Any] = {"latest_metrics": None, "event_counts_today": {}}
+            metrics = data.get("latest_metrics")
+            if isinstance(metrics, dict):
+                metric_record = dict(metrics)
+                metric_record["event"] = "metrics"
+                sanitized = cls._sanitize_merged_record(metric_record, server)
+                if sanitized is not None:
+                    sanitized.pop("event", None)
+                    safe_data["latest_metrics"] = sanitized
+            event_counts = data.get("event_counts_today")
+            if isinstance(event_counts, dict):
+                safe_data["event_counts_today"] = {
+                    event: count for event, count in event_counts.items()
+                    if isinstance(event, str) and event in MERGE_EVENTS
+                    and isinstance(count, int) and not isinstance(count, bool) and 0 <= count <= 1_000_000_000
+                }
+            servers[server] = safe_data
+        return {"date_utc": day, "generated_utc": generated, "retention_days": retention_days, "servers": servers}
 
     def merge_export(self, source: Path) -> int:
         merged = 0
@@ -389,11 +504,72 @@ class Monitor:
                 for line in z.read(name).decode("utf-8", "replace").splitlines():
                     try: item = json.loads(line)
                     except json.JSONDecodeError: continue
-                    item["merged_from"] = source.name
-                    item["event"] = item.get("event", "metrics")
-                    self.global_out.write(item)
+                    if not isinstance(item, dict):
+                        continue
+                    safe = self._sanitize_merged_record(item, server)
+                    if safe is None:
+                        continue
+                    safe["merged_from"] = "peer-export"
+                    self.global_out.write(safe)
                     merged += 1
         return merged
+
+    @staticmethod
+    def _sanitize_merged_record(item: dict[str, Any], server: str) -> dict[str, Any] | None:
+        """Validate untrusted peer records and discard all non-telemetry fields."""
+        timestamp = item.get("time")
+        if not isinstance(timestamp, str):
+            return None
+        try:
+            parsed_time = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed_time.tzinfo is None:
+            return None
+
+        event = item.get("event", "metrics")
+        if not isinstance(event, str) or event not in MERGE_EVENTS:
+            return None
+        safe: dict[str, Any] = {"time": timestamp, "server": server, "event": event}
+        if event == "metrics":
+            for field in ("role", "rcon_available"):
+                value = item.get(field)
+                if field == "role" and isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_. -]{1,40}", value):
+                    safe[field] = value
+                elif field == "rcon_available" and isinstance(value, bool):
+                    safe[field] = value
+        else:
+            log_time = item.get("log_time")
+            if isinstance(log_time, str) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", log_time):
+                safe["log_time"] = log_time
+            for field in MERGE_STRING_FIELDS:
+                value = item.get(field)
+                if not isinstance(value, str):
+                    continue
+                if field == "role" and re.fullmatch(r"[A-Za-z0-9_. -]{1,40}", value):
+                    safe[field] = value
+                elif field == "source" and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", value):
+                    safe[field] = value
+                elif field == "severity" and value in {"info", "warning", "error"}:
+                    safe[field] = value
+                elif field == "metric" and value in MERGE_NUMERIC_FIELDS:
+                    safe[field] = value
+                elif field == "reason" and value in MERGE_EVENTS:
+                    safe[field] = value
+            subject = item.get("subject")
+            if isinstance(subject, str) and re.fullmatch(r"[0-9a-f]{12}", subject):
+                safe["subject"] = subject
+            journal_state = item.get("journal_state")
+            if isinstance(journal_state, str) and journal_state in {"error", "healthy", "pending", "unknown"}:
+                safe["journal_state"] = journal_state
+
+        for field in MERGE_NUMERIC_FIELDS:
+            value = item.get(field)
+            if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                    and math.isfinite(value) and 0 <= value <= 1e18
+                    and (field not in MERGE_INTEGER_FIELDS or isinstance(value, int))):
+                safe[field] = value
+        return safe
 
 
 def format_daily_summary(summary: dict[str, Any]) -> str:
@@ -455,6 +631,10 @@ def main() -> int:
             monitor.run_once()
             time.sleep(max(0.1, float(monitor.cfg["poll_seconds"])-(time.monotonic()-started)))
     except KeyboardInterrupt:
+        # Flush recent log events and a final readable summary on an orderly stop.
+        for server in monitor.cfg["servers"]:
+            monitor.read_logs(server)
+        monitor.write_daily_summary()
         return 0
 
 

@@ -44,6 +44,88 @@ class BetaMonitorTests(unittest.TestCase):
         journal = monitor.parse_log_line("scheduled tick journal acknowledged", "backend2", "latest.log", b"salt")
         self.assertEqual(journal["journal_state"], "healthy")
 
+    def test_crafty_data_integrity_warnings_are_categorized_without_raw_details(self):
+        cases = {
+            "[20:09:52 WARN]: Paper I/O Worker #0 has no chunk holder for reading chunk world,region,12,34, reading it straight from disk instead": "chunk_read_fallback",
+            "[16:27:01 WARN]: Entity uuid already exists: 12345678-1234-1234-1234-123456789abc": "entity_uuid_conflict",
+            "[16:27:01 WARN]: UUID of added entity already exists: Pig['pig'/42, ...]": "entity_uuid_conflict",
+            "[16:27:02 WARN]: Tried to create an entity from nbt, but the entities for that chunk aren't loaded: Pig['pig'/42, ...]": "entity_update_unavailable",
+            "[16:27:03 WARN]: Could not route removal of entity 12345678-1234-1234-1234-123456789abc from non-owner backend to its chunk owner; broadcasting removal as fallback": "entity_removal_route_fallback",
+            "[16:27:04 WARN]: Mona: Ignoring stale inventory replacement 1 minecraft:diamond -> 0 minecraft:air. Re-syncing the authoritative slot.": "inventory_stale_replacement",
+            "[16:27:05 WARN]: Mona moved too quickly!": "movement_correction",
+        }
+        for line, expected in cases.items():
+            with self.subTest(event=expected):
+                event = monitor.parse_log_line(line, "backend1", "latest.log", b"salt")
+                self.assertEqual(event["event"], expected)
+                self.assertEqual(event["severity"], "warning")
+                self.assertNotIn("Mona", json.dumps(event))
+                self.assertNotIn("12345678", json.dumps(event))
+                self.assertNotIn("Pig", json.dumps(event))
+
+    def test_master_rejected_chunk_write_is_urgent_and_sanitized(self):
+        line = "java.io.IOException: Master rejected persistence of region chunk -3,14 in world rc5world"
+        event = monitor.parse_log_line(line, "backend1", "latest.log", b"salt")
+        self.assertEqual(event["event"], "chunk_write_rejected")
+        self.assertEqual(event["severity"], "error")
+        serialized = json.dumps(event)
+        self.assertNotIn("-3,14", serialized)
+        self.assertNotIn("rc5world", serialized)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log = root / "latest.log"
+            log.write_text("")
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(root / "monitor"),
+                "servers": [{"id": "backend1", "logs": [str(log)]}],
+            }))
+            m = monitor.Monitor(cfg)
+            server = m.cfg["servers"][0]
+            m.read_logs(server)  # Establish the current end-of-log offset.
+            with log.open("a", encoding="utf-8") as stream:
+                stream.write(line + "\n")
+            m.read_logs(server)
+            events = root / "monitor" / "backend1" / "events.jsonl"
+            records = [json.loads(value) for value in events.read_text().splitlines()]
+            self.assertEqual([value["event"] for value in records], ["chunk_write_rejected", "alert"])
+            self.assertEqual(records[1]["reason"], "chunk_write_rejected")
+            self.assertNotIn("-3,14", json.dumps(records))
+            self.assertNotIn("rc5world", json.dumps(records))
+
+    def test_integrity_warning_alerts_are_immediate_rate_limited_and_sanitized(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log = root / "latest.log"
+            log.write_bytes(b"")
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(root / "monitor"),
+                "servers": [{"id": "backend1", "logs": [str(log)]}],
+            }))
+            m = monitor.Monitor(cfg)
+            server = m.cfg["servers"][0]
+            m.read_logs(server)  # Establish an empty-file offset.
+
+            warning = ("[20:09:52 WARN]: Worker has no chunk holder for reading chunk "
+                       "world,region,12,34, reading it straight from disk instead\n")
+            with patch.object(monitor.time, "monotonic", side_effect=[0.0, 59.0, 60.0]):
+                for _ in range(3):
+                    with log.open("ab") as f:
+                        f.write(warning.encode())
+                    m.read_logs(server)
+
+            event_path = root / "monitor" / "backend1" / "events.jsonl"
+            records = [json.loads(line) for line in event_path.read_text().splitlines()]
+            self.assertEqual([r["event"] for r in records].count("chunk_read_fallback"), 3)
+            alerts = [r for r in records if r["event"] == "alert"]
+            self.assertEqual(len(alerts), 2, "alert immediately, suppress within 60s, alert at 60s")
+            self.assertTrue(all(r["reason"] == "chunk_read_fallback" for r in alerts))
+            serialized = json.dumps(records)
+            self.assertNotIn("12,34", serialized)
+            self.assertNotIn("Worker", serialized)
+
     def test_log_events_keep_no_chat_or_player_name(self):
         event = monitor.parse_log_line("[12:00:00 INFO]: DeltaPvP_ joined the game", "backend1", "/logs/latest.log", b"salt")
         self.assertEqual(event["event"], "player_join")
@@ -139,6 +221,78 @@ class BetaMonitorTests(unittest.TestCase):
             self.assertEqual(master.merge_export(bundle), 1)
             self.assertIn("pc2-backend", (root / "master" / "timeline.jsonl").read_text())
 
+    def test_merge_rejects_private_fields_and_invalid_record_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "master.json"
+            cfg.write_text(json.dumps({"output_dir": str(root / "master"), "servers": [{"id": "master"}]}))
+            master = monitor.Monitor(cfg)
+            bundle = root / "private-player-name-and-secret.zip"
+            record = {
+                "time": monitor.utc_now(), "server": "forged-server", "event": "player_join",
+                "subject": "012345abcdef", "severity": "info", "source": "latest.log",
+                "player_name": "PrivatePlayerName", "chat": "PrivateChatContents",
+                "password": "SyntheticRconSecret", "token": "SyntheticToken",
+                "arbitrary": {"world": "PrivateWorld"}, "merged_from": "SyntheticOriginCredential",
+            }
+            malformed = {"time": monitor.utc_now(), "event": "player_leave", "journal_state": ["not", "a", "state"]}
+            metrics = {
+                "time": monitor.utc_now(), "role": "backend", "cpu_percent": 12.5,
+                "rcon_available": True, "private_note": "SyntheticPrivateNote",
+            }
+            with zipfile.ZipFile(bundle, "w") as z:
+                z.writestr("pc2-backend/events.jsonl", json.dumps(record) + "\n" + json.dumps(malformed) + "\n")
+                z.writestr("pc2-backend/metrics.jsonl", json.dumps(metrics) + "\n")
+
+            self.assertEqual(master.merge_export(bundle), 3)
+            timeline = (root / "master" / "timeline.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn("PrivatePlayerName", timeline)
+            self.assertNotIn("PrivateChatContents", timeline)
+            self.assertNotIn("SyntheticRconSecret", timeline)
+            self.assertNotIn("SyntheticToken", timeline)
+            self.assertNotIn("PrivateWorld", timeline)
+            self.assertNotIn("SyntheticOriginCredential", timeline)
+            self.assertNotIn("SyntheticPrivateNote", timeline)
+            self.assertNotIn(bundle.name, timeline)
+            records = [json.loads(line) for line in timeline.splitlines()]
+            self.assertTrue(all(item["server"] == "pc2-backend" for item in records))
+            self.assertTrue(all(item["merged_from"] == "peer-export" for item in records))
+            self.assertNotIn("journal_state", records[1])
+            metric_record = next(item for item in records if item["event"] == "metrics")
+            self.assertEqual(metric_record["cpu_percent"], 12.5)
+            self.assertEqual(metric_record["rcon_available"], True)
+
+    def test_keyboard_interrupt_flushes_logs_and_summary(self):
+        class FakeMonitor:
+            cfg = {"poll_seconds": 10, "servers": [{"id": "master"}, {"id": "backend1"}]}
+
+            def __init__(self, _config):
+                self.run_once_calls = 0
+                self.read_servers = []
+                self.summary_calls = 0
+
+            def run_once(self):
+                self.run_once_calls += 1
+
+            def read_logs(self, server):
+                self.read_servers.append(server["id"])
+
+            def write_daily_summary(self):
+                self.summary_calls += 1
+
+        fake_instance = FakeMonitor(Path("private.json"))
+        with patch.object(monitor, "Monitor", return_value=fake_instance), \
+                patch.object(monitor, "time") as mocked_time, \
+                patch("sys.argv", ["multipaper-beta-monitor.py", "--config", "private.json"]):
+            mocked_time.monotonic.return_value = 10.0
+            mocked_time.sleep.side_effect = KeyboardInterrupt
+            result = monitor.main()
+
+        self.assertEqual(result, 0)
+        self.assertEqual(fake_instance.run_once_calls, 1)
+        self.assertEqual(fake_instance.read_servers, ["master", "backend1"])
+        self.assertEqual(fake_instance.summary_calls, 1)
+
     def test_daily_human_summary_is_readable_and_exported(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -162,11 +316,34 @@ class BetaMonitorTests(unittest.TestCase):
             self.assertNotIn("ab12cd34ef56", rendered)
             self.assertNotIn("private.json", rendered)
 
+            secret_markers = ("ExportPrivatePlayer", "ExportPrivateChat", "ExportSyntheticPassword", "ExportSyntheticToken", "ExportPrivateNote")
+            with (m.root / "backend1" / "events.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"time": monitor.utc_now(), "server": "backend1", "event": "player_join",
+                                    "password": secret_markers[2], "chat": secret_markers[1], "player_name": secret_markers[0]}) + "\n")
+            with (m.root / "backend1" / "metrics.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"time": monitor.utc_now(), "server": "backend1", "event": "metrics",
+                                    "cpu_percent": 1.0, "private_note": secret_markers[4], "token": secret_markers[3]}) + "\n")
+            with (m.root / "timeline.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"time": monitor.utc_now(), "server": "backend1", "event": "error",
+                                    "message": secret_markers[1], "password": secret_markers[2]}) + "\n")
+            summary_json = summaries / report.with_suffix(".json").name
+            summary_data = json.loads(summary_json.read_text(encoding="utf-8"))
+            summary_data["private_note"] = secret_markers[4]
+            summary_data["servers"]["backend1"]["private_note"] = secret_markers[4]
+            summary_data["servers"]["backend1"]["event_counts_today"][secret_markers[1]] = 4
+            summary_json.write_text(json.dumps(summary_data), encoding="utf-8")
+            report.write_text(report.read_text(encoding="utf-8") + "\n" + " ".join(secret_markers), encoding="utf-8")
+
             bundle = root / "support.zip"
             m.export(bundle)
             with zipfile.ZipFile(bundle) as z:
                 self.assertIn(f"summaries/{report.name}", z.namelist())
                 self.assertFalse(any("private.json" in name for name in z.namelist()))
+                exported = "\n".join(z.read(name).decode("utf-8") for name in z.namelist())
+                for marker in secret_markers:
+                    self.assertNotIn(marker, exported)
+                exported_report = z.read(f"summaries/{report.name}").decode("utf-8")
+                self.assertIn("TPS (1m): 19.5", exported_report)
 
     def test_daily_summary_refreshes_at_five_minute_interval(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -181,6 +358,37 @@ class BetaMonitorTests(unittest.TestCase):
                 m.run_once()
                 m.run_once()
             self.assertEqual(write_summary.call_count, 2)
+
+    def test_daily_summary_retention_removes_only_expired_date_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(root / "monitor"),
+                "retention": {"max_bytes_per_file": 10000, "keep_rotated": 2, "days": 3},
+                "servers": [{"id": "backend1"}],
+            }))
+            m = monitor.Monitor(cfg)
+            summaries = m.root / "summaries"
+            summaries.mkdir()
+            today = monitor.dt.datetime.now(monitor.dt.timezone.utc).date()
+            expired = today - monitor.dt.timedelta(days=4)
+            retained = today - monitor.dt.timedelta(days=2)
+            old_json = summaries / f"{expired.isoformat()}.json"
+            old_text = summaries / f"{expired.isoformat()}.txt"
+            retained_text = summaries / f"{retained.isoformat()}.txt"
+            unrelated = summaries / "notes.txt"
+            for path in (old_json, old_text, retained_text, unrelated):
+                path.write_text("synthetic retention fixture", encoding="utf-8")
+
+            m.write_daily_summary()
+
+            self.assertFalse(old_json.exists())
+            self.assertFalse(old_text.exists())
+            self.assertTrue(retained_text.exists())
+            self.assertTrue(unrelated.exists())
+            self.assertTrue((summaries / f"{today.isoformat()}.json").exists())
+            self.assertTrue((summaries / f"{today.isoformat()}.txt").exists())
 
 
 if __name__ == "__main__": unittest.main()
