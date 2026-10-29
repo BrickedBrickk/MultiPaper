@@ -4,6 +4,8 @@ import net.minecraft.world.entity.Entity;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -12,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Normal
 class EntityUpdateNBTPacketTest {
@@ -95,6 +98,48 @@ class EntityUpdateNBTPacketTest {
         assertSame(candidate, result);
         assertSame(candidate, added.get());
         assertNull(unavailable.get());
+    }
+
+    @Test
+    void earlyUpdateCanBeRecoveredByLaterChunkLoadWithoutDuplicateUuid() {
+        UUID uuid = UUID.fromString("00000000-0000-0000-0000-000000000006");
+        Entity earlyCandidate = entity(uuid.toString());
+        Entity chunkLoadCandidate = entity(uuid.toString());
+        Entity duplicateCandidate = entity(uuid.toString());
+        List<Entity> registered = new ArrayList<>();
+        AtomicReference<UUID> unavailable = new AtomicReference<>();
+        AtomicReference<Entity> refreshedCanonical = new AtomicReference<>();
+
+        Entity earlyResult = EntityUpdateNBTPacket.registerEntityOrReportUnavailable(earlyCandidate, false,
+                candidate -> {
+                    registered.add(candidate);
+                    return true;
+                }, ignored -> registered.stream().filter(entity -> entity.getUUID().equals(uuid)).findFirst().orElse(null),
+                (existing, incoming) -> refreshedCanonical.set(existing), unavailable::set);
+        assertNull(earlyResult, "an incremental update must not register into an unloaded entity chunk");
+        assertEquals(uuid, unavailable.get());
+        assertTrue(registered.isEmpty(), "the early update must leave no untracked entity behind");
+
+        Entity recovered = EntityUpdateNBTPacket.registerEntityOrReportUnavailable(chunkLoadCandidate, true,
+                candidate -> {
+                    if (registered.stream().anyMatch(entity -> entity.getUUID().equals(candidate.getUUID()))) return false;
+                    registered.add(candidate);
+                    return true;
+                }, ignored -> registered.stream().filter(entity -> entity.getUUID().equals(uuid)).findFirst().orElse(null),
+                (existing, incoming) -> refreshedCanonical.set(existing), unavailable::set);
+        assertSame(chunkLoadCandidate, recovered, "the later full chunk image must register the entity");
+        assertEquals(1, registered.size());
+
+        Entity retried = EntityUpdateNBTPacket.registerEntityOrReportUnavailable(duplicateCandidate, true,
+                candidate -> {
+                    if (registered.stream().anyMatch(entity -> entity.getUUID().equals(candidate.getUUID()))) return false;
+                    registered.add(candidate);
+                    return true;
+                }, ignored -> registered.stream().filter(entity -> entity.getUUID().equals(uuid)).findFirst().orElse(null),
+                (existing, incoming) -> refreshedCanonical.set(existing), unavailable::set);
+        assertSame(chunkLoadCandidate, retried, "a repeated packet must keep and refresh the canonical entity");
+        assertSame(chunkLoadCandidate, refreshedCanonical.get());
+        assertEquals(1, registered.size(), "recovery and a repeated update must leave exactly one entity with this UUID");
     }
 
     private static Entity entity(String uuid) {
