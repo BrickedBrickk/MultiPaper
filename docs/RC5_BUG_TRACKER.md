@@ -1,6 +1,17 @@
 # MultiPaper 26.3 RC5 bug tracker
 
-Updated: 2026-10-28. Scope: user-reported RC4 symptoms and the two supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
+Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
+
+### RC5-02 Master session-epoch/protocol rerun — 2026-10-29
+
+- Recompiled the current Master and MasterBound protocol sources and tests with Java 25 / Gradle 9.8 using `--rerun-tasks` and an isolated Gradle user home. `MasterIntegrationTest` passed **40/40** and `ProtocolRoundtripTest` passed **6/6**, both with zero failures/errors/skips. The session epoch test covers negotiated capability, registered current owner, disconnect clearing, and denial of a legacy peer; protocol checks cover the separate capability marker and stable appended message IDs.
+- This validates the Master/protocol boundary only. Paper session sender/reconnect compilation and runtime remain unverified; no target-owner prepare/attestation, click identity, cursor escrow, live mirror application, or cross-owner durable transaction is wired to InvSee++. Exact RC4 16→32 duplication remains unfixed, remote edits remain fail-closed, and **RC5-02 stays P0 `BLOCKED`**.
+- Full command, JUnit/source hashes and limits: `performance-results/rc5-session-epoch-master-protocol-rerun-20261029.md`. No live SMP was touched.
+
+### RC5 beta monitor current working-tree validation — 2026-10-29
+
+- Current Python 3.11.9 run passed **8/8** monitor tests, including requested event categories, sanitized export/no chat or player names, bounded rotation, copy-truncate detection, and independent per-server baselines for host-wide network counters. This remains synthetic parser/collector validation; no Crafty host or live RCON was queried, and target-PC overhead/runtime event availability is not certified.
+- Hashes and scope: `performance-results/rc5-monitor-current-working-tree-rerun-20261029.md`. Keep the target-PC setup/overhead gate pending beta installation.
 
 ### RC5 compatibility gate update — current official component availability and Bedrock transport — 2026-10-28
 
@@ -2301,3 +2312,16 @@ Refreshed the local BLOCKED/NOT FOR INSTALLATION OR DISTRIBUTION ZIP with the cu
 - **B→A PASS:** Same schedule/assertions passed in reverse. Master rejected the stale write and exact chest NBT persisted. Result SHA-256 `45C9E2A0373C986C27CD1A7250BE2566E233966C06051EB57CFA2530A54937DC`; transcript `1F9F65B345D305809FE262EE96E6CD4B438E93B15FC500B46B10727077917C91`.
 - Both Master stops were graceful; all six fixture ports closed and no fixture Java process remained. Full log hashes and limitations: `performance-results/rc5-current-source-chest-273-bidirectional-20261029.md`. Non-fatal Windows OSHI/process-metrics diagnostics and a disposable-world migration notice are documented there.
 - This confirms selected current-candidate schedules only, not the live empty-chest incident or every save/crash ordering. No live server/world was accessed or restored. **RC5-01 stays P0 `TESTING`**; **RC5-02 stays P0 `BLOCKED`**.
+
+### RC5-01 exact-current six-component chest probe and late former-owner writes — 2026-10-29
+
+- **Evidence:** In disposable fixture `D:\multipaper-tests\system-temp\rc5-current-sixcomponent-sequential-shutdown-20261029-003000`, a chest seeded with exactly 17 diamonds at `(-38,79,-199)` was read with the exact stack by Backend B after Backend A stopped. Backend A's shutdown still emitted 8 failed chunk writes (16 error/cause lines). Temporary Master diagnostics attributed each reject to sender `smoke-a` after that same connection relinquished ownership (`hasOwner=false`, `previousOwner=smoke-a`); no other backend owned the chunk at rejection time.
+- **Meaning:** This confirms a late former-owner write/release ordering window that is safely rejected by the owner fence. The seeded chest's chunk was not among the rejected coordinates, and B read its exact contents after handoff. This run does not show chest loss or prove every chunk save. Backend B restarted to `Done`, but the post-restart exact chest assertion did not finish before runner cleanup, so this run fails the strict shutdown-write gate and is **inconclusive for restart persistence**.
+- **Reproduction artifacts:** `performance-results/rc5-current-sixcomponent-chest-single-restart-probe-20261029.md` records exact log hashes and scope. The diagnostic instrumentation was removed afterward. All fixture processes exited and test ports 32651, 32652, 32661, 32662, 32672 were closed. No live Crafty/world access or restoration occurred.
+- **Verification/status:** The independent exact-current 273-read A→B and B→A chest tests above remain passing through graceful backend and Master restarts; they cover populated single/double chests in selected handoff schedules. The new simple probe adds direct evidence that one post-handoff chest retained contents despite other ownerless stale writes. **RC5-01 remains P0 `TESTING`** pending attribution of the actual reported empty chests and wider asynchronous save/crash ordering. Keep fail-closed rejection; no source fix is justified by this probe alone.
+
+### RC5-01 targeted late-write chest verification — 2026-10-29
+
+- Extended the disposable runner with `-ExerciseLateShutdownChestWrite`: after Backend A flushes, it changes the seeded chest from diamond x17 to x29, then stops A. In fresh run `six-component-smoke-20261029-004513`, chest `(-34,88,-217)` is in chunk `(-3,-14)`. Temporary Master diagnostics confirmed a rejected ownerless write for that exact chunk from `smoke-a`, whose previous ownership had been relinquished.
+- **Exact-content result:** Backend B read diamond x29 after A stopped and again after B stopped/restarted. Thus the rejected write in this timing did not contain the only/latest chest image; a newer Master snapshot already preserved x29. A second region write at `(-1,-14)` was also rejected. Paper reports four error/cause lines for the two rejects, so the runner's no-rejection log gate fails even though both chest persistence assertions pass.
+- This is stronger evidence about the late-write window, not a universal guarantee: it does not establish that all shutdown rejections are duplicates or explain the real empty chests. Keep the owner fence and **RC5-01 P0 `TESTING`**. Detailed artifact hashes: `performance-results/rc5-current-sixcomponent-chest-single-restart-probe-20261029.md`. The runner is now pinned to the opt-in regression and its test passed on a disposable fixture; no live service/world was accessed.

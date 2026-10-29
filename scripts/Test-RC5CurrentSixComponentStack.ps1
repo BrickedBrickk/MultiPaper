@@ -10,6 +10,8 @@ param(
     [string]$ExpectedBackendA = 'smoke-a',
     [string]$ExpectedBackendB = 'smoke-b',
     [switch]$RunVanillaMechanics,
+    [switch]$ChestPersistenceProbe,
+    [switch]$ExerciseLateShutdownChestWrite,
     [string]$JavaExecutable = 'C:\Program Files\Eclipse Adoptium\jdk-25.0.3.9-hotspot\bin\java.exe',
     [string]$NodeExecutable = 'node',
     [string]$NodeModules = "$env:TEMP\mp-26.3-protocol-probe-deps\node_modules",
@@ -99,6 +101,20 @@ function Invoke-Rcon([int]$Port, [string]$Password, [string]$Command) {
     } finally { $client.Dispose() }
 }
 
+function Get-ChestItems([int]$Port, [string]$Password, [int]$X, [int]$Y, [int]$Z, [string]$Label, [int]$ExpectedCount) {
+    Invoke-Rcon $Port $Password "forceload add $X $Z" | Out-Null
+    $reply = ''
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        $reply = Invoke-Rcon $Port $Password "data get block $X $Y $Z Items"
+        if ($reply -notmatch 'not loaded') { break }
+        Start-Sleep -Milliseconds 500
+    }
+    if ($reply -notmatch 'minecraft:diamond' -or $reply -notmatch "count:\s*$ExpectedCount\b") {
+        throw "$Label chest inventory was not exactly diamond x${ExpectedCount}: $reply"
+    }
+    return $reply
+}
+
 function Wait-ForLog([string]$Path, [string]$Pattern, [Diagnostics.Process]$Process, [string]$Label) {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
@@ -113,7 +129,7 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $logRoot = Join-Path $FixtureRoot "six-component-smoke-$stamp"
 New-Item -ItemType Directory -Path $logRoot | Out-Null
 $owned = [Collections.Generic.List[Diagnostics.Process]]::new()
-$master = $null; $backendA = $null; $backendB = $null; $geyser = $null
+$master = $null; $backendA = $null; $backendB = $null; $backendRestart = $null; $geyser = $null
 $oldNodePath = $env:NODE_PATH; $oldMcData = $env:MULTIPAPER_MC_DATA_26_3
 $passwordA = Get-Property (Join-Path $FixtureRoot 'backend-a\server.properties') 'rcon.password'
 $passwordB = Get-Property (Join-Path $FixtureRoot 'backend-b\server.properties') 'rcon.password'
@@ -145,22 +161,65 @@ try {
     Invoke-Rcon $BackendBRconPort $passwordB 'op StackSmoke' | Out-Null
     $env:NODE_PATH = $NodeModules; $env:MULTIPAPER_MC_DATA_26_3 = $MinecraftData26_3
     $probe = Join-Path $repo 'scripts\Run-ProxyCommandProbe.js'
-    & $NodeExecutable $probe '127.0.0.1' "$ProxyPort" 'StackSmoke' '26.3' $ExpectedBackendA $ExpectedBackendB
-    if ($LASTEXITCODE -ne 0) { throw "Exact-pair proxy command/chunk smoke failed with exit code $LASTEXITCODE." }
+    $probeOutput = (& $NodeExecutable $probe '127.0.0.1' "$ProxyPort" 'StackSmoke' '26.3' $ExpectedBackendA $ExpectedBackendB 2>&1 | Out-String)
+    $probeExitCode = $LASTEXITCODE
+    $probeOutput
+    if ($probeExitCode -ne 0) { throw "Exact-pair proxy command/chunk smoke failed with exit code $probeExitCode." }
 
     $status = (& (Join-Path $repo 'scripts\Probe-ServerStatus.ps1') -Host2 '127.0.0.1' -Port $ProxyPort | Out-String)
     if ($status -notmatch 'Protocol\s*:\s*777' -or $status -notmatch 'MultiPaper 26\.3') { throw "Proxy server-list status ping failed: $status" }
     $status
 
+    $chestX = -40; $chestY = 80; $chestZ = -216; $chestCount = 17
+    if ($ChestPersistenceProbe) {
+        $positionMatch = [regex]::Match($probeOutput, 'PLAYER_READY\s+(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)')
+        if (-not $positionMatch.Success) { throw "Could not derive a loaded test chunk from proxy probe output: $probeOutput" }
+        $chestX = [Math]::Floor([double]::Parse($positionMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)) + 3
+        $chestY = [Math]::Floor([double]::Parse($positionMatch.Groups[2].Value, [Globalization.CultureInfo]::InvariantCulture)) - 1
+        $chestZ = [Math]::Floor([double]::Parse($positionMatch.Groups[3].Value, [Globalization.CultureInfo]::InvariantCulture))
+        $setChestReply = Invoke-Rcon $BackendARconPort $passwordA "setblock $chestX $chestY $chestZ minecraft:chest replace"
+        $setItemsReply = Invoke-Rcon $BackendARconPort $passwordA "item replace block $chestX $chestY $chestZ container.0 with minecraft:diamond $chestCount"
+        $seedRead = Invoke-Rcon $BackendARconPort $passwordA "data get block $chestX $chestY $chestZ Items"
+        if ($seedRead -notmatch 'minecraft:diamond' -or $seedRead -notmatch "count:\s*$chestCount\b") {
+            throw "Chest seed failed at $chestX,$chestY,$chestZ. setblock=$setChestReply item=$setItemsReply read=$seedRead"
+        }
+        Write-Output "CHEST_SEEDED x=$chestX y=$chestY z=$chestZ minecraft:diamond count=$chestCount"
+    }
+
     # A startup/login smoke is not a clean persistence result if Moonrise reports
-    # a Master-rejected chunk write during the orderly fixture shutdown. Stop both
-    # backends while Master is still running, then inspect their complete logs.
+    # a Master-rejected chunk write during shutdown. Stop one backend fully before
+    # the other so an intentional simultaneous teardown does not create a test-only
+    # ownership race. Keep Master up until both backend saves have completed.
     Invoke-Rcon $BackendARconPort $passwordA 'save-all flush' | Out-Null
-    Invoke-Rcon $BackendBRconPort $passwordB 'save-all flush' | Out-Null
+    if ($ExerciseLateShutdownChestWrite) {
+        if (-not $ChestPersistenceProbe) { throw 'Late-shutdown chest write probe requires -ChestPersistenceProbe.' }
+        $lateShutdownChestCount = $chestCount + 12
+        $lateMutationReply = Invoke-Rcon $BackendARconPort $passwordA "item replace block $chestX $chestY $chestZ container.0 with minecraft:diamond $lateShutdownChestCount"
+        $lateMutationRead = Invoke-Rcon $BackendARconPort $passwordA "data get block $chestX $chestY $chestZ Items"
+        if ($lateMutationRead -notmatch 'minecraft:diamond' -or $lateMutationRead -notmatch "count:\s*$lateShutdownChestCount\b") {
+            throw "Late-shutdown chest mutation failed at $chestX,$chestY,$chestZ. command=$lateMutationReply read=$lateMutationRead"
+        }
+        Write-Output "CHEST_MUTATED_AFTER_FLUSH x=$chestX y=$chestY z=$chestZ minecraft:diamond count=$lateShutdownChestCount"
+        $chestCount = $lateShutdownChestCount
+    }
     Invoke-Rcon $BackendARconPort $passwordA 'stop' | Out-Null
+    if (-not $backendA.WaitForExit(60000)) { throw "Disposable backend PID $($backendA.Id) did not stop within 60 seconds." }
+    if ($ChestPersistenceProbe) {
+        [void](Get-ChestItems $BackendBRconPort $passwordB $chestX $chestY $chestZ 'After owner A stopped (read by B)' $chestCount)
+        Write-Output 'CHEST_PERSISTED after owner A stopped and read by backend B'
+    }
+    Invoke-Rcon $BackendBRconPort $passwordB 'save-all flush' | Out-Null
     Invoke-Rcon $BackendBRconPort $passwordB 'stop' | Out-Null
-    foreach ($process in @($backendA, $backendB)) {
-        if (-not $process.WaitForExit(60000)) { throw "Disposable backend PID $($process.Id) did not stop within 60 seconds." }
+    if (-not $backendB.WaitForExit(60000)) { throw "Disposable backend PID $($backendB.Id) did not stop within 60 seconds." }
+    if ($ChestPersistenceProbe) {
+        $restartLog = Join-Path $logRoot 'backend-b-restart.out'
+        $backendRestart = Start-Process -FilePath $JavaExecutable -WorkingDirectory (Join-Path $FixtureRoot 'backend-b') -ArgumentList @('-jar', 'server.jar', '--nogui') -WindowStyle Hidden -RedirectStandardOutput $restartLog -RedirectStandardError (Join-Path $logRoot 'backend-b-restart.err') -PassThru
+        $owned.Add($backendRestart)
+        Wait-ForLog $restartLog 'Done \(' $backendRestart 'Backend B restart'
+        [void](Get-ChestItems $BackendBRconPort $passwordB $chestX $chestY $chestZ 'After Backend B restart' $chestCount)
+        Write-Output 'CHEST_PERSISTED after backend B restart'
+        Invoke-Rcon $BackendBRconPort $passwordB 'stop' | Out-Null
+        if (-not $backendRestart.WaitForExit(60000)) { throw "Disposable backend PID $($backendRestart.Id) did not stop within 60 seconds." }
     }
     $persistenceErrors = @(
         (Select-String -LiteralPath (Join-Path $logRoot 'backend-a.out') -Pattern 'Failed to write chunk data|Master rejected persistence' -ErrorAction SilentlyContinue),
