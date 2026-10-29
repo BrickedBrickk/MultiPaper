@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 player-session registration readiness prerequisite — 2026-10-29
+
+Current uncommitted work exposes Master Boolean acknowledgements for exact player-session registration and records readiness by player UUID, session UUID, and Master connection generation. Six state regressions cover acceptance, deduplication, rejection/retry, late old-session replies, disconnect invalidation, and matching-session retirement. Focused inventory/session tests passed 44/44; two sequential clean Java 25 full builds each passed 10,794 tests (0 failures/errors, 88 skipped) and produced nine identical JAR hashes. Evidence: `performance-results/rc5-player-session-registration-readiness-20261029.md`. This does not use readiness in the cross-backend click path or implement owner-attested transactions; InvSee++ remote edits remain fail-closed and RC5-02 P0 BLOCKED. Do not install or publish RC5. Preserve unrelated dirty files. Continue from `docs/RC5_BUG_TRACKER.md`.
+
 ## Beta monitor readable summaries — 2026-10-29
 
 Added a privacy-safe UTF-8 daily text summary alongside the existing JSON summary. It refreshes every five minutes, identifies unavailable metrics, separates host and Java-process measures, labels network rates host-wide, and is included in allowlisted diagnostics ZIPs. Focused Python suite: 10/10 passed; `py_compile` and `git diff --check` passed. Hashes and scope: `performance-results/rc5-monitor-readable-summary-20261029.md`. This validates synthetic formatting/export only; host instrumentation, target-PC overhead, and actual event availability remain unverified. RC5 remains blocked by P0 InvSee++ conservation and chest validation gates.

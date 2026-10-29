@@ -1,5 +1,11 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### RC5-02 session-registration readiness prerequisite — 2026-10-29
+
+- Added Master-acknowledged player-session readiness fenced by player UUID, session UUID, and connection generation. Duplicate registrations share one pending result; rejected replies, replacement sessions, disconnect/reconnect, and matching-session retirement stay fail-closed. Six state regressions were added.
+- Focused inventory/session suite passed **44/44** (12 suites); two clean Java 25 full builds each passed **10,794 tests, 0 failures/errors, 88 skipped**, with all nine JAR outputs byte-identical and archive-readable. Exact commands, hashes, and changed-file list: `performance-results/rc5-player-session-registration-readiness-20261029.md`.
+- This is readiness groundwork only: the cross-backend click path still does not use it and remains fail-closed. No owner-attested inventory/cursor transaction was implemented; no paired runtime acknowledgement or item-conservation test was run. **RC5-02 remains P0 `BLOCKED`; do not install or publish RC5.** Live services/worlds were untouched.
+
 ### Beta monitor readable-summary verification — 2026-10-29
 
 - Added a UTF-8 human-readable daily summary generated from sanitized JSON summary fields, refreshed every five minutes, and included it in the export allowlist. Unavailable metrics are explicit; host-wide network rates and Java-process CPU/RSS have distinct labels. Regressions verify text output, event counts, no session hash leakage, text-summary export excluding private config, and refresh cadence.

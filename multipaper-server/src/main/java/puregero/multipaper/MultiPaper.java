@@ -177,6 +177,7 @@ public class MultiPaper {
     }
 
     public static void sendPlayerDisconnect(ServerPlayer player) {
+        getConnection().retirePlayerSession(player.getUUID(), PlayerSyncSession.getSessionId(player));
         getConnection().send(new PlayerDisconnectMessage(player.getUUID()));
     }
 

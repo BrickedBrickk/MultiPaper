@@ -70,6 +70,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
     private final PeerServerStartTracker peerServerStartTracker = new PeerServerStartTracker();
     private final ServerStartMessageTracker serverStartMessageTracker = new ServerStartMessageTracker();
+    private final PlayerSessionRegistrationState playerSessionRegistrationState = new PlayerSessionRegistrationState();
     public String secret;
     public Map<String, byte[]> dataCache = Maps.newHashMap();
     public int port = -1;
@@ -107,6 +108,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
+        playerSessionRegistrationState.invalidate();
         channel = (SocketChannel) ctx.channel();
         supportsPlayerDataTransactionProtocol = false;
         supportsPlayerSessionProtocol = false;
@@ -175,6 +177,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         channelActive = false;
         supportsPlayerDataTransactionProtocol = false;
         supportsPlayerSessionProtocol = false;
+        playerSessionRegistrationState.invalidate();
         serverStartMessageTracker.onDisconnect();
         LOGGER.info("Lost connection to " + ((SocketChannel) ctx.channel()).remoteAddress());
         failPendingPlayerSessionRegistrations();
@@ -348,15 +351,33 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         }
     }
 
-    public void registerPlayerSession(ServerPlayer player) {
-        if (!supportsPlayerSessionProtocol || !channelActive || !MultiPaper.isRealPlayer(player)) return;
+    public CompletableFuture<Boolean> registerPlayerSession(ServerPlayer player) {
+        if (!supportsPlayerSessionProtocol || !channelActive || !MultiPaper.isRealPlayer(player)) {
+            return CompletableFuture.completedFuture(false);
+        }
         UUID sessionId = PlayerSyncSession.getSessionId(player);
-        RegisterPlayerSessionMessage request = new RegisterPlayerSessionMessage(player.getUUID(), sessionId);
-        send(request, reply -> {
-            if (!(reply instanceof BooleanMessageReply accepted) || !accepted.result) {
-                LOGGER.warn("Master rejected live player session registration for {}", player.getScoreboardName());
-            }
-        });
+        if (sessionId == null || new UUID(0, 0).equals(sessionId)) return CompletableFuture.completedFuture(false);
+        PlayerSessionRegistrationState.Attempt attempt = playerSessionRegistrationState.begin(player.getUUID(), sessionId);
+        if (attempt.shouldSend()) {
+            trySendAndAwaitReply(new RegisterPlayerSessionMessage(player.getUUID(), sessionId), BooleanMessageReply.class)
+                    .whenComplete((reply, failure) -> {
+                        boolean accepted = failure == null && reply.result;
+                        if (!playerSessionRegistrationState.complete(attempt, accepted)) return;
+                        if (!accepted) {
+                            LOGGER.warn("Master rejected live player session registration for {}", player.getScoreboardName(), failure);
+                        }
+                    });
+        }
+        return attempt.result();
+    }
+
+    public boolean isPlayerSessionRegistered(UUID playerId, UUID sessionId) {
+        return supportsPlayerSessionProtocol && channelActive
+                && playerSessionRegistrationState.isRegistered(playerId, sessionId);
+    }
+
+    public void retirePlayerSession(UUID playerId, UUID sessionId) {
+        playerSessionRegistrationState.retire(playerId, sessionId);
     }
 
     private void registerOnlinePlayerSessions() {
