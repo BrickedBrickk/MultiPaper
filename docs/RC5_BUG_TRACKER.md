@@ -2,9 +2,9 @@
 
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
 
-### RC5 blocked review package v33 — 2026-10-29
+### RC5 blocked review package v34 — 2026-10-29
 
-- Refreshed local review-only ZIP: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`. All 49 payload hashes matched, 51 ZIP entries, no unsafe paths/data files or private-key/literal-RCON matches. It includes the source-commit publication evidence and remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**.
+- Refreshed local review-only ZIP: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v34-20261029.zip`, 82,714,132 bytes, SHA-256 `88d0c1ee3b53bd294b278acb90b2d2ed40f8c1f7d3aed692ca8c297991580bf7`. All 49 payload hashes matched, 51 ZIP entries, no unsafe paths/data files or private-key/literal-RCON matches. It includes the source-commit publication evidence and is stamped with packaging HEAD `22c75ab14887437d05c403fa2ec25d0822a3f833`. It remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**.
 - This packaging audit confirms archive contents only. P0 chest-loss attribution/recovery and InvSee++ conservation remain open; do not install or publish RC5.
 
 ### RC5 source checkpoint — commit a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0

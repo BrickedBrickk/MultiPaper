@@ -1,5 +1,11 @@
 # RC5 blocked local review bundle — 2026-10-28
 
+## v34 refresh — committed provenance and readable package note — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v34-20261029.zip`, 82,714,132 bytes, SHA-256 `88d0c1ee3b53bd294b278acb90b2d2ed40f8c1f7d3aed692ca8c297991580bf7`; sidecar matched. Its embedded manifest SHA-256 is `af8de8460246e5351c6ded06a67cad69934c14dc0ed175eb36770bd83cfbe8b8`; all 49 payload entries verified from ZIP member bytes, 51 entries total. Duplicate/unsafe archive paths, world/backup/playerdata/region/log/database/key paths, private-key markers and literal RCON-password patterns: zero. README status and committed-source provenance matched expected values.
+
+V34 corrects the source-commit note's character encoding while preserving the exact Java 25 Master/Paperclip pair and issue statuses. Packaging HEAD is `22c75ab14887437d05c403fa2ec25d0822a3f833`; product code used for the binaries is commit `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0`. This is a local blocked review bundle, not an installable or public RC5 release. No live service/world was accessed.
+
 ## v33 refresh — source commit publication evidence — 2026-10-29
 
 Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`; sidecar matched. Direct ZIP-member validation passed all 49 payload hashes, 51 entries total, zero duplicate/unsafe paths, zero world/backup/playerdata/region/raw-log/database/key paths, and zero private-key or literal-RCON-password pattern hits. The blocked/not-for-installation label and source-commit publication record are present. Exact pair hashes match the reproducible build report.

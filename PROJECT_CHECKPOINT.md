@@ -2,7 +2,7 @@
 
 ## RC5 blocked review package refresh — 2026-10-29
 
-Built review-only bundle v33 from the exact twice-clean-built Java 25 pair: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`. All 49 embedded checksums verified directly from ZIP entries; zero unsafe paths/data files or private-key/literal-RCON pattern hits. The archive includes the source-commit record and is explicitly blocked/not for installation or distribution. Full audit: `performance-results/rc5-blocked-local-bundle-20261028.md`. P0 blockers remain unchanged.
+Built review-only bundle v34 from the exact twice-clean-built Java 25 pair: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v34-20261029.zip`, 82,714,132 bytes, SHA-256 `88d0c1ee3b53bd294b278acb90b2d2ed40f8c1f7d3aed692ca8c297991580bf7`. All 49 embedded checksums verified directly from ZIP entries; zero unsafe paths/data files or private-key/literal-RCON pattern hits. The archive includes the source-commit record and is explicitly blocked/not for installation or distribution. Full audit: `performance-results/rc5-blocked-local-bundle-20261028.md`. P0 blockers remain unchanged.
 
 ## RC5 source commit and push — 2026-10-29
 
