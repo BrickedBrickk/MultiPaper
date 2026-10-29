@@ -49,6 +49,7 @@ if (Test-Path -LiteralPath $oldManifest) {
 $reports = @(
     'rc5-ender-chest-revision-fence-20261029.md',
     'rc5-source-commit-publication-20261029.md',
+    'rc5-current-candidate-invsee-ender-gate-20261029.md',
     'rc5-crafty1-upload-recheck-20261029.md',
     'rc5-crafty1-noholder-current-source-recheck-20261029.md',
     'rc5-packaged-pair-chest-race-20261029.md',

@@ -1,5 +1,9 @@
 # MultiPaper 26.3 RC4 evaluation handoff
 
+## 2026-10-29 exact packaged-pair InvSee++ containment result
+
+Latest exact-candidate test: `performance-results/rc5-current-candidate-invsee-ender-gate-20261029.md`. On the 8C281 Paperclip / 1E2463 Master pair with InvSee++ 0.31.22, one protocol-valid remote EnderSee pickup was denied; owner Ender Chest NBT stayed at diamond x16, and the synthetic viewer saw an empty cursor plus unchanged contents at menu state 2. Fixture was freshly created with configs and JARs only; no world/playerdata was copied. All six fixture listeners and test processes were confirmed closed. This is fail-closed containment only, not a functional item-conservation fix: RC5-02 remains P0 BLOCKED. Continue from `docs/RC5_BUG_TRACKER.md`.
+
 ## 2026-10-29 blocked bundle refresh
 
 Local review bundle v34 is `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v34-20261029.zip` (82,714,132 bytes, SHA-256 `88d0c1ee3b53bd294b278acb90b2d2ed40f8c1f7d3aed692ca8c297991580bf7`). The source-commit publication evidence is included. All 49 payload hashes and archive path/content exclusions passed. It is **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**; P0 chest attribution/recovery and InvSee++ conservation gates remain open. See `performance-results/rc5-blocked-local-bundle-20261028.md` and continue from `docs/RC5_BUG_TRACKER.md`.
