@@ -823,7 +823,7 @@ Current Master worktree adds an accepted-async-chunk-write disconnect fence and 
 
 Local review bundle v39 includes the rebuilt Master and exact Paperclip used by the 273-read bidirectional chest runtime. ZIP SHA-256 `1756dc3b878b7dad78ecb7feb9311ba403ef24ea168a353785b09a1b3223c25d`; all 52 embedded payload hashes verified. It remains blocked/not for installation or distribution due P0 InvSee++ conservation and live chest attribution/recovery. Details: `performance-results/rc5-blocked-local-bundle-v39-20261029.md`. Continue from `docs/RC5_BUG_TRACKER.md`.
 
-Correction: blocked review ZIP v39 was superseded after detecting a stale source-checkpoint paragraph in its README. Do not use v39; preserve it for audit. Use v40 only after its independent archive/provenance checks pass. Tracker: `docs/RC5_BUG_TRACKER.md`.
+Correction: blocked review ZIP v39 was superseded after detecting a stale source-checkpoint paragraph in its README. Do not use v39; preserve it for audit. Use v42 after its independent archive/provenance checks passed. Tracker: `docs/RC5_BUG_TRACKER.md`.
 
 ## RC5 blocked review v40
 
@@ -831,4 +831,8 @@ V39 is superseded due stale README provenance. V40 is the corrected local BLOCKE
 
 ## RC5 full current-source build validation
 
-Two sequential full Java 25 clean builds at commit `04724a62e188d5f99c20435a6a47427d09de5d1e` passed 10,788 tests each (0 failures/errors, 88 skipped) and produced nine identical JAR hashes. The full test/build report is `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This is build evidence only; live chest attribution/recovery and P0 InvSee++ item conservation remain open. V40 is superseded by v41 once verified. Continue from `docs/RC5_BUG_TRACKER.md`.
+Two sequential full Java 25 clean builds at commit `04724a62e188d5f99c20435a6a47427d09de5d1e` passed 10,788 tests each (0 failures/errors, 88 skipped) and produced nine identical JAR hashes. The full test/build report is `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This is build evidence only; live chest attribution/recovery and P0 InvSee++ item conservation remain open. V40 is superseded by v42 after archive verification. Continue from `docs/RC5_BUG_TRACKER.md`.
+
+## RC5 current exact-source review bundle v42
+
+V42 is a local BLOCKED review ZIP with the co-built Master/Paperclip pair from source commit 04724a62. Archive SHA-256 `19bc0773d62dda58876086951d4aaa166ef60d24833a16647aad1a02c449a9f1`; all 53 embedded payload hashes and safety scans passed. It is not installable/distributable. See `performance-results/rc5-blocked-local-bundle-v42-20261029.md`; P0 InvSee++ conservation and live chest attribution/recovery remain open.

@@ -708,4 +708,8 @@ V39 was preserved but superseded after a stale README checkpoint was detected. C
 
 ## RC5 full current-source reproducibility — 2026-10-29
 
-At exact source commit `04724a62e188d5f99c20435a6a47427d09de5d1e`, two sequential isolated Java 25 full clean builds passed **10,788 tests each (0 failures/errors, 88 skipped)**. All nine JAR output hashes matched; all nine passed `jar tf`. Master remains `E9CEE0...`; co-built Paperclip is `A03B3C...`. Detailed manifest/log/report and known limits: `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This does not clear P0 InvSee++ conservation or live chest-loss attribution/recovery. V40 will be superseded by an exact co-built v41 local blocked review package after archive audit.
+At exact source commit `04724a62e188d5f99c20435a6a47427d09de5d1e`, two sequential isolated Java 25 full clean builds passed **10,788 tests each (0 failures/errors, 88 skipped)**. All nine JAR output hashes matched; all nine passed `jar tf`. Master remains `E9CEE0...`; co-built Paperclip is `A03B3C...`. Detailed manifest/log/report and known limits: `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This does not clear P0 InvSee++ conservation or live chest-loss attribution/recovery. V40 is superseded by exact co-built v42 local blocked review package; archive audit passed.
+
+## RC5 co-built full-source blocked review v42 — 2026-10-29
+
+Local review ZIP v42, SHA-256 `19bc0773d62dda58876086951d4aaa166ef60d24833a16647aad1a02c449a9f1`, contains the Master/Paperclip pair co-built from current exact source commit `04724a62e188d5f99c20435a6a47427d09de5d1e`. All 53 payload hashes, archive path scan, and textual credential scan passed. It is explicitly BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION. Full audit: `performance-results/rc5-blocked-local-bundle-v42-20261029.md`. InvSee++ P0 and chest-loss attribution/recovery remain unresolved.
