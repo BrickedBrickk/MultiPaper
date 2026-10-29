@@ -24,6 +24,7 @@ $paperHashes = @(
     'F5462FDA66732D7226920B04B89F8DB45D4125746B51F4BD90BDB3D8A46167B9', # clean RC5 candidate before persistent InvSee click gate
     '391D91696B8C6DBBFD1A952FABF15A5F31AA2DB5D129BC742CCC279905438349', # persistent-input InvSee gate candidate
     '99B24AE11909C246C040D137CD3528A6C3F6EBC052244C523AE2250A9CED5E85', # current reproducible session-registration candidate
+    '4180250D05A570009F30349A0251A4924D11D403ED7E4C65CF5686C18B204E7F', # exact normal Paperclip packaged in blocked review bundle v43
     '8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692'  # current packaged Ender Chest revision-fence candidate; chest race rerun documented for exact pair
 )
 $masterHash = (Get-FileHash -LiteralPath $MasterJar -Algorithm SHA256).Hash

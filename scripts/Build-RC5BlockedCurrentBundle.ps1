@@ -57,6 +57,7 @@ $reportNames = @(
     'rc5-monitor-readable-summary-20261029.md',
     'rc5-crafty1-upload-evidence-recheck-20261028.md',
     'rc5-packaged-pair-chest-race-20261029.md',
+    'rc5-v43-packaged-pair-chest-273-20261029.md',
     'rc5-current-sixcomponent-shutdown-write-rejections-20261029.md'
 )
 $evidence = Join-Path $payload 'evidence'
@@ -85,7 +86,7 @@ Set-Content -LiteralPath (Join-Path $evidence 'BUILD-ARTIFACT-PROVENANCE.txt') -
 $readme = @"
 MultiPaper 26.3 RC5 — BLOCKED REVIEW PACKAGE
 
-NOT FOR INSTALLATION OR DISTRIBUTION. This is a local review package only. The live RC4 SMP must remain unchanged.
+BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION. This is a local review package only. The live RC4 SMP must remain unchanged.
 
 Packaged binaries (Java 25):
 - Master SHA-256: $($expected.Master)
@@ -95,7 +96,7 @@ Packaged binaries (Java 25):
 Build verification: two clean Java 25 full builds each passed 10,794 tests (0 failures/errors, 88 skipped); all nine JARs matched byte-for-byte. See evidence/rc5-player-session-registration-readiness-20261029.md.
 
 Open release gates:
-- RC5-01 chest integrity remains P0 TESTING. Isolated no-holder/stale-owner chest fixtures pass on the earlier packaged pair; the live chest incident remains unattributed and no recovery is established.
+- RC5-01 chest integrity remains P0 TESTING. This exact packaged pair passed 273-read no-holder/stale-owner chest schedules in both ownership directions, with exact chest NBT after backend and Master restarts. The live chest incident remains unattributed and no recovery is established; see evidence/rc5-v43-packaged-pair-chest-273-20261029.md.
 - RC5-02 InvSee++ cross-owner item conservation remains P0 BLOCKED. Remote editing remains fail-closed; no functional transaction fix is included.
 - The paired session-registration ACK runtime used a diagnostic Paperclip, not this package's normal Paperclip. No equivalent runtime claim is made for the packaged pair.
 - The latest referenced Crafty1 log bytes were unavailable for fresh hashing; see the tracker and evidence/rc5-crafty1-upload-evidence-recheck-20261028.md.
