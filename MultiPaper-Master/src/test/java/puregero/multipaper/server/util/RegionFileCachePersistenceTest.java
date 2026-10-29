@@ -10,9 +10,14 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionFileCachePersistenceTest {
@@ -30,6 +35,52 @@ class RegionFileCachePersistenceTest {
 
         assertArrayEquals(expected, RegionFileCache.getChunkDeflatedDataAsync(regionDirectory, -33, 48).join());
         RegionFileCache.closeAll();
+    }
+
+    @Test
+    void slowTaskWarningMustNotReleaseLaterRegionFileOperations() throws Exception {
+        RegionFile regionFile = new RegionFile(tempDir.resolve("r.0.0.mca").toFile());
+        CountDownLatch firstTaskEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirstTask = new CountDownLatch(1);
+        CountDownLatch secondTaskEntered = new CountDownLatch(1);
+        AtomicBoolean firstTaskFinished = new AtomicBoolean();
+
+        CompletableFuture<String> first = regionFile.submitTask(file -> {
+            firstTaskEntered.countDown();
+            try {
+                if (!releaseFirstTask.await(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting to release the first region task");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(interrupted);
+            } finally {
+                firstTaskFinished.set(true);
+            }
+            return "first";
+        }, 25, TimeUnit.MILLISECONDS);
+
+        CompletableFuture<String> second = regionFile.submitTask(file -> {
+            secondTaskEntered.countDown();
+            if (!firstTaskFinished.get()) {
+                throw new AssertionError("A later region task ran before the prior task finished");
+            }
+            return "second";
+        }, 25, TimeUnit.MILLISECONDS);
+
+        try {
+            assertTrue(firstTaskEntered.await(2, TimeUnit.SECONDS), "First region task should start");
+            Thread.sleep(150);
+            assertFalse(first.isDone(), "A slow-task warning must not complete the active task future");
+            assertEquals(1, secondTaskEntered.getCount(), "The next operation must remain queued behind active I/O");
+
+            releaseFirstTask.countDown();
+            assertEquals("first", first.get(2, TimeUnit.SECONDS));
+            assertEquals("second", second.get(2, TimeUnit.SECONDS));
+        } finally {
+            releaseFirstTask.countDown();
+            regionFile.close();
+        }
     }
 
     @Test

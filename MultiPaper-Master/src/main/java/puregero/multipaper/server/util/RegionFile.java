@@ -65,7 +65,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.zip.*;
 
@@ -89,6 +88,7 @@ public class RegionFile {
     private int sizeDelta;
     private long lastModified = 0;
     private CompletableFuture<?> lastTaskInQueue = CompletableFuture.completedFuture(null);
+    private boolean slowTaskWarningScheduled;
 
     public RegionFile(File path) {
         offsets = new int[SECTOR_INTS];
@@ -159,13 +159,27 @@ public class RegionFile {
      * pool isn't full of tasks that are waiting upon a single RegionFile.
      * @param task The task to execute
      */
-    public <T> CompletableFuture<T> submitTask(Function<RegionFile, T> task) {
-        CompletableFuture<T> future = lastTaskInQueue.orTimeout(15, TimeUnit.SECONDS).exceptionally(e -> {
-            if (e instanceof TimeoutException || e.getCause() instanceof TimeoutException) {
-                e.printStackTrace();
-            }
-            return null;
-        }).thenApplyAsync((value) -> task.apply(this));
+    public synchronized <T> CompletableFuture<T> submitTask(Function<RegionFile, T> task) {
+        return submitTask(task, 15, TimeUnit.SECONDS);
+    }
+
+    /** The warning delay is diagnostic only; it must never release later I/O early. */
+    synchronized <T> CompletableFuture<T> submitTask(Function<RegionFile, T> task, long warningAfter, TimeUnit warningUnit) {
+        CompletableFuture<?> previous = lastTaskInQueue;
+        CompletableFuture<T> future = previous.handle((ignored, failure) -> null)
+                .thenApplyAsync(ignored -> task.apply(this));
+        if (!previous.isDone() && !slowTaskWarningScheduled) {
+            slowTaskWarningScheduled = true;
+            CompletableFuture.delayedExecutor(warningAfter, warningUnit).execute(() -> {
+                if (!future.isDone()) {
+                    System.err.println("RegionFile task remains queued or active after " + warningAfter + " " + warningUnit
+                            + " for " + directory + "; later operations remain ordered behind it");
+                }
+                synchronized (RegionFile.this) {
+                    slowTaskWarningScheduled = false;
+                }
+            });
+        }
         lastTaskInQueue = future;
         return future;
     }
