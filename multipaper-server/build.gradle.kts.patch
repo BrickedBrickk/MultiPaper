@@ -77,7 +77,7 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,242 @@
+@@ -266,2 +_,248 @@
 +val applyMultiPaperChunkHolderBasePatch = tasks.register("applyMultiPaperChunkHolderBasePatch") {
 +    dependsOn("applyMinecraftPatches")
 +    doLast {
@@ -278,12 +278,14 @@
 +}
 +
 +val applyRealPlayerQuitAnnouncementGuardPatch = tasks.register("applyRealPlayerQuitAnnouncementGuardPatch") {
-+    dependsOn("applyMinecraftPatches")
++    // Both patches edit ServerGamePacketListenerImpl.java. Serialize them so
++    // parallel Gradle workers cannot overwrite one patch with the other.
++    dependsOn(applyRemoteInventoryClickGatePatch)
 +    doLast {
 +        val patchFile = rootProject.file("multipaper-server/minecraft-patches/sources/0081-MultiPaper-only-broadcast-real-player-quit.patch")
 +        val sourceRoot = "multipaper-server/src/minecraft/java"
 +        val sourceFile = rootProject.file("$sourceRoot/net/minecraft/server/network/ServerGamePacketListenerImpl.java")
-+        val guard = "puregero.multipaper.MultiPaper.isRealPlayer(this.player)"
++        val guard = "if ((quitMessage != null) && !quitMessage.equals(net.kyori.adventure.text.Component.empty()) && puregero.multipaper.MultiPaper.isRealPlayer(this.player)) {"
 +        if (sourceFile.readText().contains(guard)) {
 +            return@doLast
 +        }
@@ -307,6 +309,9 @@
 +            if (alreadyApplied.exitValue != 0) {
 +                throw GradleException("Could not apply real-player quit announcement guard to regenerated ServerGamePacketListenerImpl.java")
 +            }
++        }
++        if (!sourceFile.readText().contains(guard)) {
++            throw GradleException("Real-player quit announcement guard was not present after patching ServerGamePacketListenerImpl.java")
 +        }
 +    }
 +}
