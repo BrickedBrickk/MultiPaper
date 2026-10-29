@@ -89,6 +89,8 @@ public class RegionFile {
     private long lastModified = 0;
     private CompletableFuture<?> lastTaskInQueue = CompletableFuture.completedFuture(null);
     private boolean slowTaskWarningScheduled;
+    private boolean closing;
+    private boolean closed;
 
     public RegionFile(File path) {
         offsets = new int[SECTOR_INTS];
@@ -165,6 +167,9 @@ public class RegionFile {
 
     /** The warning delay is diagnostic only; it must never release later I/O early. */
     synchronized <T> CompletableFuture<T> submitTask(Function<RegionFile, T> task, long warningAfter, TimeUnit warningUnit) {
+        if (closing || closed) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Region file is closing: " + directory));
+        }
         CompletableFuture<?> previous = lastTaskInQueue;
         CompletableFuture<T> future = previous.handle((ignored, failure) -> null)
                 .thenApplyAsync(ignored -> task.apply(this));
@@ -475,11 +480,23 @@ public class RegionFile {
     }
 
     public void close() throws IOException {
-        while (!lastTaskInQueue.isDone()) {
-            lastTaskInQueue.join();
-        }
+        CompletableFuture<?> pending;
         synchronized (this) {
+            if (closed) {
+                return;
+            }
+            closing = true;
+            pending = lastTaskInQueue;
+        }
+
+        pending.handle((ignored, failure) -> null).join();
+
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
             file.close();
+            closed = true;
         }
     }
 }

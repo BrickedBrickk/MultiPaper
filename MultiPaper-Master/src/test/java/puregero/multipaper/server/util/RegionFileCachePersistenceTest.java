@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,6 +81,114 @@ class RegionFileCachePersistenceTest {
         } finally {
             releaseFirstTask.countDown();
             regionFile.close();
+        }
+    }
+
+    @Test
+    void closePreventsNewRegionFileTasksFromStartingAfterTheFileIsClosed() throws Exception {
+        RegionFile regionFile = new RegionFile(tempDir.resolve("close-race.mca").toFile());
+        CountDownLatch closeFinished = new CountDownLatch(1);
+        AtomicBoolean closeFailed = new AtomicBoolean();
+        Thread closer = new Thread(() -> {
+            try {
+                regionFile.close();
+            } catch (IOException failure) {
+                closeFailed.set(true);
+            } finally {
+                closeFinished.countDown();
+            }
+        }, "region-file-close-race-test");
+        closer.start();
+
+        boolean rejectedAfterCloseBegan = false;
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (!rejectedAfterCloseBegan && System.nanoTime() < deadline) {
+            CompletableFuture<Void> task = regionFile.submitTask(file -> null);
+            try {
+                task.get(200, TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.ExecutionException expected) {
+                rejectedAfterCloseBegan = true;
+            }
+            if (!rejectedAfterCloseBegan) {
+                Thread.sleep(1);
+            }
+        }
+
+        assertTrue(closeFinished.await(2, TimeUnit.SECONDS), "close should finish");
+        assertFalse(closeFailed.get(), "close should not fail");
+        assertTrue(rejectedAfterCloseBegan, "New tasks must be rejected once close starts draining the queue");
+        closer.join(2000);
+    }
+
+    @Test
+    void closeDrainsPreviouslyAcceptedRegionFileTasksBeforeClosing() throws Exception {
+        Path path = tempDir.resolve("close-drain.mca");
+        RegionFile regionFile = new RegionFile(path.toFile());
+        CountDownLatch taskStarted = new CountDownLatch(1);
+        CountDownLatch releaseTask = new CountDownLatch(1);
+        CountDownLatch closeFinished = new CountDownLatch(1);
+        AtomicBoolean closeFailed = new AtomicBoolean();
+        byte[] expected = new byte[]{9, 8, 7, 6};
+        CompletableFuture<Void> pending = regionFile.submitTask(file -> {
+            taskStarted.countDown();
+            try {
+                if (!releaseTask.await(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting to release the region write");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(interrupted);
+            }
+            file.putDeflatedBytes(0, 0, expected);
+            return null;
+        });
+        assertTrue(taskStarted.await(2, TimeUnit.SECONDS), "The accepted region task should start");
+
+        Thread closer = new Thread(() -> {
+            try {
+                regionFile.close();
+            } catch (IOException failure) {
+                closeFailed.set(true);
+            } finally {
+                closeFinished.countDown();
+            }
+        }, "region-file-close-drain-test");
+        closer.start();
+
+        boolean closeStartedDraining = false;
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (!closeStartedDraining && System.nanoTime() < deadline) {
+            CompletableFuture<Void> probe = regionFile.submitTask(file -> null);
+            try {
+                probe.get(100, TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.ExecutionException expectedRejection) {
+                closeStartedDraining = true;
+            } catch (java.util.concurrent.TimeoutException stillQueuedBehindWrite) {
+                // The close fence has not rejected this probe yet; the accepted write is still held.
+            }
+            if (!closeStartedDraining) {
+                Thread.sleep(1);
+            }
+        }
+
+        try {
+            assertTrue(closeStartedDraining, "close should stop accepting tasks before draining");
+            assertFalse(closeFinished.await(100, TimeUnit.MILLISECONDS), "close must wait for accepted I/O");
+        } finally {
+            releaseTask.countDown();
+        }
+
+        pending.get(2, TimeUnit.SECONDS);
+        assertTrue(closeFinished.await(2, TimeUnit.SECONDS), "close should complete after accepted I/O drains");
+        assertFalse(closeFailed.get(), "close should not fail");
+        closer.join(2000);
+
+        RegionFile reopened = new RegionFile(path.toFile());
+        try {
+            assertArrayEquals(expected, reopened.getDeflatedBytes(0, 0),
+                    "The accepted write should be readable after close and reopen");
+        } finally {
+            reopened.close();
         }
     }
 
