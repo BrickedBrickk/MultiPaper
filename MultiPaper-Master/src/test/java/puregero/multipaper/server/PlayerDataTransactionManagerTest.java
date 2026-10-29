@@ -175,6 +175,68 @@ class PlayerDataTransactionManagerTest {
     }
 
     @Test
+    void randomizedStaleContenderCannotDuplicatePlayerdataTransfer() throws Exception {
+        String world = tempDirectory.resolve("randomized-stale-transfer-world").toString();
+        UUID firstPlayer = UUID.nameUUIDFromBytes("stale-first".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        UUID secondPlayer = UUID.nameUUIDFromBytes("stale-second".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Random random = new Random(0x5354414c4554584eL);
+        int firstCount = 64;
+        int secondCount = 0;
+        PlayerDataTransactionManager.writePlayer(world, firstPlayer, new byte[]{(byte) firstCount});
+        PlayerDataTransactionManager.writePlayer(world, secondPlayer, new byte[]{(byte) secondCount});
+
+        for (int attempt = 0; attempt < 512; attempt++) {
+            int beforeFirst = firstCount;
+            int beforeSecond = secondCount;
+            byte[] firstBefore = {(byte) beforeFirst};
+            byte[] secondBefore = {(byte) beforeSecond};
+            Map<UUID, byte[]> expectedHashes = Map.of(
+                    firstPlayer, sha256(firstBefore),
+                    secondPlayer, sha256(secondBefore));
+
+            int[] accepted = transfer(firstBefore, secondBefore, random);
+            int[] stale = transfer(firstBefore, secondBefore, random);
+            Map<UUID, byte[]> acceptedAfter = Map.of(
+                    firstPlayer, new byte[]{(byte) accepted[0]},
+                    secondPlayer, new byte[]{(byte) accepted[1]});
+            Map<UUID, byte[]> staleAfter = Map.of(
+                    firstPlayer, new byte[]{(byte) stale[0]},
+                    secondPlayer, new byte[]{(byte) stale[1]});
+
+            assertTrue(PlayerDataTransactionManager.commitIfCurrent(world, UUID.randomUUID(), expectedHashes, acceptedAfter),
+                    "the first contender based on the current before-image should commit at attempt " + attempt);
+            assertFalse(PlayerDataTransactionManager.commitIfCurrent(world, UUID.randomUUID(), expectedHashes, staleAfter),
+                    "a concurrent stale contender must be rejected at attempt " + attempt);
+
+            firstCount = Byte.toUnsignedInt(PlayerDataTransactionManager.readPlayer(world, firstPlayer)[0]);
+            secondCount = Byte.toUnsignedInt(PlayerDataTransactionManager.readPlayer(world, secondPlayer)[0]);
+            assertEquals(accepted[0], firstCount, "the accepted after-image must remain authoritative at attempt " + attempt);
+            assertEquals(accepted[1], secondCount, "the stale after-image must not overwrite the accepted transfer at attempt " + attempt);
+            assertEquals(64, firstCount + secondCount, "rejecting a stale contender must not lose or duplicate items at attempt " + attempt);
+        }
+    }
+
+    private static int[] transfer(byte[] firstBefore, byte[] secondBefore, Random random) {
+        int first = Byte.toUnsignedInt(firstBefore[0]);
+        int second = Byte.toUnsignedInt(secondBefore[0]);
+        boolean firstToSecond = first > 0 && (second == 0 || random.nextBoolean());
+        int sourceCount = firstToSecond ? first : second;
+        int moved = 1 + random.nextInt(Math.min(sourceCount, 16));
+        if (firstToSecond) {
+            first -= moved;
+            second += moved;
+        } else {
+            second -= moved;
+            first += moved;
+        }
+        return new int[]{first, second};
+    }
+
+    private static byte[] sha256(byte[] bytes) throws Exception {
+        return java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+    }
+
+    @Test
     void duplicateCommitIsIdempotentAndCannotRestoreOlderSnapshots() throws Exception {
         String world = tempDirectory.resolve("idempotent-world").toString();
         UUID alice = UUID.randomUUID();
