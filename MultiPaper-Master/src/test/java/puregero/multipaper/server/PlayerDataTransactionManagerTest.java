@@ -116,6 +116,60 @@ class PlayerDataTransactionManagerTest {
     }
 
     @Test
+    void randomizedTransfersPreserveAggregateItemsAcrossJournalCrashCuts() throws Exception {
+        String world = tempDirectory.resolve("randomized-item-conservation-world").toString();
+        UUID firstPlayer = UUID.nameUUIDFromBytes("randomized-first".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        UUID secondPlayer = UUID.nameUUIDFromBytes("randomized-second".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Random random = new Random(0x5243354954454d53L);
+        int firstCount = 64;
+        int secondCount = 0;
+        int total = firstCount + secondCount;
+        PlayerDataTransactionManager.writePlayer(world, firstPlayer, new byte[]{(byte) firstCount});
+        PlayerDataTransactionManager.writePlayer(world, secondPlayer, new byte[]{(byte) secondCount});
+
+        for (int transfer = 0; transfer < 512; transfer++) {
+            boolean firstToSecond = random.nextBoolean();
+            int sourceCount = firstToSecond ? firstCount : secondCount;
+            if (sourceCount == 0) {
+                firstToSecond = !firstToSecond;
+                sourceCount = firstToSecond ? firstCount : secondCount;
+            }
+            assertTrue(sourceCount > 0, "the fixed-total inventory must always have an item to move");
+            int moved = 1 + random.nextInt(Math.min(sourceCount, 16));
+            if (firstToSecond) {
+                firstCount -= moved;
+                secondCount += moved;
+            } else {
+                secondCount -= moved;
+                firstCount += moved;
+            }
+
+            UUID transactionId = new UUID(random.nextLong(), random.nextLong());
+            Map<UUID, byte[]> snapshots = Map.of(
+                    firstPlayer, new byte[]{(byte) firstCount},
+                    secondPlayer, new byte[]{(byte) secondCount});
+            if (random.nextInt(8) == 0) {
+                int crashAfterWrite = 1 + random.nextInt(2);
+                int[] writes = {0};
+                assertThrows(IOException.class, () -> PlayerDataTransactionManager.commit(world, transactionId, snapshots,
+                        ignored -> {
+                            if (++writes[0] == crashAfterWrite) {
+                                throw new IOException("simulated crash during randomized inventory transfer");
+                            }
+                        }));
+            } else {
+                PlayerDataTransactionManager.commit(world, transactionId, snapshots);
+            }
+
+            int actualFirst = Byte.toUnsignedInt(PlayerDataTransactionManager.readPlayer(world, firstPlayer)[0]);
+            int actualSecond = Byte.toUnsignedInt(PlayerDataTransactionManager.readPlayer(world, secondPlayer)[0]);
+            assertEquals(firstCount, actualFirst, "first player's stack must match the committed transaction at step " + transfer);
+            assertEquals(secondCount, actualSecond, "second player's stack must match the committed transaction at step " + transfer);
+            assertEquals(total, actualFirst + actualSecond, "journal recovery must neither lose nor duplicate items at step " + transfer);
+        }
+    }
+
+    @Test
     void duplicateCommitIsIdempotentAndCannotRestoreOlderSnapshots() throws Exception {
         String world = tempDirectory.resolve("idempotent-world").toString();
         UUID alice = UUID.randomUUID();
