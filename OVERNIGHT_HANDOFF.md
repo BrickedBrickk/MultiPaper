@@ -2,7 +2,7 @@
 
 ## 2026-10-29 monitor update and blocked review ZIP v36
 
-The beta monitor produces a readable daily text summary alongside JSON and refreshes it every five minutes. Ten focused Python tests pass, including sanitized export and refresh cadence. The blocked local review ZIP v37 (`release-staging/MultiPaper-26.3-RC5-blocked-current-source-v37-20261029.zip`) has SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; all 51 payload hashes were verified from the ZIP. It preserves the same Master/Paperclip hashes and remains explicitly blocked/not for installation. Full monitor/package scope: `performance-results/rc5-monitor-readable-summary-20261029.md` and `performance-results/rc5-blocked-local-bundle-20261028.md`.
+The beta monitor produces a readable daily text summary alongside JSON and refreshes it every five minutes. Ten focused Python tests pass, including sanitized export and refresh cadence. The blocked local review ZIP v38 (`release-staging/MultiPaper-26.3-RC5-blocked-current-source-v38-20261029.zip`) has SHA-256 `4a6d7eee0faabbae47c1fe4d81806d2c9af9499c933f305d72732084f955e636`; all 51 payload hashes were verified from the ZIP. Its provenance names committed HEAD `fd5a793ea167154a258e9db4cbf438b53b51992b`. It preserves the same Master/Paperclip hashes and remains explicitly blocked/not for installation. Full monitor/package scope: `performance-results/rc5-monitor-readable-summary-20261029.md` and `performance-results/rc5-blocked-local-bundle-20261028.md`.
 
 ## Beta monitor summary update — 2026-10-29
 

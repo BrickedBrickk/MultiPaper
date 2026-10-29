@@ -1,5 +1,11 @@
 # RC5 blocked local review bundle — 2026-10-28
 
+## v38 refresh — committed monitor candidate provenance — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v38-20261029.zip`, 82,720,101 bytes, SHA-256 `4a6d7eee0faabbae47c1fe4d81806d2c9af9499c933f305d72732084f955e636`; sidecar matched. Embedded manifest SHA-256 `59bac455830dfed1164c52536758605694e6c71762a290d48be0e1bbc83ddb05`; all 51 payload hashes verified directly from ZIP entries; 53 unique entries. Unsafe world/backup/playerdata/region/log/database/key paths and credential-pattern hits in docs/data: zero. Provenance names packaging HEAD `fd5a793ea167154a258e9db4cbf438b53b51992b`. The monitor report, tracker, and explicit blocked README are present.
+
+The archive preserves Master `1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E` and Paperclip `8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692`; no MultiPaper binaries changed for the monitor work. V38 is a local blocked review package, not a public release or installable RC5. P0 InvSee++ item conservation and chest-integrity gates, actual host monitoring measurements, authenticated Bedrock, and exact-stack/capacity gates remain open.
+
 ## v37 refresh — tracker-current readable monitor package — 2026-10-29
 
 Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v37-20261029.zip`, 82,720,099 bytes, SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; detached sidecar matched. Embedded manifest SHA-256 `2cb76876bd313868a892057e31ea193dfff76a85a2c086f5d67704eb11467d6b`; all 51 payload hashes verified directly from ZIP entries; 53 unique entries. Unsafe world/backup/playerdata/region/log/database/key paths: zero. Credential-pattern hits in docs/data: zero (source is excluded because its code intentionally names credential fields and detection patterns). Tracker, monitor report and blocked label are present.

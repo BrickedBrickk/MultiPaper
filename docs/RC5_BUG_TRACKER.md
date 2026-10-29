@@ -8,7 +8,7 @@
 
 ### Blocked review ZIP v36 — 2026-10-29
 
-- Refreshed the local review ZIP with the current tracker, monitor script/README, and readable-summary test report while preserving the same Master/Paperclip binary hashes. Latest ZIP v37 SHA-256 `887912462d35424245ce42838f2a3f67b2dad2664e0c48d9355686bdef062fe7`; all 51 payload checksums verified from archive members, 53 unique entries, no unsafe data paths. Full exclusions and limits: `performance-results/rc5-blocked-local-bundle-20261028.md`.
+- Refreshed the local review ZIP from committed HEAD `fd5a793ea167154a258e9db4cbf438b53b51992b` with the current tracker, monitor script/README, and readable-summary report. Latest ZIP v38 SHA-256 `4a6d7eee0faabbae47c1fe4d81806d2c9af9499c933f305d72732084f955e636`; all 51 payload checksums verified from archive members, 53 unique entries, no unsafe data paths. Full exclusions and limits: `performance-results/rc5-blocked-local-bundle-20261028.md`.
 - This is a blocked documentation/monitoring review package, **not for installation or distribution**. P0 chest and InvSee++ gates remain open; no live server access occurred.
 
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
