@@ -5,6 +5,7 @@
 - Added Master-acknowledged player-session readiness fenced by player UUID, session UUID, and connection generation. Duplicate registrations share one pending result; rejected replies, replacement sessions, disconnect/reconnect, and matching-session retirement stay fail-closed. Six state regressions were added.
 - Focused inventory/session suite passed **44/44** (12 suites); two clean Java 25 full builds each passed **10,794 tests, 0 failures/errors, 88 skipped**, with all nine JAR outputs byte-identical and archive-readable. Exact commands, hashes, and changed-file list: `performance-results/rc5-player-session-registration-readiness-20261029.md`.
 - This is readiness groundwork only: the cross-backend click path still does not use it and remains fail-closed. No owner-attested inventory/cursor transaction was implemented; no paired runtime acknowledgement or item-conservation test was run. **RC5-02 remains P0 `BLOCKED`; do not install or publish RC5.** Live services/worlds were untouched.
+- Source and evidence commit `f59ae3833b8faa4344c407a04beba98978f79bea` is pushed to owner-controlled `fork/feature/port-26.3`; the fork ref was verified at that commit. Unrelated worktree changes were excluded.
 
 ### Beta monitor readable-summary verification — 2026-10-29
 
