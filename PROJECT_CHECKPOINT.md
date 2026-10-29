@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 blocked review package refresh — 2026-10-29
+
+Built review-only bundle v33 from the exact twice-clean-built Java 25 pair: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`. All 49 embedded checksums verified directly from ZIP entries; zero unsafe paths/data files or private-key/literal-RCON pattern hits. The archive includes the source-commit record and is explicitly blocked/not for installation or distribution. Full audit: `performance-results/rc5-blocked-local-bundle-20261028.md`. P0 blockers remain unchanged.
+
 ## RC5 source commit and push — 2026-10-29
 
 Committed the reviewed 39-file source/test set as `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0` (`Fence cross-backend inventory and chunk synchronization`) and verified `fork/feature/port-26.3` points to that exact commit. The matching Java 25 clean-build evidence is `performance-results/rc5-ender-chest-revision-fence-20261029.md`: two clean runs, 10,785 tests each, 0 failures/errors, 88 skipped, nine identical JARs. This does not close the P0 InvSee++ conservation blocker or chest-loss attribution gate. No release was published or installed; unrelated dirty files remain untouched.

@@ -2,6 +2,11 @@
 
 Updated: 2026-10-29. Scope: user-reported RC4 symptoms and the supplied read-only Crafty logs. This file is the working source of truth for RC5 bug work; update it after each meaningful reproduction, fix, or test and before handing off. Do not access or modify live Crafty/SMP data for these investigations.
 
+### RC5 blocked review package v33 — 2026-10-29
+
+- Refreshed local review-only ZIP: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`. All 49 payload hashes matched, 51 ZIP entries, no unsafe paths/data files or private-key/literal-RCON matches. It includes the source-commit publication evidence and remains **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**.
+- This packaging audit confirms archive contents only. P0 chest-loss attribution/recovery and InvSee++ conservation remain open; do not install or publish RC5.
+
 ### RC5 source checkpoint — commit a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0
 
 - The tracked source/test set for Master session fencing, Ender Chest revision ordering, chunk-unload persistence fencing, gamerule synchronization, and fail-closed remote inventory clicks was committed and fast-forward-pushed to the owner-controlled `fork/feature/port-26.3` branch. The remote tip was verified equal to the commit. `origin` remains PaperMC/Paper and was not used.

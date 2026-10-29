@@ -48,6 +48,7 @@ if (Test-Path -LiteralPath $oldManifest) {
 }
 $reports = @(
     'rc5-ender-chest-revision-fence-20261029.md',
+    'rc5-source-commit-publication-20261029.md',
     'rc5-crafty1-upload-recheck-20261029.md',
     'rc5-crafty1-noholder-current-source-recheck-20261029.md',
     'rc5-packaged-pair-chest-race-20261029.md',
@@ -62,12 +63,14 @@ foreach ($report in $reports) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $evidence $report)
 }
 
-$provenance = @'
+$sourceCheckout = (& git -C $repo rev-parse HEAD).Trim()
+$provenance = @"
 RC5 blocked review package artifact provenance
 
 Branch: feature/port-26.3
-Source checkout HEAD at packaging: dd4756dcc7262225e5cd54411eae08274c77c605
-The candidate contains working-tree source changes; this is not an immutable clean Git tag.
+Source checkout HEAD at packaging: $sourceCheckout
+Product source commit used for these binaries: a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0
+The build ran on that exact product source state before it was committed; the later checkpoint commit changes documentation only.
 Build verification: evidence/rc5-ender-chest-revision-fence-20261029.md
 Build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential clean offline builds, no build cache, no daemon, one worker; 10,785 tests each, 0 failures/errors, 88 skipped; all nine JARs byte-identical.
 SOURCE-SHA256-v23.txt is historical and describes the earlier v23 Paperclip, not this candidate.
@@ -75,7 +78,7 @@ SOURCE-SHA256-v23.txt is historical and describes the earlier v23 Paperclip, not
 Packaged Master SHA-256: 1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E
 Packaged Paperclip SHA-256: 8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692
 Release state: BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION.
-'@
+"@
 Set-Content -LiteralPath (Join-Path $evidence 'BUILD-ARTIFACT-PROVENANCE.txt') -Value $provenance -Encoding utf8
 
 $readmePath = Join-Path $payload 'README-BLOCKED.txt'
@@ -102,6 +105,16 @@ Latest candidate note (2026-10-29): this package carries Paperclip 8C28146D36F20
 '@
 }
 Set-Content -LiteralPath $readmePath -Value $readme -Encoding utf8
+
+if ($readme -notmatch 'Source commit a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0') {
+    $readme += @'
+
+## Source commit checkpoint (2026-10-29)
+
+The candidate product sources and tests are committed as `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0`; checkpoint documentation is committed as `2d4837454736c9ee60712c50ca8c7b22cb78c43a`. The owner fork branch was verified at the documentation commit. See `evidence/rc5-source-commit-publication-20261029.md`. This is source publication, not a binary release. P0 chest attribution and InvSee++ item conservation gates remain open; the package stays blocked and must not be installed or distributed.
+'@
+    Set-Content -LiteralPath $readmePath -Value $readme -Encoding utf8
+}
 
 $manifestPath = Join-Path $payload 'SHA256SUMS.txt'
 $manifestSidecar = "$manifestPath.sha256"

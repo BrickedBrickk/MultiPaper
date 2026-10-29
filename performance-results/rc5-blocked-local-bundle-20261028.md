@@ -1,5 +1,11 @@
 # RC5 blocked local review bundle — 2026-10-28
 
+## v33 refresh — source commit publication evidence — 2026-10-29
+
+Archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip`, 82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`; sidecar matched. Direct ZIP-member validation passed all 49 payload hashes, 51 entries total, zero duplicate/unsafe paths, zero world/backup/playerdata/region/raw-log/database/key paths, and zero private-key or literal-RCON-password pattern hits. The blocked/not-for-installation label and source-commit publication record are present. Exact pair hashes match the reproducible build report.
+
+V33 refreshes the tracker, compatibility and manual docs, adds the source commit/push evidence, and packages the exact Java 25 Master/Paperclip pair. Source code is committed at `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0`; checkpoint docs were committed/pushed at `2d4837454736c9ee60712c50ca8c7b22cb78c43a`. It is still **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**: no functional cross-owner InvSee++ transaction exists; live chest loss remains unattributed; exact current six-component/login/route/capacity gates remain open. No live service/world or player data was accessed.
+
 ## v32 refresh — exact packaged-pair chest regression and matrix correction — 2026-10-29
 
 Latest archive: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v32-20261029.zip`, 82,711,827 bytes, SHA-256 `06ae8892065869730afa2038d8398969cbdf3c19b800d4ad63e3dbe89f1db8c3`. Sidecar matched. All 48 payload hashes verified directly from ZIP members; 50 entries total. Unsafe world/region/playerdata/log/database/key paths: zero. Private-key/literal-RCON-pattern files: zero. The README and compatibility matrix cite the exact packaged-pair chest regression, with no remaining claim that the 8C281 Paperclip lacks chest runtime evidence. The blocked/not-for-installation label is present.

@@ -1,5 +1,9 @@
 # MultiPaper 26.3 RC4 evaluation handoff
 
+## 2026-10-29 blocked bundle refresh
+
+Local review bundle v33 is `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v33-20261029.zip` (82,713,960 bytes, SHA-256 `00d05aed49a9fddf3deab92ec591efee0f0b6a21bc75232cb3608244393d9933`). The source-commit publication evidence is included. All 49 payload hashes and archive path/content exclusions passed. It is **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**; P0 chest attribution/recovery and InvSee++ conservation gates remain open. See `performance-results/rc5-blocked-local-bundle-20261028.md` and continue from `docs/RC5_BUG_TRACKER.md`.
+
 ## 2026-10-29 source commit checkpoint
 
 Commit `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0` (`Fence cross-backend inventory and chunk synchronization`) contains the reviewed Master/session, Ender Chest revision, chunk-unload fencing, gamerule, and fail-closed remote-click source/tests. It was fast-forward-pushed only to the verified owner fork; `fork/feature/port-26.3` matches the commit. Two clean Java 25 builds passed 10,785 tests each (0 failures/errors, 88 skipped), with nine identical JAR outputs. See `performance-results/rc5-ender-chest-revision-fence-20261029.md` and continue from `docs/RC5_BUG_TRACKER.md`.
