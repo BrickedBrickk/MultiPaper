@@ -15,6 +15,10 @@ The package provenance names product source commit `f59ae3833b8faa4344c407a04beb
 
 `README-BLOCKED.txt` correctly says BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION and names unresolved chest attribution, InvSee++ item conservation, exact-stack/network/hardware gates. Keep that label. Do not update only the documentation while leaving these stale binaries. A refreshed artifact requires a new exact-source full build pair, tests and runtime evidence after P0 gates.
 
+## Paperclip launcher smoke
+
+Copied only the packaged Paperclip JAR into a new marker-guarded fixture under `D:\multipaper-tests\system-temp\rc5-gamerule-binary-check-v47-20261029` and ran it with Temurin Java 25.0.3 and `--version`. Paperclip applied patches and exited 0, printing `26.3-DEV-04724a6`. The temporary directory contained only the copied launcher JAR and its disposable marker; no world or server configuration was created. This is a launcher/version smoke only. It does not prove the gamerule hook is in the packaged class or validate server gameplay, and the displayed DEV version reinforces that this blocked package is not a releasable RC5 candidate. No listener, live server, or Crafty host was contacted.
+
 ## Result
 
-The v47 archive is internally hash-consistent and contains no detected private/local-world payload, but it is stale relative to current source and is correctly blocked. No source, release staging, live server, Crafty host or world was changed. Full release remains blocked.
+The v47 archive is internally hash-consistent and contains no detected private/local-world payload, but it is stale relative to current source and is correctly blocked. No source or archive bytes were changed. Full release remains blocked.
