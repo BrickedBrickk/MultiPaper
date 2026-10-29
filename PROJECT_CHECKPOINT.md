@@ -705,3 +705,7 @@ Commit `14e03630c10423564f034a57845ddc7cd832b8e0` is pushed to the verified owne
 ## RC5 blocked review bundle v40 — 2026-10-29
 
 V39 was preserved but superseded after a stale README checkpoint was detected. Corrected local review-only ZIP v40: `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v40-20261029.zip`, SHA-256 `85de2d9c0e0fe40f848596dcf2151a3f232aade375af2979b0471b1677eb180e`; 52 payload hashes verified, 54 unique entries, zero unsafe paths or credential-pattern hits, clean README/provenance. It packages the rebuilt Master `E9CEE0...` and prior verified Paperclip `8C28146...` and explicitly does not claim co-build provenance. Still not for installation/distribution: P0 InvSee++ conservation and live chest attribution/recovery remain open. Audit: `performance-results/rc5-blocked-local-bundle-v40-20261029.md`.
+
+## RC5 full current-source reproducibility — 2026-10-29
+
+At exact source commit `04724a62e188d5f99c20435a6a47427d09de5d1e`, two sequential isolated Java 25 full clean builds passed **10,788 tests each (0 failures/errors, 88 skipped)**. All nine JAR output hashes matched; all nine passed `jar tf`. Master remains `E9CEE0...`; co-built Paperclip is `A03B3C...`. Detailed manifest/log/report and known limits: `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This does not clear P0 InvSee++ conservation or live chest-loss attribution/recovery. V40 will be superseded by an exact co-built v41 local blocked review package after archive audit.

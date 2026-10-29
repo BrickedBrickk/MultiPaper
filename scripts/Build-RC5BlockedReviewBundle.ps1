@@ -58,7 +58,8 @@ $reports = @(
     'rc5-session-sender-bytecode-provenance-20261029.md',
     'rc5-official-component-availability-20261029.md',
     'rc5-monitor-readable-summary-20261029.md',
-    'rc5-master-disconnect-active-chunk-write-fence-20261029.md'
+    'rc5-master-disconnect-active-chunk-write-fence-20261029.md',
+    'rc5-full-current-clean-reproducible-builds-20261029.md'
 )
 foreach ($report in $reports) {
     $source = Join-Path $repo "performance-results\$report"
@@ -72,15 +73,13 @@ RC5 blocked review package artifact provenance
 
 Branch: feature/port-26.3
 Source checkout HEAD at packaging: $sourceCheckout
-Paperclip source commit: a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0 (see historical build evidence for exact provenance).
-Master source commit: 14e03630c10423564f034a57845ddc7cd832b8e0. The Master was rebuilt from this product source commit; the Paperclip below is the verified pre-existing RC5 candidate and was not rebuilt in this task.
-Master build verification: evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
-Master build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential clean :MultiPaper-Master:build runs, no build cache and no daemon; 78 Master tests each, 0 failures/errors/skips; Master JARs byte-identical.
-The Paperclip's earlier source/build provenance is retained in the historical reports listed under evidence; this bundle does not claim the two binaries were built together.
-SOURCE-SHA256-v23.txt is historical and describes an earlier candidate, not the packaged artifacts.
+Source commit for both binaries: 04724a62e188d5f99c20435a6a47427d09de5d1e.
+Full build verification: evidence/rc5-full-current-clean-reproducible-builds-20261029.md
+Build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential full clean offline builds, no build cache, no daemon, one worker; 10,788 tests each, 0 failures/errors, 88 skipped; all nine JARs byte-identical across passes.
+The Master and Paperclip packaged below were co-built from this exact source commit. SOURCE-SHA256-v23.txt is historical and describes an earlier candidate, not these artifacts.
 
 Packaged Master SHA-256: E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E
-Packaged Paperclip SHA-256: 8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692
+Packaged Paperclip SHA-256: A03B3C4AD79E6102E678E6CD3AD9F859A6C32ADEA36225F3545E4E4313988E94
 Release state: BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION.
 "@
 Set-Content -LiteralPath (Join-Path $evidence 'BUILD-ARTIFACT-PROVENANCE.txt') -Value $provenance -Encoding utf8
@@ -118,14 +117,14 @@ RC5 has not passed the release gates. Keep the live RC4 SMP unchanged.
 
 Artifact pair in this package:
 - Master SHA-256: E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E
-- Paperclip SHA-256: 8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692
+- Paperclip SHA-256: A03B3C4AD79E6102E678E6CD3AD9F859A6C32ADEA36225F3545E4E4313988E94
 - Java: Temurin 25.0.3+9
 - Build provenance: evidence/BUILD-ARTIFACT-PROVENANCE.txt
 
 Current verified persistence scope:
-- Master clean build/test: two sequential builds, 78 tests each, 0 failures/errors/skips, identical Master JAR hashes.
+- Full project clean build/test: two sequential builds, 10,788 tests each, 0 failures/errors, 88 skipped, all nine JAR hashes identical.
 - Disposable exact-pair chest race: 273 forced Master no-holder reads during delayed stale-owner writes passed in A-to-B and B-to-A directions. Exact single/double chest contents remained after new-owner and graceful Master restarts.
-- Full commands, fixture paths, result hashes, and limitations: evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
+- Full build commands, output hashes, test counts, fixture paths, result hashes, and limitations: evidence/rc5-full-current-clean-reproducible-builds-20261029.md and evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
 
 The above does not diagnose or recover live empty chests, exhaust power-loss schedules, or prove all behavior. RC5-01 remains P0 TESTING. InvSee++ cross-owner inventory edits remain fail-closed and item conservation is not implemented/verified; RC5-02 remains P0 BLOCKED. Do not mix this RC5 review pair with RC4 backends.
 

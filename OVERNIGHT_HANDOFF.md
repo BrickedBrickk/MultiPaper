@@ -828,3 +828,7 @@ Correction: blocked review ZIP v39 was superseded after detecting a stale source
 ## RC5 blocked review v40
 
 V39 is superseded due stale README provenance. V40 is the corrected local BLOCKED review ZIP: SHA-256 `85de2d9c0e0fe40f848596dcf2151a3f232aade375af2979b0471b1677eb180e`; all 52 payload hashes, unsafe path scan, and text credential scan passed. It is not installable/distributable or published. See `performance-results/rc5-blocked-local-bundle-v40-20261029.md` and continue from `docs/RC5_BUG_TRACKER.md`.
+
+## RC5 full current-source build validation
+
+Two sequential full Java 25 clean builds at commit `04724a62e188d5f99c20435a6a47427d09de5d1e` passed 10,788 tests each (0 failures/errors, 88 skipped) and produced nine identical JAR hashes. The full test/build report is `performance-results/rc5-full-current-clean-reproducible-builds-20261029.md`. This is build evidence only; live chest attribution/recovery and P0 InvSee++ item conservation remain open. V40 is superseded by v41 once verified. Continue from `docs/RC5_BUG_TRACKER.md`.
