@@ -528,8 +528,8 @@ class MasterIntegrationTest {
         String world = "write-failure-world";
         int chunkX = 17;
         int chunkZ = -21;
-        byte[] previousData = "previous-chunk-data".getBytes(StandardCharsets.UTF_8);
-        byte[] replacementData = "replacement-chunk-data".getBytes(StandardCharsets.UTF_8);
+        byte[] previousData = chestChunk(17);
+        byte[] replacementData = chestChunk(29);
 
         ServerBoundMessage initialReply = serverB.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, previousData));
         assertTrue(initialReply instanceof BooleanMessageReply && ((BooleanMessageReply) initialReply).result,
@@ -548,7 +548,9 @@ class MasterIntegrationTest {
         ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(world, "region", chunkX, chunkZ));
         assertTrue(readReply instanceof DataMessageReply, "The previous chunk data should remain readable");
         assertArrayEquals(previousData, ((DataMessageReply) readReply).data,
-                "A failed replacement must leave the last acknowledged chunk data intact");
+                "A failed replacement must leave the last acknowledged chest NBT intact");
+        assertEquals(17, readChestItemCount(((DataMessageReply) readReply).data),
+                "The previously persisted chest inventory must remain exact after a failed save");
         RegionFileCache.closeAll();
     }
 
