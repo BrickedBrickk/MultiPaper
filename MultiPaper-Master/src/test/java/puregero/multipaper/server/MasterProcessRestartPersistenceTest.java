@@ -166,6 +166,69 @@ class MasterProcessRestartPersistenceTest {
 
     @Test
     @Timeout(90)
+    void populatedChestChunkSurvivesAbruptMasterTerminationAfterAcknowledgedWrite() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("chest-abrupt-restart-master");
+        Files.createDirectories(masterDirectory);
+        String world = "chest-abrupt-restart-world";
+        int chunkX = -19;
+        int chunkZ = 27;
+        byte[] acknowledgedChest = chestChunk(chunkX, chunkZ, 41);
+
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient firstOwner = null;
+        try {
+            awaitListening(firstMaster, masterPort);
+            firstOwner = TestServerClient.connect(masterPort, "abrupt-chest-writer");
+            firstOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            firstOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(firstOwner, chunkX, chunkZ, "abrupt-chest-writer");
+            assertAcknowledged(firstOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, acknowledgedChest)),
+                    "acknowledged populated chest chunk");
+            assertEquals(41, readChestItemCount(readData(firstOwner.request(
+                    new ForceReadChunkMessage(world, "region", chunkX, chunkZ)), "First Master", "pre-crash chest chunk")));
+
+            // The write acknowledgement promises persistence has completed. Kill only
+            // this disposable Master process to exercise recovery without its shutdown path.
+            firstOwner.close();
+            firstOwner = null;
+            firstMaster.destroyForcibly();
+            assertTrue(firstMaster.waitFor(10, TimeUnit.SECONDS), "First disposable Master did not terminate forcibly");
+        } finally {
+            closeClient(firstOwner);
+            stopIfRunning(firstMaster);
+        }
+
+        Process recoveredMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient nextOwner = null;
+        try {
+            awaitListening(recoveredMaster, masterPort);
+            nextOwner = TestServerClient.connect(masterPort, "abrupt-chest-new-owner");
+            nextOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            nextOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(nextOwner, chunkX, chunkZ, "abrupt-chest-new-owner");
+
+            byte[] restored = readData(nextOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)),
+                    "Abruptly recovered Master", "chest chunk");
+            assertArrayEquals(acknowledgedChest, restored,
+                    "Abrupt Master termination after ACK must preserve the exact populated chest chunk NBT");
+            assertEquals(41, readChestItemCount(restored), "Every acknowledged chest item must survive abrupt Master termination");
+
+            nextOwner.close();
+            nextOwner = null;
+            requestGracefulExit(recoveredMaster);
+            assertTrue(recoveredMaster.waitFor(15, TimeUnit.SECONDS), "Recovered Master did not stop cleanly");
+            assertEquals(0, recoveredMaster.exitValue(), "Recovered Master should exit successfully");
+        } finally {
+            closeClient(nextOwner);
+            stopIfRunning(recoveredMaster);
+        }
+    }
+
+    @Test
+    @Timeout(90)
     void worldUidSurvivesGracefulAndCrashMasterRestarts() throws Exception {
         int masterPort = findFreePort();
         int proxyPort = findFreePort();
