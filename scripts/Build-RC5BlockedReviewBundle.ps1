@@ -57,7 +57,8 @@ $reports = @(
     'rc5-session-registration-runtime-20261029.md',
     'rc5-session-sender-bytecode-provenance-20261029.md',
     'rc5-official-component-availability-20261029.md',
-    'rc5-monitor-readable-summary-20261029.md'
+    'rc5-monitor-readable-summary-20261029.md',
+    'rc5-master-disconnect-active-chunk-write-fence-20261029.md'
 )
 foreach ($report in $reports) {
     $source = Join-Path $repo "performance-results\$report"
@@ -71,13 +72,14 @@ RC5 blocked review package artifact provenance
 
 Branch: feature/port-26.3
 Source checkout HEAD at packaging: $sourceCheckout
-Product source commit used for these binaries: a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0
-The build ran on that exact product source state before it was committed; the later checkpoint commit changes documentation only.
-Build verification: evidence/rc5-ender-chest-revision-fence-20261029.md
-Build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential clean offline builds, no build cache, no daemon, one worker; 10,785 tests each, 0 failures/errors, 88 skipped; all nine JARs byte-identical.
-SOURCE-SHA256-v23.txt is historical and describes the earlier v23 Paperclip, not this candidate.
+Paperclip source commit: a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0 (see historical build evidence for exact provenance).
+Master source commit: $sourceCheckout. The Master was rebuilt for this package; the Paperclip below is the verified pre-existing RC5 candidate and was not rebuilt in this task.
+Master build verification: evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
+Master build method: Temurin Java 25.0.3+9 / Gradle 9.8.0; two sequential clean :MultiPaper-Master:build runs, no build cache and no daemon; 78 Master tests each, 0 failures/errors/skips; Master JARs byte-identical.
+The Paperclip's earlier source/build provenance is retained in the historical reports listed under evidence; this bundle does not claim the two binaries were built together.
+SOURCE-SHA256-v23.txt is historical and describes an earlier candidate, not the packaged artifacts.
 
-Packaged Master SHA-256: 1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E
+Packaged Master SHA-256: E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E
 Packaged Paperclip SHA-256: 8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692
 Release state: BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION.
 "@
@@ -108,15 +110,30 @@ Latest candidate note (2026-10-29): this package carries Paperclip 8C28146D36F20
 }
 Set-Content -LiteralPath $readmePath -Value $readme -Encoding utf8
 
-if ($readme -notmatch 'Source commit a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0') {
-    $readme += @'
+$readme = @'
+MultiPaper 26.3 RC5 — BLOCKED EVALUATION REVIEW PACKAGE
 
-## Source commit checkpoint (2026-10-29)
+NOT FOR INSTALLATION OR DISTRIBUTION. This is a local review artifact only.
+RC5 has not passed the release gates. Keep the live RC4 SMP unchanged.
 
-The candidate product sources and tests are committed as `a4e196bcccd40a3d26ae59dc18ba21f8efb8c3d0`; checkpoint documentation is committed as `2d4837454736c9ee60712c50ca8c7b22cb78c43a`. The owner fork branch was verified at the documentation commit. See `evidence/rc5-source-commit-publication-20261029.md`. This is source publication, not a binary release. P0 chest attribution and InvSee++ item conservation gates remain open; the package stays blocked and must not be installed or distributed.
+Artifact pair in this package:
+- Master SHA-256: E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E
+- Paperclip SHA-256: 8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692
+- Java: Temurin 25.0.3+9
+- Build provenance: evidence/BUILD-ARTIFACT-PROVENANCE.txt
+
+Current verified persistence scope:
+- Master clean build/test: two sequential builds, 78 tests each, 0 failures/errors/skips, identical Master JAR hashes.
+- Disposable exact-pair chest race: 273 forced Master no-holder reads during delayed stale-owner writes passed in A-to-B and B-to-A directions. Exact single/double chest contents remained after new-owner and graceful Master restarts.
+- Full commands, fixture paths, result hashes, and limitations: evidence/rc5-master-disconnect-active-chunk-write-fence-20261029.md
+
+The above does not diagnose or recover live empty chests, exhaust power-loss schedules, or prove all behavior. RC5-01 remains P0 TESTING. InvSee++ cross-owner inventory edits remain fail-closed and item conservation is not implemented/verified; RC5-02 remains P0 BLOCKED. Do not mix this RC5 review pair with RC4 backends.
+
+Other open gates include exact-stack six-component startup, authenticated Java and Bedrock/Floodgate login, older-client behavior, Playit route validation, two-PC capacity, and monitored beta runtime instrumentation. See docs/RC5_BUG_TRACKER.md and docs/RC5_COMPATIBILITY_MATRIX.md for exact status. Do not advertise hardware capacity or mark the build stable.
+
+No live world, playerdata, backups, Crafty settings, secrets, RCON files, keys, raw logs, or chat are included. For any future update, first pass all gates and use docs/RC5_MANUAL_UPDATE_PLAN.md during operator-scheduled maintenance. No upgrade is authorized by this package.
 '@
-    Set-Content -LiteralPath $readmePath -Value $readme -Encoding utf8
-}
+Set-Content -LiteralPath $readmePath -Value $readme -Encoding utf8
 
 $manifestPath = Join-Path $payload 'SHA256SUMS.txt'
 $manifestSidecar = "$manifestPath.sha256"

@@ -818,3 +818,9 @@ Read `docs/RC5_COMPATIBILITY_MATRIX.md` and `performance-results/rc5-official-co
 ## 2026-10-29 persistence investigation continuation
 
 Current Master worktree adds an accepted-async-chunk-write disconnect fence and regression tests. Two clean Java 25 Master builds passed 78/78 tests with identical Master SHA-256 `E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E`. Exact paired disposable chest tests on the RC5 Paperclip passed 273-read A→B and B→A handoffs with exact single/double chest contents through backend and Master restarts. Live chest reports remain un-attributed/un-recovered; RC5-01 remains P0 TESTING. Exact uploaded `1latest.log` / `2latest.log` paths were unavailable, so only historical log SHA-256 `920B665985CB2066D2199F0A6795C438D268FEADE91E8BE1246EAEA00CCA25D1` is cited. Continue from `docs/RC5_BUG_TRACKER.md` and `performance-results/rc5-master-disconnect-active-chunk-write-fence-20261029.md`. The precise mid-write disconnect still needs a real-backend disposable runtime test before claiming complete verification.
+
+## 2026-10-29 blocked-review artifact
+
+Local review bundle v39 includes the rebuilt Master and exact Paperclip used by the 273-read bidirectional chest runtime. ZIP SHA-256 `1756dc3b878b7dad78ecb7feb9311ba403ef24ea168a353785b09a1b3223c25d`; all 52 embedded payload hashes verified. It remains blocked/not for installation or distribution due P0 InvSee++ conservation and live chest attribution/recovery. Details: `performance-results/rc5-blocked-local-bundle-v39-20261029.md`. Continue from `docs/RC5_BUG_TRACKER.md`.
+
+Correction: blocked review ZIP v39 was superseded after detecting a stale source-checkpoint paragraph in its README. Do not use v39; preserve it for audit. Use v40 only after its independent archive/provenance checks pass. Tracker: `docs/RC5_BUG_TRACKER.md`.
