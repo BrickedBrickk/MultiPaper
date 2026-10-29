@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 blocked review bundle v43 — 2026-10-29
+
+Created `release-staging/MultiPaper-26.3-RC5-blocked-current-source-v43-20261029.zip` from the normal Java 25 build pair for source base `04724a6` plus source/test overlay `f59ae3833b8faa4344c407a04beba98978f79bea`. Master SHA-256 `E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E`; Paperclip SHA-256 `4180250D05A570009F30349A0251A4924D11D403ED7E4C65CF5686C18B204E7F`. Two clean Java 25 builds each passed 10,794 tests (0 failures/errors, 88 skipped), with all nine JAR hashes matching. The archive SHA-256 is `21ef1e18731ae48ccf914ee4f2b622a493653e718921ff8de73fa483f9babd88`; its 57 payload hashes were checked directly against archive members. It contains no unsafe world/log/database/key paths or detected private-key/literal-RCON patterns. It is labeled **BLOCKED / NOT FOR INSTALLATION OR DISTRIBUTION**. RC5-01 chest attribution remains P0 TESTING; RC5-02 InvSee++ conservation remains P0 BLOCKED. Full audit: `performance-results/rc5-blocked-current-bundle-v43-20261029.md`.
+
 ## RC5 session registration acknowledgement runtime — 2026-10-29
 
 The paired backend callback/readiness gap is now exercised in a fresh marked fixture. A synthetic client logged in on A, reconnected on A, and transferred ownership to B; all three backend callback records reported Master `accepted=true`, current registration, and `ready=true`. The updated runner directly asserts those backend records. Diagnostic JAR provenance, restored candidate/source hashes, fixture result/log hashes, closed ports and limits: `performance-results/rc5-session-registration-ack-readiness-runtime-20261029.md`. The diagnostic JAR is not distributable. This does not implement the owner-attested InvSee++ transaction or cursor/conservation protocol: RC5-02 remains P0 BLOCKED, remote clicks remain disabled, and RC5 is not installable/publishable.
