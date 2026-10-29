@@ -824,3 +824,7 @@ Current Master worktree adds an accepted-async-chunk-write disconnect fence and 
 Local review bundle v39 includes the rebuilt Master and exact Paperclip used by the 273-read bidirectional chest runtime. ZIP SHA-256 `1756dc3b878b7dad78ecb7feb9311ba403ef24ea168a353785b09a1b3223c25d`; all 52 embedded payload hashes verified. It remains blocked/not for installation or distribution due P0 InvSee++ conservation and live chest attribution/recovery. Details: `performance-results/rc5-blocked-local-bundle-v39-20261029.md`. Continue from `docs/RC5_BUG_TRACKER.md`.
 
 Correction: blocked review ZIP v39 was superseded after detecting a stale source-checkpoint paragraph in its README. Do not use v39; preserve it for audit. Use v40 only after its independent archive/provenance checks pass. Tracker: `docs/RC5_BUG_TRACKER.md`.
+
+## RC5 blocked review v40
+
+V39 is superseded due stale README provenance. V40 is the corrected local BLOCKED review ZIP: SHA-256 `85de2d9c0e0fe40f848596dcf2151a3f232aade375af2979b0471b1677eb180e`; all 52 payload hashes, unsafe path scan, and text credential scan passed. It is not installable/distributable or published. See `performance-results/rc5-blocked-local-bundle-v40-20261029.md` and continue from `docs/RC5_BUG_TRACKER.md`.
