@@ -9,12 +9,16 @@ import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlay
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadUidMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PlayerConnectMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ForceReadChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.LockChunkMessage;
+import puregero.multipaper.mastermessagingprotocol.messages.masterbound.SubscribeChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WriteLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.WritePlayerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.PersistContainerTransactionMessage.Snapshot;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.BooleanMessageReply;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.DataMessageReply;
+import puregero.multipaper.mastermessagingprotocol.messages.serverbound.SetChunkOwnerMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.serverbound.ServerBoundMessage;
 import se.llbit.nbt.CompoundTag;
 import se.llbit.nbt.IntTag;
@@ -97,6 +101,65 @@ class MasterProcessRestartPersistenceTest {
             assertEquals(0, secondMaster.exitValue(), "Second Master process should exit successfully");
         } finally {
             closeClient(secondClient);
+            stopIfRunning(secondMaster);
+        }
+    }
+
+    @Test
+    @Timeout(90)
+    void populatedChestChunkSurvivesMasterRestartAndNewOwnerClaim() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("chest-owner-restart-master");
+        Files.createDirectories(masterDirectory);
+        String world = "chest-owner-restart-world";
+        int chunkX = -3;
+        int chunkZ = 14;
+        byte[] chestBeforeRestart = chestChunk(chunkX, chunkZ, 17);
+        byte[] chestAfterRestart = chestChunk(chunkX, chunkZ, 29);
+
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient firstOwner = null;
+        try {
+            awaitListening(firstMaster, masterPort);
+            firstOwner = TestServerClient.connect(masterPort, "chest-restart-owner-a");
+            firstOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            firstOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(firstOwner, chunkX, chunkZ, "chest-restart-owner-a");
+            assertAcknowledged(firstOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, chestBeforeRestart)), "owned chest chunk");
+            assertEquals(17, readChestItemCount(readData(firstOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)), "First Master", "chest chunk")));
+            firstOwner.close();
+            firstOwner = null;
+
+            requestGracefulExit(firstMaster);
+            assertTrue(firstMaster.waitFor(15, TimeUnit.SECONDS), "First Master did not stop after exit");
+            assertEquals(0, firstMaster.exitValue(), "First Master process should exit successfully");
+        } finally {
+            closeClient(firstOwner);
+            stopIfRunning(firstMaster);
+        }
+
+        Process secondMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient nextOwner = null;
+        try {
+            awaitListening(secondMaster, masterPort);
+            nextOwner = TestServerClient.connect(masterPort, "chest-restart-owner-b");
+            nextOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            nextOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(nextOwner, chunkX, chunkZ, "chest-restart-owner-b");
+            byte[] restored = readData(nextOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)), "Restarted Master", "chest chunk");
+            assertEquals(17, readChestItemCount(restored), "The exact populated chest stack must survive Master restart");
+
+            assertAcknowledged(nextOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, chestAfterRestart)), "new-owner chest update");
+            assertEquals(29, readChestItemCount(readData(nextOwner.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ)), "Restarted Master", "updated chest chunk")));
+            nextOwner.close();
+            nextOwner = null;
+            requestGracefulExit(secondMaster);
+            assertTrue(secondMaster.waitFor(15, TimeUnit.SECONDS), "Restarted Master did not stop after exit");
+            assertEquals(0, secondMaster.exitValue(), "Restarted Master process should exit successfully");
+        } finally {
+            closeClient(nextOwner);
             stopIfRunning(secondMaster);
         }
     }
@@ -499,6 +562,43 @@ class MasterProcessRestartPersistenceTest {
             root.write(output);
         }
         return compressed.toByteArray();
+    }
+
+    private static byte[] chestChunk(int chunkX, int chunkZ, int count) throws IOException {
+        CompoundTag chest = blockEntity(chunkX * 16, "chest-count-" + count);
+        chest.add("z", new IntTag(chunkZ * 16));
+        CompoundTag item = new CompoundTag();
+        item.add("id", new StringTag("minecraft:diamond"));
+        item.add("count", new IntTag(count));
+        item.add("Slot", new IntTag(0));
+        ListTag items = new ListTag(10, new ArrayList<>());
+        items.add(item);
+        chest.add("Items", items);
+        return inventoryChunk(chunkX, chest);
+    }
+
+    private static int readChestItemCount(byte[] compressedChunk) throws IOException {
+        try (DataInputStream input = new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(compressedChunk)))) {
+            if (input.readUnsignedByte() != 10) throw new IOException("Chunk root is not a compound");
+            input.readUTF();
+            CompoundTag root = CompoundTag.read(input).asCompound();
+            ListTag blockEntities = root.get("block_entities").asList();
+            if (blockEntities == null || blockEntities.isEmpty()) throw new IOException("Chunk has no chest block entity");
+            ListTag items = blockEntities.get(0).asCompound().get("Items").asList();
+            if (items == null || items.isEmpty()) return 0;
+            return items.get(0).asCompound().get("count").intValue();
+        }
+    }
+
+    private static void awaitChunkOwner(TestServerClient client, int chunkX, int chunkZ, String expectedOwner) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            SetChunkOwnerMessage update = client.chunkOwnerUpdates.poll(100, TimeUnit.MILLISECONDS);
+            if (update != null && update.cx == chunkX && update.cz == chunkZ && expectedOwner.equals(update.owner)) {
+                return;
+            }
+        }
+        throw new AssertionError("Timed out waiting for chunk " + chunkX + "," + chunkZ + " owner " + expectedOwner);
     }
 
     private static String readBlockEntityState(byte[] compressedChunk) throws IOException {

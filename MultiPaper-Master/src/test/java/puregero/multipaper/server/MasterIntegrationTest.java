@@ -1561,4 +1561,57 @@ class MasterIntegrationTest {
             waiter.close();
         }
     }
+
+    @Test
+    @Order(38)
+    void concurrentForcedChestReadsWaitForPendingSaveAndReturnExactSameInventory() throws Exception {
+        int chunkX = 31;
+        int chunkZ = 0;
+        String world = Files.createTempDirectory("multipaper-concurrent-chest-read-").toString();
+        byte[] previousChest = chestChunk(11);
+        byte[] savedChest = chestChunk(23);
+        TestServerClient owner = TestServerClient.connect(port, "concurrent-chest-owner");
+        java.util.List<TestServerClient> readers = new java.util.ArrayList<>();
+        try {
+            owner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            owner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            owner.request(new PingMessage());
+            assertEquals("concurrent-chest-owner", pollUntilOwner(owner, chunkX, chunkZ, "concurrent-chest-owner").owner);
+            assertTrue(((BooleanMessageReply) owner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, previousChest))).result);
+
+            owner.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            owner.request(new PingMessage());
+
+            java.util.List<CompletableFuture<ServerBoundMessage>> pendingReads = new java.util.ArrayList<>();
+            for (int index = 0; index < 8; index++) {
+                TestServerClient reader = TestServerClient.connect(port, "chest-reader-" + index);
+                readers.add(reader);
+                pendingReads.add(CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return reader.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ));
+                    } catch (Exception failure) {
+                        throw new java.util.concurrent.CompletionException(failure);
+                    }
+                }));
+            }
+
+            Thread.sleep(250);
+            assertTrue(pendingReads.stream().noneMatch(CompletableFuture::isDone),
+                    "Every forced reader must wait while the owner's announced chest save is pending");
+
+            assertTrue(((BooleanMessageReply) owner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, savedChest))).result);
+            for (CompletableFuture<ServerBoundMessage> pendingRead : pendingReads) {
+                ServerBoundMessage reply = pendingRead.get(10, TimeUnit.SECONDS);
+                assertTrue(reply instanceof DataMessageReply, "Each concurrent forced read must return authoritative chunk data");
+                byte[] chest = ((DataMessageReply) reply).data;
+                assertArrayEquals(savedChest, chest, "All readers must receive the exact same post-save chest NBT");
+                assertEquals(23, readChestItemCount(chest), "No reader may observe the older chest contents");
+            }
+        } finally {
+            for (TestServerClient reader : readers) {
+                reader.close();
+            }
+            owner.close();
+        }
+    }
 }

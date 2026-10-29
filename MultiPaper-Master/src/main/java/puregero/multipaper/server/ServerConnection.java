@@ -12,6 +12,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.SocketAddress;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -86,6 +88,16 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     public void send(ServerBoundMessage message, Consumer<MasterBoundMessage> callback) {
         send(setCallback(message, callback));
+    }
+
+    public CompletableFuture<MasterBoundMessage> sendAndAwaitReply(ServerBoundMessage message, long timeout, TimeUnit unit) {
+        CompletableFuture<MasterBoundMessage> reply = setCallbackFuture(message, timeout, unit);
+        channel.writeAndFlush(message).addListener(write -> {
+            if (!write.isSuccess()) {
+                reply.completeExceptionally(write.cause());
+            }
+        });
+        return reply;
     }
 
     public void sendReply(ServerBoundMessage message, MasterBoundMessage inReplyTo) {
