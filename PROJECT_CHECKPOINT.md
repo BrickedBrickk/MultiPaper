@@ -1,5 +1,9 @@
 # MultiPaper project checkpoint — 2026-10-27
 
+## RC5 session registration acknowledgement runtime — 2026-10-29
+
+The paired backend callback/readiness gap is now exercised in a fresh marked fixture. A synthetic client logged in on A, reconnected on A, and transferred ownership to B; all three backend callback records reported Master `accepted=true`, current registration, and `ready=true`. The updated runner directly asserts those backend records. Diagnostic JAR provenance, restored candidate/source hashes, fixture result/log hashes, closed ports and limits: `performance-results/rc5-session-registration-ack-readiness-runtime-20261029.md`. The diagnostic JAR is not distributable. This does not implement the owner-attested InvSee++ transaction or cursor/conservation protocol: RC5-02 remains P0 BLOCKED, remote clicks remain disabled, and RC5 is not installable/publishable.
+
 ## RC5 player-session registration readiness prerequisite — 2026-10-29
 
 Commit `f59ae3833b8faa4344c407a04beba98978f79bea`, pushed to `fork/feature/port-26.3`, exposes Master Boolean acknowledgements for exact player-session registration and records readiness by player UUID, session UUID, and Master connection generation. Six state regressions cover acceptance, deduplication, rejection/retry, late old-session replies, disconnect invalidation, and matching-session retirement. Focused inventory/session tests passed 44/44; two sequential clean Java 25 full builds each passed 10,794 tests (0 failures/errors, 88 skipped) and produced nine identical JAR hashes. Evidence: `performance-results/rc5-player-session-registration-readiness-20261029.md`. This does not use readiness in the cross-backend click path or implement owner-attested transactions; InvSee++ remote edits remain fail-closed and RC5-02 P0 BLOCKED. Do not install or publish RC5. Preserve unrelated dirty files. Continue from `docs/RC5_BUG_TRACKER.md`.

@@ -1,5 +1,11 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### RC5-02 backend acknowledgement/readiness paired runtime — 2026-10-29
+
+- A fresh marked disposable two-backend fixture passed synthetic initial login on A, reconnect on A, then owner transfer to B. Three backend callback records for the same player UUID were `accepted=true current=true ready=true` (two A, one B); the protocol probe completed all three named stages.
+- The diagnostic Paperclip differs from current source only by one temporary INFO statement after readiness completion; it is not a candidate/release binary. The original source and normal Paperclip were restored byte-for-byte. Runner now supports `-VerifyBackendSessionAckReadiness` so it asserts the backend ACK directly with an uninstrumented Master. Logs, hashes, exact commands and limits: `performance-results/rc5-session-registration-ack-readiness-runtime-20261029.md`.
+- This verifies session registration ACK/readiness only. There is still no owner-attested InvSee++ transaction or accepted cross-owner click conservation; the remote click gate remains fail-closed. **RC5-02 stays P0 `BLOCKED`; RC5 must not be installed or published.** Fixture processes and test ports were closed; live services/worlds were untouched.
+
 ### RC5-02 session-registration readiness prerequisite — 2026-10-29
 
 - Added Master-acknowledged player-session readiness fenced by player UUID, session UUID, and connection generation. Duplicate registrations share one pending result; rejected replies, replacement sessions, disconnect/reconnect, and matching-session retirement stay fail-closed. Six state regressions were added.

@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory)][string]$FixtureRoot,
     [string]$PaperclipSha256 = '99B24AE11909C246C040D137CD3528A6C3F6EBC052244C523AE2250A9CED5E85',
     [string]$MasterSha256 = '93FF3AB7E6F2D1DC7192070E90E54F8DD334D3247E74A22F72223B0CAF3E257C',
-    [string]$Username = 'RC5Reconnect'
+    [string]$Username = 'RC5Reconnect',
+    [switch]$VerifyBackendSessionAckReadiness
 )
 
 $ErrorActionPreference = 'Stop'
@@ -111,16 +112,37 @@ try {
 }
 if ($failure) { throw $failure }
 
-$events = @([regex]::Matches([IO.File]::ReadAllText((Join-Path $logs 'master.out')), 'RC5_SESSION_REGISTRATION_RESULT backend=(\S+) player=(\S+) session=(\S+) accepted=(true|false)') | ForEach-Object {
-    [pscustomobject]@{ Backend = $_.Groups[1].Value; Player = $_.Groups[2].Value; Session = $_.Groups[3].Value; Accepted = $_.Groups[4].Value }
-})
-if ($events.Count -ne 3) { throw "Expected 3 registration records, found $($events.Count); evidence retained in $logs" }
-if (@($events | Where-Object { $_.Accepted -ne 'true' }).Count -ne 0) { throw "A registration was rejected; evidence retained in $logs" }
-if (@($events.Player | Select-Object -Unique).Count -ne 1) { throw "Reconnect did not preserve the offline player UUID; evidence retained in $logs" }
-if (@($events.Session | Select-Object -Unique).Count -ne 3) { throw "Expected three unique login session epochs; evidence retained in $logs" }
-if (($events.Backend -join ',') -ne 'race-a,race-a,race-b') { throw "Unexpected owner registration order: $($events.Backend -join ','); evidence retained in $logs" }
+if ($VerifyBackendSessionAckReadiness) {
+    $events = [Collections.Generic.List[object]]::new()
+    foreach ($backend in @('backend-a', 'backend-b')) {
+        $backendLog = [IO.File]::ReadAllText((Join-Path $logs "$backend.out"))
+        foreach ($match in [regex]::Matches($backendLog, 'RC5_DIAG_PLAYER_SESSION_ACK player=(\S+) accepted=(true|false) current=(true|false) ready=(true|false)')) {
+            $events.Add([pscustomobject]@{
+                Backend = $backend
+                Player = $match.Groups[1].Value
+                Accepted = $match.Groups[2].Value
+                Current = $match.Groups[3].Value
+                Ready = $match.Groups[4].Value
+            })
+        }
+    }
+    if ($events.Count -ne 3) { throw "Expected 3 backend acknowledgement records, found $($events.Count); evidence retained in $logs" }
+    if (@($events | Where-Object { $_.Accepted -ne 'true' -or $_.Current -ne 'true' -or $_.Ready -ne 'true' }).Count -ne 0) { throw "A backend did not reach accepted/current/ready; evidence retained in $logs" }
+    if (@($events.Player | Select-Object -Unique).Count -ne 1) { throw "Reconnect did not preserve the offline player UUID; evidence retained in $logs" }
+    if (@($events | Where-Object Backend -eq 'backend-a').Count -ne 2 -or @($events | Where-Object Backend -eq 'backend-b').Count -ne 1) { throw "Expected two acknowledged registrations on A and one after transfer to B; evidence retained in $logs" }
+    $result = "PASS: the same player session was acknowledged and ready on A, reconnected and acknowledged on A, then acknowledged and ready after owner transfer to B. Logs: $logs"
+} else {
+    $events = @([regex]::Matches([IO.File]::ReadAllText((Join-Path $logs 'master.out')), 'RC5_SESSION_REGISTRATION_RESULT backend=(\S+) player=(\S+) session=(\S+) accepted=(true|false)') | ForEach-Object {
+        [pscustomobject]@{ Backend = $_.Groups[1].Value; Player = $_.Groups[2].Value; Session = $_.Groups[3].Value; Accepted = $_.Groups[4].Value }
+    })
+    if ($events.Count -ne 3) { throw "Expected 3 registration records, found $($events.Count); evidence retained in $logs" }
+    if (@($events | Where-Object { $_.Accepted -ne 'true' }).Count -ne 0) { throw "A registration was rejected; evidence retained in $logs" }
+    if (@($events.Player | Select-Object -Unique).Count -ne 1) { throw "Reconnect did not preserve the offline player UUID; evidence retained in $logs" }
+    if (@($events.Session | Select-Object -Unique).Count -ne 3) { throw "Expected three unique login session epochs; evidence retained in $logs" }
+    if (($events.Backend -join ',') -ne 'race-a,race-a,race-b') { throw "Unexpected owner registration order: $($events.Backend -join ','); evidence retained in $logs" }
 
-$result = "PASS: one player session registered on A, reconnected on A, then re-registered after owner transfer to B; three accepted epochs. Logs: $logs"
+    $result = "PASS: one player session registered on A, reconnected on A, then re-registered after owner transfer to B; three accepted epochs. Logs: $logs"
+}
 Set-Content -LiteralPath (Join-Path $logs 'RESULT.txt') -Value $result
 foreach ($port in @(33151, 33152, 33153, 33154, 33161, 33162)) {
     if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Fixture listener remained on $port; evidence retained in $logs" }
