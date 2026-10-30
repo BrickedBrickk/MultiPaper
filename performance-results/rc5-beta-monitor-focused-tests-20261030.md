@@ -15,6 +15,10 @@ Monitor implementation SHA-256: `873843122CBD26261D2DCE2C12DD42FE5D69E157EF715FD
 
 The monitor now explicitly requests each Java process's creation time when enumerating processes, so a reused PID after restart starts a fresh CPU baseline. The regression asserts this attribute is requested; the complete focused suite passes on the corrected source.
 
+## Synthetic overhead measurement
+
+On Python 3.13.5, `py -3 scripts/Measure-BetaMonitorOverhead.py --iterations 200 --events-per-interval 20 --poll-seconds 10` exited 0 with 2.40625 process CPU seconds over 3.343762 wall seconds, 12.031 ms CPU per synthetic poll, and estimated 0.1203% of one core at the assumed 10-second interval. RCON was disabled and the runner used only temporary synthetic logs/metrics. RSS was unavailable (`null`) because `psutil` is not installed in this environment. This is not a Debian/Crafty/target-PC or live-RCON measurement; deployed-host overhead remains a manual beta gate.
+
 ## Scope limits
 
 This validates the current worktree's parser, sanitation, rotation, diagnostic-export and summary unit tests only. It does not measure live beta CPU/RSS/MSPT overhead, verify Crafty deployment, capture actual host/backend runtime metrics, or establish RC5 readiness. The suite ran locally without connecting to Minecraft, Crafty, RCON, or any server. No source, configuration, fixture, or binary was changed by the test run. The test may update Python bytecode cache files; the existing untracked cache directories were left untouched.
