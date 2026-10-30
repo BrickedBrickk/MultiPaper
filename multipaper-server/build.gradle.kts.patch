@@ -77,7 +77,7 @@
              "-Alog4j.graalvm.groupId=${project.group}",
              "-Alog4j.graalvm.artifactId=${project.name}"
          )
-@@ -266,2 +_,248 @@
+@@ -266,2 +_,282 @@
 +val applyMultiPaperChunkHolderBasePatch = tasks.register("applyMultiPaperChunkHolderBasePatch") {
 +    dependsOn("applyMinecraftPatches")
 +    doLast {
@@ -316,8 +316,42 @@
 +    }
 +}
 +
++val normalizeLevelEntityGetterAdapterQuery = tasks.register("normalizeLevelEntityGetterAdapterQuery") {
++    // Vineflower can fail decompiling this generic bridge with a
++    // ConcurrentModificationException and emit an empty method body. Keep the
++    // compiled entity lookup behavior stable across clean source generations.
++    dependsOn("applyMinecraftPatches")
++    doLast {
++        val sourceFile = rootProject.file("multipaper-server/src/minecraft/java/net/minecraft/world/level/entity/LevelEntityGetterAdapter.java")
++        val source = sourceFile.readText()
++        val signature = "    public <U extends T> void get(final EntityTypeTest<T, U> type, final AbortableIterationConsumer<U> consumer) {"
++        val methodPattern = Regex("(?s)    public <U extends T> void get\\(final EntityTypeTest<T, U> type, final AbortableIterationConsumer<U> consumer\\) \\{.*?\\r?\\n    \\}")
++        if (!source.contains("private final EntityLookup<T> visibleEntities;")) {
++            throw GradleException("Unexpected LevelEntityGetterAdapter source: visible entity lookup field is missing")
++        }
++        if (methodPattern.findAll(source).count() != 1) {
++            throw GradleException("Expected exactly one LevelEntityGetterAdapter entity-type query method")
++        }
++
++        val newline = if ("\r\n" in source) "\r\n" else "\n"
++        val replacement = listOf(
++            signature,
++            "        this.visibleEntities.getEntities(type, consumer);",
++            "    }"
++        ).joinToString(newline)
++        val normalized = methodPattern.replace(source, replacement)
++        if (normalized != source) {
++            sourceFile.writeText(normalized)
++        }
++        if (!sourceFile.readText().contains(replacement)) {
++            throw GradleException("LevelEntityGetterAdapter entity-type query was not normalized")
++        }
++    }
++}
++
  tasks.withType<JavaCompile>().configureEach {
 +    dependsOn("applyMinecraftPatches")
++    dependsOn(normalizeLevelEntityGetterAdapterQuery)
 +    dependsOn(applyDurableScheduledTickReplayGuardPatch)
 +    dependsOn(applyEntitySubscriptionReadinessPatch)
 +    dependsOn(applyTransientEntitySavePatch)
