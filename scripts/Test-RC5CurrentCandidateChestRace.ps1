@@ -24,6 +24,7 @@ $paperHashes = @(
     'F5462FDA66732D7226920B04B89F8DB45D4125746B51F4BD90BDB3D8A46167B9', # clean RC5 candidate before persistent InvSee click gate
     '391D91696B8C6DBBFD1A952FABF15A5F31AA2DB5D129BC742CCC279905438349', # persistent-input InvSee gate candidate
     '99B24AE11909C246C040D137CD3528A6C3F6EBC052244C523AE2250A9CED5E85', # current reproducible session-registration candidate
+    '20024BC1C50AF5DDB1248AD2C79426A892A219AE69AE7E1770395123171B936A', # exact reproducible entity-getter-normalized candidate used in click-containment runtime
     '4180250D05A570009F30349A0251A4924D11D403ED7E4C65CF5686C18B204E7F', # exact normal Paperclip packaged in blocked review bundle v43
     '8C28146D36F2005C6943876D2A04C654BE407F150555C1DCD1EE4216EAA1E692'  # current packaged Ender Chest revision-fence candidate; chest race rerun documented for exact pair
 )
@@ -31,6 +32,7 @@ $masterHash = (Get-FileHash -LiteralPath $MasterJar -Algorithm SHA256).Hash
 $fencedMasterHash = 'BB20D1935AC6A12A4B2BA0907097779BD268D4330FA8460C945354711704200C'
 $currentSourceMasterHash = '1E2463A42CBE42CEF5DCF490461E3C956835CF4C43FD41D113013B885CE0360E'
 $activeChunkWriteFenceMasterHash = 'E9CEE0B236779A89DDBD1B84D1F06D3EDB75B8374DE28264B4CE04CF6F78FF0E' # current clean-built Master with accepted async chunk-write disconnect drain fence
+$entityGetterNormalizedMasterHash = '8EB978519B900CEABDD67C278FCD1A0C16D2DF538879DFA509305EEB437E54B3' # exact reproducible pair used for the isolated InvSee click-containment run
 $finalUnsubscribeFenceMasterHash = '2BE4B169A570543A5AFBCC7B80767336F27ACE8AFAD74EAF5E855853CD3D35DE'
 $finalUnsubscribeBaselineMasterHash = 'E50B82443F1A1303258B5013DB156F9094CDAA372B043A25A0862462057233DE'
 $baselineMasterHash = 'E122A819950C50FF504CDC6600D6E5C4970CD9D25F45AC19ED974F9D194134B7'
@@ -65,8 +67,8 @@ if ($TestAfterFinalUnsubscribe) {
     $expectedGapMasterHash = if ($ExpectedFinalUnsubscribeWrite -eq 'REJECTED') { $finalUnsubscribeFenceMasterHash } else { $finalUnsubscribeBaselineMasterHash }
     if ($masterHash -ne $expectedGapMasterHash) { throw "Final-unsubscribe gap test with ExpectedFinalUnsubscribeWrite=$ExpectedFinalUnsubscribeWrite requires Master $expectedGapMasterHash, got $masterHash." }
     if ($ExpectedStaleWrite -ne 'REJECTED') { throw 'Final-unsubscribe gap test requires ExpectedStaleWrite=REJECTED.' }
-} elseif ($masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash,$baselineMasterHash)) { throw "Unrecognized Master artifact: $masterHash" }
-if (-not $TestAfterFinalUnsubscribe -and (($ExpectedStaleWrite -eq 'REJECTED' -and $masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash)) -or ($ExpectedStaleWrite -eq 'ACCEPTED' -and $masterHash -ne $baselineMasterHash))) { throw "ExpectedStaleWrite=$ExpectedStaleWrite is incompatible with Master $masterHash." }
+} elseif ($masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash,$entityGetterNormalizedMasterHash,$baselineMasterHash)) { throw "Unrecognized Master artifact: $masterHash" }
+if (-not $TestAfterFinalUnsubscribe -and (($ExpectedStaleWrite -eq 'REJECTED' -and $masterHash -notin @($fencedMasterHash,$currentSourceMasterHash,$activeChunkWriteFenceMasterHash,$entityGetterNormalizedMasterHash)) -or ($ExpectedStaleWrite -eq 'ACCEPTED' -and $masterHash -ne $baselineMasterHash))) { throw "ExpectedStaleWrite=$ExpectedStaleWrite is incompatible with Master $masterHash." }
 if (-not (Test-Path -LiteralPath $Java)) { throw 'Java 25 executable not found.' }
 if (-not (Test-Path -LiteralPath $ApiJar)) { throw "RC5 API jar not found: $ApiJar" }
 foreach ($port in $ports) { if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port is already listening." } }
