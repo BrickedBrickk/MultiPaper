@@ -84,17 +84,85 @@ class PlayerInventoryUpdatePacketTest {
     }
 
     @Test
-    void acceptsEnderChestUpdatesOnlyFromTheDeclaredPlayerOwner() {
+    void acceptsAllInventoryUpdatesOnlyFromTheDeclaredPlayerOwner() {
         assertTrue(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("enderchest", "backend-a", "backend-a"));
         assertFalse(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("enderchest", "backend-b", "backend-a"),
                 "An editor backend must not publish an Ender Chest after-image as if it came from the target owner");
         assertFalse(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("enderchest", null, "backend-a"),
                 "An unidentified connection must not publish an Ender Chest update");
+        assertTrue(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("items", "backend-a", "backend-a"));
+        assertFalse(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("items", "backend-b", "backend-a"),
+                "A peer must not publish a main-inventory after-image without an owner transaction");
+        assertFalse(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("items", null, "backend-a"));
     }
 
     @Test
-    void preservesExistingMainInventoryPeerUpdateBehavior() {
-        assertTrue(PlayerInventoryUpdatePacket.isUpdateFromPlayerOwner("items", "backend-b", "backend-a"));
+    void packetHandlerRejectsMainInventoryUpdateFromNonOwnerPeer() {
+        java.util.UUID playerId = java.util.UUID.randomUUID();
+        java.util.UUID sessionId = java.util.UUID.randomUUID();
+        ServerPlayer player = mock(ServerPlayer.class);
+        PlayerList playerList = mock(PlayerList.class);
+        MinecraftServer server = mock(MinecraftServer.class);
+        ExternalServerConnection connection = mock(ExternalServerConnection.class);
+        connection.externalServer = new ExternalServer("backend-b", false);
+        when(server.getPlayerList()).thenReturn(playerList);
+        when(playerList.getPlayer(playerId)).thenReturn(player);
+
+        try (MockedStatic<MinecraftServer> minecraft = mockStatic(MinecraftServer.class);
+             MockedStatic<MultiPaper> multiPaper = mockStatic(MultiPaper.class);
+             MockedStatic<PlayerSyncSession> sessions = mockStatic(PlayerSyncSession.class);
+             MockedStatic<MultiPaperInventoryHandler> inventory = mockStatic(MultiPaperInventoryHandler.class)) {
+            minecraft.when(MinecraftServer::getServer).thenReturn(server);
+            multiPaper.when(() -> MultiPaper.runSync(any())).thenAnswer(invocation -> {
+                invocation.<Runnable>getArgument(0).run();
+                return null;
+            });
+            sessions.when(() -> PlayerSyncSession.getSessionId(player)).thenReturn(sessionId);
+            sessions.when(() -> PlayerSyncSession.getOwnerName(player)).thenReturn("backend-a");
+            sessions.when(() -> PlayerSyncSession.matches(sessionId, sessionId, "backend-a", "backend-a")).thenReturn(true);
+
+            new PlayerInventoryUpdatePacket(playerId, sessionId, "backend-a", "items", enderChestUpdate(1, 2, 3)).handle(connection);
+
+            inventory.verifyNoInteractions();
+            verify(player, never()).detectEquipmentUpdates();
+        }
+    }
+
+    @Test
+    void packetHandlerAcceptsMainInventoryUpdateFromDeclaredOwnerPeer() {
+        java.util.UUID playerId = java.util.UUID.randomUUID();
+        java.util.UUID sessionId = java.util.UUID.randomUUID();
+        ExternalPlayer player = mock(ExternalPlayer.class);
+        PlayerList playerList = mock(PlayerList.class);
+        MinecraftServer server = mock(MinecraftServer.class);
+        ExternalServerConnection connection = mock(ExternalServerConnection.class);
+        connection.externalServer = new ExternalServer("backend-a", false);
+        when(server.getPlayerList()).thenReturn(playerList);
+        when(playerList.getPlayer(playerId)).thenReturn(player);
+
+        try (MockedStatic<MinecraftServer> minecraft = mockStatic(MinecraftServer.class);
+             MockedStatic<MultiPaper> multiPaper = mockStatic(MultiPaper.class);
+             MockedStatic<PlayerSyncSession> sessions = mockStatic(PlayerSyncSession.class);
+             MockedStatic<MultiPaperInventoryHandler> inventory = mockStatic(MultiPaperInventoryHandler.class)) {
+            minecraft.when(MinecraftServer::getServer).thenReturn(server);
+            multiPaper.when(() -> MultiPaper.runSync(any())).thenAnswer(invocation -> {
+                invocation.<Runnable>getArgument(0).run();
+                return null;
+            });
+            multiPaper.when(() -> MultiPaper.itemStackFromNBT(any(CompoundTag.class)))
+                    .thenAnswer(invocation -> itemFromWire(invocation.getArgument(0)));
+            sessions.when(() -> PlayerSyncSession.getSessionId(player)).thenReturn(sessionId);
+            sessions.when(() -> PlayerSyncSession.getOwnerName(player)).thenReturn("backend-a");
+            sessions.when(() -> PlayerSyncSession.matches(sessionId, sessionId, "backend-a", "backend-a")).thenReturn(true);
+
+            new PlayerInventoryUpdatePacket(playerId, sessionId, "backend-a", "items", enderChestUpdate(1, 2, 3)).handle(connection);
+
+            inventory.verify(() -> MultiPaperInventoryHandler.updateInventory(
+                    same(player), eq("items"), eq(0),
+                    argThat(stack -> !stack.isEmpty() && stack.getCount() == 2),
+                    argThat(stack -> !stack.isEmpty() && stack.getCount() == 3)), times(1));
+            verify(player).detectEquipmentUpdates();
+        }
     }
 
     @Test

@@ -136,7 +136,9 @@ public class PlayerInventoryUpdatePacket extends ExternalServerPacket {
     }
 
     static boolean isUpdateFromPlayerOwner(String component, String sourceBackendName, String ownerBackendName) {
-        return !"enderchest".equals(component)
-                || sourceBackendName != null && sourceBackendName.equals(ownerBackendName);
+        // Inventory snapshots are authoritative only on the backend that owns the player.
+        // Accepting a peer's main-inventory after-image lets plugin-side mirror mutations
+        // overwrite the owner's inventory without a cross-owner transaction protocol.
+        return sourceBackendName != null && sourceBackendName.equals(ownerBackendName);
     }
 }
