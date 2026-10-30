@@ -12,6 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkSubscriptionManager {
 
+    public enum ChunkWriteRejection {
+        NONE,
+        ACTIVE_OWNER_MISMATCH,
+        NO_ACTIVE_OWNER_PREVIOUS_OWNER_RECORDED
+    }
+
+    public record ChunkWriteDecision(ChunkWriteRejection rejection, String requester,
+                                     String activeOwner, String previousOwner) { }
+
     private static final Queue<List<ServerConnection>> objectPool = new LinkedList<>();
 
     // Index 0 in the list is the current chunk owning it
@@ -42,20 +51,35 @@ public class ChunkSubscriptionManager {
      * allowed only for chunks that have never had an owner; a previously owned chunk
      * must be claimed again before any backend can replace its Master snapshot.
      */
-    public static boolean runIfOwnerOrUnowned(ServerConnection connection, String world, int cx, int cz, Runnable action) {
+    public static Optional<ChunkWriteDecision> runIfOwnerOrUnowned(
+            ServerConnection connection, String world, int cx, int cz, Runnable action) {
         ChunkKey key = new ChunkKey(world, cx, cz);
         synchronized (ChunkLock.getChunkLock(key)) {
             List<ServerConnection> serverConnections = chunkLocks.get(key);
-            boolean hasOwner = serverConnections != null && !serverConnections.isEmpty();
-            if (hasOwner && serverConnections.get(0) != connection) {
-                return false;
-            }
-            if (!hasOwner && previousOwners.containsKey(key)) {
-                return false;
+            ServerConnection activeOwner = serverConnections != null && !serverConnections.isEmpty()
+                    ? serverConnections.get(0) : null;
+            ServerConnection previousOwner = previousOwners.get(key);
+            ChunkWriteRejection rejection = classifyChunkWrite(activeOwner != null, activeOwner == connection,
+                    previousOwner != null);
+            if (rejection != ChunkWriteRejection.NONE) {
+                return Optional.of(new ChunkWriteDecision(rejection, connection.getBungeeCordName(),
+                        activeOwner == null ? "" : activeOwner.getBungeeCordName(),
+                        previousOwner == null ? "" : previousOwner.getBungeeCordName()));
             }
             action.run();
-            return true;
+            return Optional.empty();
         }
+    }
+
+    static ChunkWriteRejection classifyChunkWrite(boolean hasActiveOwner, boolean requesterIsActiveOwner,
+                                                   boolean hasPreviousOwner) {
+        if (hasActiveOwner && !requesterIsActiveOwner) {
+            return ChunkWriteRejection.ACTIVE_OWNER_MISMATCH;
+        }
+        if (!hasActiveOwner && hasPreviousOwner) {
+            return ChunkWriteRejection.NO_ACTIVE_OWNER_PREVIOUS_OWNER_RECORDED;
+        }
+        return ChunkWriteRejection.NONE;
     }
 
     public static ServerConnection getOwnerOrSubscriber(String world, int cx, int cz) {

@@ -18,6 +18,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -33,9 +35,16 @@ public class WriteChunkHandler {
         }
 
         if (message.path.equals("region")) {
-            boolean accepted = ChunkSubscriptionManager.runIfOwnerOrUnowned(connection, message.world, message.cx, message.cz,
+            Optional<ChunkSubscriptionManager.ChunkWriteDecision> rejection = ChunkSubscriptionManager.runIfOwnerOrUnowned(
+                    connection, message.world, message.cx, message.cz,
                     () -> writeData(connection, message, message.data));
-            if (!accepted) {
+            if (rejection.isPresent()) {
+                ChunkSubscriptionManager.ChunkWriteDecision decision = rejection.get();
+                System.err.println("[MULTIPAPER_CHUNK_WRITE_REJECT] time=" + Instant.now()
+                        + " world=" + logValue(message.world) + " chunk=" + message.cx + "," + message.cz
+                        + " reason=" + decision.rejection() + " requester=" + logValue(decision.requester())
+                        + " activeOwner=" + logValue(decision.activeOwner())
+                        + " previousOwner=" + logValue(decision.previousOwner()));
                 // Release any read wait registered by the old owner's preannounced save.
                 ChunkLockManager.cancelPendingWrite(connection, message.world, message.cx, message.cz);
                 connection.sendReply(new BooleanMessageReply(false), message);
@@ -44,6 +53,11 @@ public class WriteChunkHandler {
         }
 
         writeData(connection, message, message.data);
+    }
+
+    private static String logValue(String value) {
+        return String.valueOf(value).replace("\\", "\\\\").replace("\r", "\\r")
+                .replace("\n", "\\n").replace("\t", "\\t").replace(" ", "\\s");
     }
 
     private static void writeData(ServerConnection connection, WriteChunkMessage message, byte[] data) {
