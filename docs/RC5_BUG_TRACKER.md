@@ -1,5 +1,12 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Exact-HEAD clean-checkout backend and full-module suite — 2026-10-30
+
+- **Build setup:** Fresh clean detached E: worktree at the verified fork HEAD `3bc6f46f3c6dc006540b5dc3b74b7033a35ccdb2`, Java 25.0.3.9 / Gradle 9.8. `applyAllPatches` succeeded in 10m39s; Paperweight completed the formerly stalled Mache setup and generated Paper/Moonrise/MultiPaper backend sources. This supersedes the previous setup-stall state for this fixture.
+- **Focused regressions:** 22/22 passed: entity dependency/boat/leash 3, entity NBT 6, inventory owner authority 11, gamerule updates 2.
+- **Full serial module suites:** Master 99/99, messaging protocol 13/13, MultiPaper server 10,225 tests with 86 skipped; aggregate **10,337 total, 10,251 passed, 86 skipped, 0 failures/errors**. This includes chest handoff/restart and failed-write retention tests. Full report and evidence hashes: [`rc5-evolume-clean-checkout-full-suite-20261030.md`](../performance-results/rc5-evolume-clean-checkout-full-suite-20261030.md); retained test log/XML manifest are linked there.
+- **Limits/status:** This proves clean patch generation and test-task success for exact HEAD, not two reproducible release builds, a Paperclip/Master pair, live gameplay/client rendering, actual Crafty chest incident cause/recovery, or cross-owner InvSee++ item conservation. RC5-01 remains P0 `TESTING`; RC5-02 remains P0 `BLOCKED`; do not publish/install. No live service or data was accessed.
+
 ### Validation setup follow-up — exact-source Paperweight Mache copy stall — 2026-10-30
 
 - A bounded 60-minute `applyAllPatches` retry in disposable detached fixture `b51e61a6d13cf9048230ece8dc31c7d6f30841a4` completed Purpur/Paper patch stages and entered `multipaper-server:setupMacheResources`, then remained at `Copy initial sources...`. Captured worker stack is in Java `Files.copy` while closing a `FileChannel` (`SetupMinecraftSources.run:135`); parent waited on nested Gradle build. The exact task was interrupted at the bound, and both launched Java processes were confirmed exited.
