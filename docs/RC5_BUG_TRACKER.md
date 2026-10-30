@@ -1,5 +1,12 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Exact-source two-pass RC5 artifact reproducibility — 2026-10-30
+
+- **Source/status:** Both independent clean detached builds used source `3bc6f46f3c6dc006540b5dc3b74b7033a35ccdb2`, Temurin Java 25.0.3.9, Gradle 9.8, no build/configuration cache or daemon, and one worker. `applyAllPatches` and artifact generation passed in both worktrees. The standalone Master and Paperclip hashes match across passes.
+- **Artifacts:** Master 19,216,550 bytes, SHA-256 `86F694BA1882E2D08DC841ECE62EA11B105663DAADEF3D7C1C8DF52B1531BE19`; Paperclip 64,352,019 bytes, `464FCE20DEE5A7734666A573BA207F94E4D3E6AD7903C6BEF02A648CB32CD4F7`; bundler 107,662,634 bytes, `F667121A5CBD5A35FC2CB01F7BFBEB5AF9F2D1011896D5BBFCCA0A480DA19CA9`; server 29,317,539 bytes, `86FEB0DF8A712847A0CAE23BAD421474A3580961593868613F3C61DCBF09A767`.
+- **Smoke/tests:** A disposable Java 25 Paperclip `--version` launch exited 0 and printed `26.3-DEV-3bc6f46`; its process exited without leaving a listener. Exact-source full backend suites passed 10,251/10,337 (86 skipped, zero failures/errors) and focused regressions passed 22/22. Detailed report/log paths: [`rc5-reproducible-build-pair-20261030.md`](../performance-results/rc5-reproducible-build-pair-20261030.md) and [`rc5-evolume-clean-checkout-full-suite-20261030.md`](../performance-results/rc5-evolume-clean-checkout-full-suite-20261030.md).
+- **Limits/status:** Reproducible bytes and a launcher version smoke do not resolve chest-loss attribution/recovery, InvSee++ cross-owner conservation, exact six-component authenticated logins, legacy-client behavior, two-PC capacity, or monitored beta gates. RC5-01 remains P0 `TESTING`; RC5-02 remains P0 `BLOCKED`. Do not install/publish these artifacts. No live service/world/player data was accessed.
+
 ### Crafty1 no-holder burst re-intake — 2026-10-30
 
 - **Severity/status:** P0 data-integrity investigation; `TESTING`. The user reports uploading a Crafty1 `latest.log`; this session has no newly mounted upload. `C:\Users\elibo\Downloads` contains no `*latest.log`, and repository `logs/latest.log` is a 1,123-byte ViaProxy log dated 2026-10-24, not Crafty evidence. Do not attribute that file to Crafty1 or claim a new hash/recount.
