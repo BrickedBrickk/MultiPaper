@@ -1,5 +1,10 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Monitoring gate / current worktree regression suite — 2026-10-30
+
+- The beta-monitor regression suite passed **18/18** (`py -3 -m unittest scripts.tests.test_beta_monitor`, 0.208s). Exact implementation/test hashes and scope: `performance-results/rc5-beta-monitor-focused-tests-20261030.md`.
+- This verifies unit behavior only; Crafty installation, real RCON/log capture, live CPU/RSS/MSPT overhead, and beta operation remain unverified. No RC4 live server or Crafty host was contacted. This monitor result does not change any of the 13 issue statuses.
+
 ### RC5-01 / renewed Crafty1 no-holder and companion warning intake — 2026-10-30
 
 - **Severity/status:** P0 data integrity; `TESTING`, not VERIFIED. The user's renewed log attachment is not available as bytes in this workspace: `C:\Users\elibo\Downloads\1latest.log` and `2latest.log` are absent. The only repository `logs/latest.log` is 1,123 bytes and hashes to `C12DD0FB17A2D75CDC621FD3C08C3DE5302CE7459FFCE6B2FDC4F39CB75EBBF0`; it is unrelated ViaProxy output and was excluded. Therefore this intake makes no fresh parse, hash, timestamp correlation, or recount of the uploaded Crafty1 log.
