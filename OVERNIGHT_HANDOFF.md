@@ -6,6 +6,8 @@
 
 **Release gates:** P0 chest integrity remains `TESTING`; P0 InvSee++ remains `BLOCKED` because the current fail-closed click gate is not an item-conserving cross-owner transaction. The exact-current Master suite passed 99/99, and owner inventory packet tests passed 11/11 in an isolated fixture; the attempted current Paperweight backend suite stalled before JUnit and is not a pass. No current matching Master/Paperclip RC5 pair or installable RC5 archive exists. Keep historical `v47` labeled blocked; do not install, publish, or mark stable. No live Crafty/SMP/world access occurred.
 
+**Build setup follow-up:** A fresh `git worktree add` at current committed HEAD stalled before checkout and left `D:\multipaper-tests\worktrees\rc5-paperweight-current-c185` locked as `initializing`; no build/test ran. The partial fixture was preserved and must not be reused until repaired. Full observation: `performance-results/rc5-paperweight-backend-test-stall-and-monitor-suite-20261030.md`.
+
 **Continue:** Work only in disposable fixtures. Prioritize the actual cross-owner InvSee transaction/owner-attestation/cursor-persistence path and chest incident attribution, then unblock exact-current backend builds and release validation. Preserve the large dirty worktree; only `docs/RC5_BUG_TRACKER.md` was committed in `b1e9ba46c6`. The tracker’s latest entry also records that no new runtime test was justified without the uploaded log bytes/source regression.
 
 # RC5 2026-10-29 exact-pair chest follow-up
