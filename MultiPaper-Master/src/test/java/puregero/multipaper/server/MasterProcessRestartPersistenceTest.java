@@ -258,8 +258,35 @@ class MasterProcessRestartPersistenceTest {
             waitingOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
             waitingOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
             awaitChunkOwner(waitingOwner, chunkX, chunkZ, "abrupt-handoff-old-owner");
-            assertAcknowledged(oldOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, initialChest)),
-                    "initial chest snapshot");
+            Thread masterDiagnostic = new Thread(() -> {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(20));
+                } catch (InterruptedException cancelled) {
+                    return;
+                }
+                if (!firstMaster.isAlive()) return;
+                System.err.println("CHEST_HANDOFF_MASTER_THREAD_DUMP_BEGIN pid=" + firstMaster.pid());
+                String jcmdName = System.getProperty("os.name", "").startsWith("Windows") ? "jcmd.exe" : "jcmd";
+                Path jcmd = Path.of(System.getProperty("java.home"), "bin", jcmdName);
+                try {
+                    Process dump = new ProcessBuilder(jcmd.toString(), Long.toString(firstMaster.pid()), "Thread.print")
+                            .redirectErrorStream(true)
+                            .start();
+                    dump.getInputStream().transferTo(System.err);
+                    if (!dump.waitFor(10, TimeUnit.SECONDS)) dump.destroyForcibly();
+                } catch (Exception failure) {
+                    System.err.println("Could not capture disposable Master thread dump: " + failure);
+                }
+                System.err.println("CHEST_HANDOFF_MASTER_THREAD_DUMP_END pid=" + firstMaster.pid());
+            }, "chest-handoff-master-timeout-diagnostic");
+            masterDiagnostic.setDaemon(true);
+            masterDiagnostic.start();
+            try {
+                assertAcknowledged(oldOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, initialChest)),
+                        "initial chest snapshot");
+            } finally {
+                masterDiagnostic.interrupt();
+            }
 
             // Model Paper's final asynchronous save during unload. Ownership must
             // stay with A until this exact new chest snapshot has reached Master.
@@ -786,7 +813,9 @@ class MasterProcessRestartPersistenceTest {
     }
 
     private static void awaitListening(Process process, int port) throws Exception {
-        long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+        // Loading the shaded Master on a cold/slow test volume can exceed
+        // fifteen seconds before the Master listener is created.
+        long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
         while (System.nanoTime() < deadline) {
             if (!process.isAlive()) {
                 throw new IOException("Master process exited before listening with code " + process.exitValue());

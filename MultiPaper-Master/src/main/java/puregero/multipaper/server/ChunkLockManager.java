@@ -21,6 +21,10 @@ public class ChunkLockManager {
         return failedWrites.containsKey(key);
     }
 
+    static boolean hasPendingWrites(String world, int cx, int cz) {
+        return locks.hasPendingWrites(world, cx, cz);
+    }
+
     public static void lockUntilWrite(ServerConnection connection, String world, int cx, int cz) {
         ChunkKey key = new ChunkKey(world, cx, cz);
         synchronized (ChunkLock.getChunkLock(key)) {

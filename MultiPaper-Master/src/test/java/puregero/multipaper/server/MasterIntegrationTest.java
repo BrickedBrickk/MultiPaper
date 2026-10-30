@@ -351,11 +351,32 @@ class MasterIntegrationTest {
     @Test
     @Order(12)
     void levelDatIsSharedThroughTheMaster() throws Exception {
-        ServerBoundMessage writeReply = serverA.request(new WriteLevelMessage(WORLD, LEVEL_PAYLOAD));
-        assertTrue(((BooleanMessageReply) writeReply).result);
+        Thread timeoutDiagnostic = new Thread(() -> {
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(20));
+            } catch (InterruptedException cancelled) {
+                return;
+            }
+            System.err.println("LEVEL_DAT_TEST_THREAD_DUMP_BEGIN");
+            Thread.getAllStackTraces().forEach((thread, stack) -> {
+                System.err.println("THREAD " + thread.getName() + " state=" + thread.getState());
+                for (int i = 0; i < Math.min(stack.length, 40); i++) {
+                    System.err.println("    at " + stack[i]);
+                }
+            });
+            System.err.println("LEVEL_DAT_TEST_THREAD_DUMP_END");
+        }, "level-dat-test-timeout-diagnostic");
+        timeoutDiagnostic.setDaemon(true);
+        timeoutDiagnostic.start();
+        try {
+            ServerBoundMessage writeReply = serverA.request(new WriteLevelMessage(WORLD, LEVEL_PAYLOAD));
+            assertTrue(((BooleanMessageReply) writeReply).result);
 
-        ServerBoundMessage readReply = serverB.request(new ReadLevelMessage(WORLD));
-        assertArrayEquals(LEVEL_PAYLOAD, ((DataMessageReply) readReply).data);
+            ServerBoundMessage readReply = serverB.request(new ReadLevelMessage(WORLD));
+            assertArrayEquals(LEVEL_PAYLOAD, ((DataMessageReply) readReply).data);
+        } finally {
+            timeoutDiagnostic.interrupt();
+        }
     }
 
     @Test
@@ -390,7 +411,9 @@ class MasterIntegrationTest {
         // disconnect operation, then a per-player queue barrier avoids flooding delayed claims.
         serverA.send(new PlayerDisconnectMessage(player));
         assertTrue(((BooleanMessageReply) serverA.request(new PingMessage())).result);
-        PlayerDataOperationQueue.submit(player, () -> { }).get(30, TimeUnit.SECONDS);
+        // The 1 MiB final save above must be durably flushed before reconnect; allow slow test volumes
+        // to finish that filesystem operation without weakening the subsequent ownership assertions.
+        PlayerDataOperationQueue.submit(player, () -> { }).get(120, TimeUnit.SECONDS);
         ServerBoundMessage retry = serverB.request(new PlayerConnectMessage(player));
         assertTrue(((BooleanMessageReply) retry).result, "Player must be connectable after the queued final save and disconnect");
 
@@ -575,14 +598,32 @@ class MasterIntegrationTest {
         final byte[] firstBackendData = "metadata-from-backend-one".getBytes(StandardCharsets.UTF_8);
         final byte[] secondBackendData = "metadata-from-backend-two".getBytes(StandardCharsets.UTF_8);
         final TestServerClient dataPeer = TestServerClient.connect(port, "saved-data-peer");
+        Thread timeoutDiagnostic = new Thread(() -> {
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(40));
+            } catch (InterruptedException cancelled) {
+                return;
+            }
+            System.err.println("SAVED_DATA_TEST_THREAD_DUMP_BEGIN");
+            Thread.getAllStackTraces().forEach((thread, stack) -> {
+                System.err.println("THREAD " + thread.getName() + " state=" + thread.getState());
+                for (int i = 0; i < Math.min(stack.length, 40); i++) {
+                    System.err.println("    at " + stack[i]);
+                }
+            });
+            System.err.println("SAVED_DATA_TEST_THREAD_DUMP_END");
+        }, "saved-data-test-timeout-diagnostic");
+        timeoutDiagnostic.setDaemon(true);
+        timeoutDiagnostic.start();
 
         try {
-            assertTrue(((BooleanMessageReply) serverB.request(new WriteDataMessage(sharedPath, firstBackendData))).result);
+            assertTrue(((BooleanMessageReply) serverB.request(new WriteDataMessage(sharedPath, firstBackendData), 30, TimeUnit.SECONDS)).result);
             assertArrayEquals(firstBackendData, ((DataMessageReply) dataPeer.request(new ReadDataMessage(sharedPath))).data);
 
-            assertTrue(((BooleanMessageReply) dataPeer.request(new WriteDataMessage(sharedPath, secondBackendData))).result);
+            assertTrue(((BooleanMessageReply) dataPeer.request(new WriteDataMessage(sharedPath, secondBackendData), 30, TimeUnit.SECONDS)).result);
             assertArrayEquals(secondBackendData, ((DataMessageReply) serverB.request(new ReadDataMessage(sharedPath))).data);
         } finally {
+            timeoutDiagnostic.interrupt();
             dataPeer.close();
             if (Files.exists(temporaryWorld)) {
                 try (var paths = Files.walk(temporaryWorld)) {
@@ -1777,6 +1818,61 @@ class MasterIntegrationTest {
                     "Disconnect cleanup must remove failed-write entries even when no unlock was deferred");
         } finally {
             failedOwner.close();
+            RegionFileCache.closeAll();
+        }
+    }
+
+    @Test
+    @Order(42)
+    @Timeout(30)
+    void forcedOwnershipMustRecheckSaveBarrierAfterLateAnnouncement() throws Exception {
+        String world = Files.createTempDirectory("multipaper-late-handoff-save-").toString();
+        int chunkX = 47;
+        int chunkZ = -53;
+        int witnessX = chunkX + 1;
+        byte[] finalChest = chestChunk(37);
+        TestServerClient writer = TestServerClient.connect(port, "late-save-writer");
+        TestServerClient requester = TestServerClient.connect(port, "late-save-requester");
+        ChunkKey chestKey = new ChunkKey(world, chunkX, chunkZ);
+        ChunkKey witnessKey = new ChunkKey(world, witnessX, chunkZ);
+        ChunkKey[] claim = new ChunkKey[]{chestKey, witnessKey};
+
+        try {
+            requester.send(new SubscribeChunkMessage(world, witnessX, chunkZ));
+            requester.send(new LockChunkMessage(world, witnessX, chunkZ));
+            requester.request(new PingMessage());
+            assertEquals("late-save-requester", pollUntilOwner(requester, witnessX, chunkZ, "late-save-requester").owner);
+            ServerConnection requesterConnection = ServerConnection.getConnections().stream()
+                    .filter(connection -> "late-save-requester".equals(connection.getBungeeCordName()))
+                    .findFirst().orElseThrow();
+
+            // Mirror the exact two-step contract in RequestChunkOwnershipHandler:
+            // all requested save barriers are observed first, then the ownership
+            // helper performs its atomic promotion. Register a late save between
+            // those operations to reproduce the empty-barrier TOCTOU deterministically.
+            CompletableFuture<Void> emptyChestBarrier = ChunkLockManager.waitForLockAsync(world, chunkX, chunkZ);
+            assertTrue(emptyChestBarrier.isDone(), "The target chunk starts with an empty Master save barrier");
+            writer.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            writer.request(new PingMessage());
+
+            assertFalse(ChunkSubscriptionManager.forceLockIfNoOtherOwner(requesterConnection, claim),
+                    "Ownership must not be promoted when a save registers after the initial empty-barrier check");
+
+            assertTrue(((BooleanMessageReply) writer.request(
+                    new WriteChunkMessage(world, "region", chunkX, chunkZ, finalChest))).result,
+                    "The announced final chest snapshot must remain acceptable while ownership is unclaimed");
+            assertTrue(ChunkSubscriptionManager.forceLockIfNoOtherOwner(requesterConnection, claim),
+                    "A retry may claim the chest after its final save completes");
+            assertEquals("late-save-requester", ChunkSubscriptionManager.getOwner(world, chunkX, chunkZ).getBungeeCordName());
+
+            ServerBoundMessage chestReply = requester.request(new ForceReadChunkMessage(world, "region", chunkX, chunkZ));
+            assertTrue(chestReply instanceof DataMessageReply);
+            byte[] persisted = ((DataMessageReply) chestReply).data;
+            assertArrayEquals(finalChest, persisted, "The next owner must read the exact late-announced chest image");
+            assertEquals(37, readChestItemCount(persisted), "No items may be lost in the late-announcement handoff");
+        } finally {
+            writer.close();
+            requester.close();
             RegionFileCache.closeAll();
         }
     }

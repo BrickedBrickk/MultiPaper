@@ -408,7 +408,9 @@ public class RegionFile {
             }
             throw e;
         }
+        afterChunkPayloadWrittenBeforeOffsetPublished(x, z);
         setOffset(x, z, (sectorNumber << 8) | sectorsNeeded);
+        afterChunkOffsetPublished(x, z);
         if (!externalFile) {
             try {
                 Files.deleteIfExists(getExternalChunkPath(x, z));
@@ -422,6 +424,13 @@ public class RegionFile {
             sectorFree.set(oldSectorNumber + i, true);
         }
         setTimestamp(x, z, (int) (System.currentTimeMillis() / 1000L));
+    }
+
+    /** Cut-point hooks for package-local persistence tests. */
+    void afterChunkPayloadWrittenBeforeOffsetPublished(int x, int z) {
+    }
+
+    void afterChunkOffsetPublished(int x, int z) {
     }
 
     private Path getExternalChunkPath(int x, int z) {

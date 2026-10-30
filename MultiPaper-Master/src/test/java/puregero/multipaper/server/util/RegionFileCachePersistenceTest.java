@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionFileCachePersistenceTest {
@@ -225,6 +226,65 @@ class RegionFileCachePersistenceTest {
     }
 
     @Test
+    void chunkReplacementCutPointsKeepTheLastPublishedSnapshotReadable() throws Exception {
+        Path beforePublishPath = tempDir.resolve("before-publish.mca");
+        byte[] previous = "chest-items-before-update".getBytes(StandardCharsets.UTF_8);
+        byte[] replacement = "chest-items-after-update".getBytes(StandardCharsets.UTF_8);
+        AtomicBoolean interruptBeforePublish = new AtomicBoolean();
+        RegionFile beforePublish = new RegionFile(beforePublishPath.toFile()) {
+            @Override
+            void afterChunkPayloadWrittenBeforeOffsetPublished(int x, int z) {
+                if (interruptBeforePublish.get()) throw new SimulatedAbruptWriteInterruption();
+            }
+        };
+
+        try {
+            beforePublish.putDeflatedBytes(0, 0, previous);
+            interruptBeforePublish.set(true);
+            assertThrows(SimulatedAbruptWriteInterruption.class,
+                    () -> beforePublish.putDeflatedBytes(0, 0, replacement),
+                    "An interruption before publishing the new offset must not replace the old chunk");
+        } finally {
+            beforePublish.close();
+        }
+
+        RegionFile reopenedBeforePublish = new RegionFile(beforePublishPath.toFile());
+        try {
+            assertArrayEquals(previous, reopenedBeforePublish.getDeflatedBytes(0, 0),
+                    "The prior chest snapshot must remain readable when replacement data is unpublished");
+        } finally {
+            reopenedBeforePublish.close();
+        }
+
+        Path afterPublishPath = tempDir.resolve("after-publish.mca");
+        AtomicBoolean interruptAfterPublish = new AtomicBoolean();
+        RegionFile afterPublish = new RegionFile(afterPublishPath.toFile()) {
+            @Override
+            void afterChunkOffsetPublished(int x, int z) {
+                if (interruptAfterPublish.get()) throw new SimulatedAbruptWriteInterruption();
+            }
+        };
+
+        try {
+            afterPublish.putDeflatedBytes(0, 0, previous);
+            interruptAfterPublish.set(true);
+            assertThrows(SimulatedAbruptWriteInterruption.class,
+                    () -> afterPublish.putDeflatedBytes(0, 0, replacement),
+                    "An interruption after offset publication must leave the replacement authoritative");
+        } finally {
+            afterPublish.close();
+        }
+
+        RegionFile reopenedAfterPublish = new RegionFile(afterPublishPath.toFile());
+        try {
+            assertArrayEquals(replacement, reopenedAfterPublish.getDeflatedBytes(0, 0),
+                    "The published chest snapshot must remain readable even if timestamp update did not run");
+        } finally {
+            reopenedAfterPublish.close();
+        }
+    }
+
+    @Test
     void fragmentedRegionKeepsLatestChunkDataAfterRepeatedReplacementAndReopen() throws Exception {
         File regionDirectory = tempDir.resolve("world").resolve("region").toFile();
         Map<Integer, byte[]> expected = new HashMap<>();
@@ -269,5 +329,8 @@ class RegionFileCachePersistenceTest {
         } finally {
             RegionFileCache.closeAll();
         }
+    }
+
+    private static final class SimulatedAbruptWriteInterruption extends Error {
     }
 }

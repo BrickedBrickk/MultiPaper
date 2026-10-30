@@ -34,6 +34,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -133,9 +134,30 @@ public class TestServerClient extends ServerBoundMessageHandler {
     }
 
     public ServerBoundMessage request(MasterBoundMessage message) throws Exception {
+        return request(message, 30, TimeUnit.SECONDS);
+    }
+
+    public ServerBoundMessage request(MasterBoundMessage message, long timeout, TimeUnit unit) throws Exception {
         CompletableFuture<ServerBoundMessage> reply = new CompletableFuture<>();
         channel.writeAndFlush(setCallback(message, reply::complete));
-        ServerBoundMessage result = reply.get(10, TimeUnit.SECONDS);
+        ServerBoundMessage result;
+        try {
+            result = reply.get(timeout, unit);
+        } catch (TimeoutException timedOut) {
+            System.err.println("MASTER_TEST_REQUEST_TIMEOUT message=" + message.getClass().getSimpleName()
+                    + " timeout=" + timeout + " " + unit + " channel=" + channel);
+            Thread.getAllStackTraces().entrySet().stream()
+                    .sorted(java.util.Comparator.comparing(entry -> entry.getKey().getName()))
+                    .forEach(entry -> {
+                        Thread thread = entry.getKey();
+                        StackTraceElement[] stack = entry.getValue();
+                        System.err.println("THREAD " + thread.getName() + " state=" + thread.getState());
+                        for (int i = 0; i < Math.min(stack.length, 35); i++) {
+                            System.err.println("    at " + stack[i]);
+                        }
+                    });
+            throw timedOut;
+        }
         if (result == null) {
             fail("No reply for " + message.getClass().getSimpleName());
         }

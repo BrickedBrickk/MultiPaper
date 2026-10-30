@@ -134,6 +134,14 @@ public class ChunkSubscriptionManager {
                 .toArray();
         return withChunkLocks(lockIndexes, 0, () -> {
             for (ChunkKey key : requested) {
+                // Save announcements and ownership changes share this chunk lock.
+                // Recheck the write barrier here, after the caller's asynchronous
+                // wait, so a late announcement cannot slip between the empty check
+                // and promotion of an owner that would cause its final write to be
+                // rejected as a stale former-owner snapshot.
+                if (ChunkLockManager.hasPendingWrites(key.world, key.x, key.z)) {
+                    return false;
+                }
                 List<ServerConnection> owners = chunkLocks.get(key);
                 if (owners != null && !owners.isEmpty() && owners.get(0) != connection) {
                     return false;
