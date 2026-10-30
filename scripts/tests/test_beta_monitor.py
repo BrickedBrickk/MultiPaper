@@ -220,7 +220,7 @@ class BetaMonitorTests(unittest.TestCase):
             pid = 456
 
             def __init__(self):
-                self.cpu_values = iter([0.0, 36.0])
+                self.cpu_values = iter([0.0, 36.0, 0.0, 60.0])
 
             def cpu_percent(self, interval=None):
                 return next(self.cpu_values)
@@ -241,11 +241,16 @@ class BetaMonitorTests(unittest.TestCase):
         with patch.dict("sys.modules", {"psutil": fake_psutil}):
             first = monitor.java_process_metrics("C:/Crafty/backend1", seen)
             second = monitor.java_process_metrics("C:/Crafty/backend1", seen)
+            process.info["create_time"] = 1235.5
+            restarted_first = monitor.java_process_metrics("C:/Crafty/backend1", seen)
+            restarted_second = monitor.java_process_metrics("C:/Crafty/backend1", seen)
 
         self.assertIsNone(first["process_cpu_percent"], "the first psutil value is a baseline, not measured load")
         self.assertEqual(first["process_rss_bytes"], 8192)
         self.assertEqual(second["process_cpu_percent"], 36.0)
         self.assertEqual(second["process_rss_bytes"], 8192)
+        self.assertIsNone(restarted_first["process_cpu_percent"], "a reused PID must start a new interval baseline")
+        self.assertEqual(restarted_second["process_cpu_percent"], 60.0)
         self.assertIn("create_time", requested_attributes, "CPU baseline must distinguish reused PIDs")
 
     def test_log_tail_detects_same_inode_rewrite_after_copy_truncate(self):

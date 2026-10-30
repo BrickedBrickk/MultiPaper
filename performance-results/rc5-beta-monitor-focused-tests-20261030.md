@@ -2,18 +2,18 @@
 
 ## Command and result
 
-Ran the focused monitor suite from the repository root after correcting Java process instance identity tracking:
+Ran the focused monitor suite from the repository root after adding an explicit Java restart/PID reuse scenario:
 
 ```text
 py -3 -m unittest scripts.tests.test_beta_monitor
-Ran 18 tests in 0.183s
+Ran 18 tests in 0.193s
 OK
 ```
 
-Test file SHA-256: `2A65847499CDE49D0FDF99F2A81E04D131EEA451D46B101F1ACC5A55C28FA730`.
+Test file SHA-256: `82F1C0892209180CFBABD2CD70129EFF097F66FE8E2A3CF2B4F583CAC9BEB962`.
 Monitor implementation SHA-256: `873843122CBD26261D2DCE2C12DD42FE5D69E157EF715FDB8F5B808297BAEF25`.
 
-The monitor now explicitly requests each Java process's creation time when enumerating processes, so a reused PID after restart starts a fresh CPU baseline. The regression asserts this attribute is requested; the complete focused suite passes on the corrected source.
+The monitor now explicitly requests each Java process's creation time when enumerating processes, so a reused PID after restart starts a fresh CPU baseline. The regression changes the fake process creation time while retaining its PID and verifies the first sample for the restarted process is unavailable, then the next interval reports the measured CPU value. The complete focused suite passes on the corrected source.
 
 ## Synthetic overhead measurement
 

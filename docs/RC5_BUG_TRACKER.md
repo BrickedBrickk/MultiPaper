@@ -2,7 +2,7 @@
 
 ### Monitoring gate / current worktree regression suite — 2026-10-30
 
-- The beta-monitor regression suite passed **18/18** (`py -3 -m unittest scripts.tests.test_beta_monitor`, 0.183s) after adding the Java process `create_time` attribute to the baseline identity query. This prevents PID reuse across a Java restart from inheriting an old CPU baseline; the regression asserts the attribute is requested. Exact implementation/test hashes and scope: `performance-results/rc5-beta-monitor-focused-tests-20261030.md`.
+- The beta-monitor regression suite passed **18/18** (`py -3 -m unittest scripts.tests.test_beta_monitor`, 0.193s) with an explicit same-PID/different-creation-time restart simulation. It verifies the restarted Java process gets a fresh CPU baseline. Exact implementation/test hashes and scope: `performance-results/rc5-beta-monitor-focused-tests-20261030.md`.
 - Current synthetic overhead run on Python 3.13.5 measured 12.031 ms CPU per simulated 10-second poll (0.1203% of one core); no RCON/live service was used. RSS is unmeasured because `psutil` is absent. Deployed-host overhead remains open.
 - This verifies unit behavior only; Crafty installation, real RCON/log capture, live CPU/RSS/MSPT overhead, and beta operation remain unverified. No RC4 live server or Crafty host was contacted. This monitor result does not change any of the 13 issue statuses.
 
