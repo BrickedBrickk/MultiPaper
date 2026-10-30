@@ -1,5 +1,11 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Validation setup follow-up — exact-source Paperweight Mache copy stall — 2026-10-30
+
+- A bounded 60-minute `applyAllPatches` retry in disposable detached fixture `b51e61a6d13cf9048230ece8dc31c7d6f30841a4` completed Purpur/Paper patch stages and entered `multipaper-server:setupMacheResources`, then remained at `Copy initial sources...`. Captured worker stack is in Java `Files.copy` while closing a `FileChannel` (`SetupMinecraftSources.run:135`); parent waited on nested Gradle build. The exact task was interrupted at the bound, and both launched Java processes were confirmed exited.
+- No patched source compilation, JUnit tests, or product JAR resulted. This is a build setup stall with undetermined filesystem cause, not a product defect/pass; it does not change any issue status. Report and evidence hashes: [`rc5-paperweight-mache-resource-copy-stall-20261030.md`](../performance-results/rc5-paperweight-mache-resource-copy-stall-20261030.md).
+- RC5-01 chest integrity remains P0 `TESTING`; RC5-02 InvSee++ remains P0 `BLOCKED`. No live service or world was accessed.
+
 ### RC5-01 / Crafty1 no-holder read current-source recheck — 2026-10-30
 
 - **Fresh input:** The newly referenced `1latest.log` is not available at the stated Downloads or checked attachment paths; the project `logs/latest.log` is unrelated ViaProxy output. No fresh digest or warning recount is claimed. Counts (273 no-holder reads, 119 movement warnings, eight duplicate UUID warnings, 13 premature entity-NBT updates, ten removal-routing fallbacks, three stale inventory rejections) remain tied only to retained Crafty1 digest `920B665985CB2066D2199F0A6795C438D268FEADE91E8BE1246EAEA00CCA25D1`; no line ties them to chest coordinates/NBT, save acknowledgements, or player actions.
