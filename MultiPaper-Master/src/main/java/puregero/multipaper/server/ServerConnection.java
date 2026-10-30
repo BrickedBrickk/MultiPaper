@@ -36,6 +36,8 @@ public class ServerConnection extends MasterBoundMessageHandler {
     private volatile boolean playerDataTransactionProtocolSupported;
     private volatile boolean playerSessionCapabilityChallengeSent;
     private volatile boolean playerSessionProtocolSupported;
+    private volatile boolean playerInventoryOwnerTransactionCapabilityChallengeSent;
+    private volatile boolean playerInventoryOwnerTransactionProtocolSupported;
     private final Map<UUID, UUID> playerSessionIds = new ConcurrentHashMap<>();
     private final Map<String, ServerAnnouncement> announcedServers = new ConcurrentHashMap<>();
 
@@ -76,6 +78,38 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     public static List<ServerConnection> getConnections() {
         return connections;
+    }
+
+    /**
+     * Resolve a player owner only when the connected-server registry has one
+     * unambiguous owner and that owner has negotiated and registered the exact
+     * live session epoch. Inventory transaction handlers must fail closed when
+     * ownership or session identity is ambiguous.
+     */
+    public static ServerConnection findPlayerInventoryOwner(UUID playerId, UUID sessionId) {
+        if (playerId == null || sessionId == null || sessionId.equals(new UUID(0, 0))) {
+            return null;
+        }
+
+        ServerConnection owner = null;
+        for (ServerConnection connection : connections) {
+            if (!connection.hasPlayer(playerId)) {
+                continue;
+            }
+            if (owner != null) {
+                return null;
+            }
+            owner = connection;
+        }
+
+        if (owner == null
+                || !owner.supportsPlayerInventoryOwnerTransactionProtocol()
+                || owner.isPlayerDisconnecting(playerId)
+                || !sessionId.equals(owner.getPlayerSessionId(playerId))) {
+            return null;
+        }
+
+        return owner;
     }
 
     public SocketChannel getChannel() {
@@ -139,13 +173,23 @@ public class ServerConnection extends MasterBoundMessageHandler {
             }
             return;
         }
+        if (message.getTransactionId() == MasterBoundProtocol.PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID) {
+            if (playerInventoryOwnerTransactionCapabilityChallengeSent
+                    && Objects.equals(name, message.name)
+                    && Objects.equals(uuid, message.serverUuid)) {
+                playerInventoryOwnerTransactionProtocolSupported = true;
+            }
+            return;
+        }
 
         // Every new Hello starts a fresh negotiation. Do not carry a previous
         // capability grant across a peer identity or protocol re-handshake.
         playerDataTransactionProtocolSupported = false;
         playerSessionProtocolSupported = false;
+        playerInventoryOwnerTransactionProtocolSupported = false;
         playerDataTransactionCapabilityChallengeSent = false;
         playerSessionCapabilityChallengeSent = false;
+        playerInventoryOwnerTransactionCapabilityChallengeSent = false;
         name = message.name;
         host = ((InetSocketAddress) getAddress()).getAddress().getHostAddress();
         uuid = message.serverUuid;
@@ -178,6 +222,11 @@ public class ServerConnection extends MasterBoundMessageHandler {
         sessionSecret.setTransactionId(MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
         playerSessionCapabilityChallengeSent = true;
         send(sessionSecret);
+
+        SetSecretMessage ownerInventorySecret = new SetSecretMessage(MultiPaperServer.SECRET);
+        ownerInventorySecret.setTransactionId(MasterBoundProtocol.PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID);
+        playerInventoryOwnerTransactionCapabilityChallengeSent = true;
+        send(ownerInventorySecret);
     }
 
     @Override
@@ -278,6 +327,12 @@ public class ServerConnection extends MasterBoundMessageHandler {
 
     public boolean supportsPlayerDataTransactionProtocol() {
         return playerDataTransactionProtocolSupported && connections.contains(this) && channel.isActive();
+    }
+
+    public boolean supportsPlayerInventoryOwnerTransactionProtocol() {
+        return playerInventoryOwnerTransactionProtocolSupported
+                && supportsPlayerDataTransactionProtocol()
+                && supportsPlayerSessionProtocol();
     }
 
     public List<Player> getPlayers() {

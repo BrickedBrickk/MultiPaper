@@ -1310,6 +1310,8 @@ class MasterIntegrationTest {
         try {
             assertTrue(owner.supportsPlayerSessionProtocol());
             assertFalse(legacyOwner.supportsPlayerSessionProtocol());
+            assertTrue(owner.supportsPlayerInventoryOwnerTransactionProtocol());
+            assertFalse(legacyOwner.supportsPlayerInventoryOwnerTransactionProtocol());
             assertTrue(((BooleanMessageReply) owner.request(new PlayerConnectMessage(playerId))).result);
             assertTrue(((BooleanMessageReply) legacyOwner.request(new PlayerConnectMessage(legacyPlayerId))).result);
 
@@ -1328,15 +1330,31 @@ class MasterIntegrationTest {
             ServerConnection ownerConnection = ServerConnection.getConnection("session-epoch-owner");
             assertEquals(firstSession, ownerConnection.getPlayerSessionId(playerId),
                     "Master must retain the registered session epoch for the active owner");
+            assertEquals(ownerConnection, ServerConnection.findPlayerInventoryOwner(playerId, firstSession),
+                    "Only the exact registered player session should resolve to its inventory owner");
+            assertNull(ServerConnection.findPlayerInventoryOwner(playerId, nextSession),
+                    "A stale or unregistered session epoch must not resolve to an owner");
+            ServerConnection legacyConnection = ServerConnection.getConnection("session-epoch-legacy-owner");
+            assertFalse(legacyConnection.supportsPlayerInventoryOwnerTransactionProtocol());
+            assertNull(ServerConnection.findPlayerInventoryOwner(legacyPlayerId, UUID.randomUUID()),
+                    "A player on a peer without owner-transaction support must not resolve");
+            ServerConnection nextOwnerConnection = ServerConnection.getConnection("session-epoch-next-owner");
+            assertTrue(nextOwnerConnection.addPlayer(playerId), "Test duplicate owner should be registered");
+            assertNull(ServerConnection.findPlayerInventoryOwner(playerId, firstSession),
+                    "Ambiguous duplicate player ownership must fail closed");
+            nextOwnerConnection.removePlayer(playerId);
             assertTrue(((BooleanMessageReply) owner.request(
                     new RegisterPlayerSessionMessage(playerId, nextSession))).result,
                     "A reconnect on the same owner may advance the session epoch");
             assertEquals(nextSession, ownerConnection.getPlayerSessionId(playerId));
+            assertEquals(ownerConnection, ServerConnection.findPlayerInventoryOwner(playerId, nextSession));
 
             owner.send(new PlayerDisconnectMessage(playerId));
             assertFalse(((BooleanMessageReply) owner.request(
                     new RegisterPlayerSessionMessage(playerId, firstSession))).result,
                     "A disconnecting session must not be re-registered");
+            assertNull(ServerConnection.findPlayerInventoryOwner(playerId, nextSession),
+                    "A disconnecting session must no longer resolve as an inventory owner");
             assertNull(ownerConnection.getPlayerSessionId(playerId),
                     "Disconnect must retire the registered session epoch");
             assertTrue(((BooleanMessageReply) owner.request(new PlayerConnectMessage(playerId))).result,
@@ -1344,6 +1362,7 @@ class MasterIntegrationTest {
             assertTrue(((BooleanMessageReply) owner.request(
                     new RegisterPlayerSessionMessage(playerId, nextSession))).result);
             assertEquals(nextSession, ownerConnection.getPlayerSessionId(playerId));
+            assertEquals(ownerConnection, ServerConnection.findPlayerInventoryOwner(playerId, nextSession));
         } finally {
             owner.close();
             legacyOwner.close();
@@ -1457,6 +1476,8 @@ class MasterIntegrationTest {
         UUID secondPlayer = UUID.randomUUID();
         String world = Files.createTempDirectory("multipaper-renegotiated-player-transaction-").toString();
         try {
+            ServerConnection serverConnection = ServerConnection.getConnection(peer.name);
+            assertTrue(serverConnection.supportsPlayerInventoryOwnerTransactionProtocol());
             assertTrue(((BooleanMessageReply) peer.request(new PlayerConnectMessage(firstPlayer))).result);
             assertTrue(((BooleanMessageReply) peer.request(new PlayerConnectMessage(secondPlayer))).result);
 
@@ -1471,6 +1492,8 @@ class MasterIntegrationTest {
                     });
             assertFalse(((BooleanMessageReply) peer.request(transaction)).result,
                     "A peer must re-acknowledge after sending a new Hello");
+            assertFalse(serverConnection.supportsPlayerInventoryOwnerTransactionProtocol(),
+                    "A repeated Hello must revoke the prior owner-transaction capability until fresh acknowledgement");
             assertEquals(0, ((DataMessageReply) peer.request(
                     new ReadPlayerMessage(world, firstPlayer.toString()))).data.length);
             assertEquals(0, ((DataMessageReply) peer.request(

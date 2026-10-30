@@ -190,6 +190,14 @@ class ProtocolRoundtripTest {
     }
 
     @Test
+    void ownerInventoryTransactionCapabilityUsesItsOwnMarker() {
+        int marker = MasterBoundProtocol.PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID;
+        assertEquals(Integer.MIN_VALUE + 4, marker);
+        assertNotEquals(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID, marker);
+        assertNotEquals(MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID, marker);
+    }
+
+    @Test
     void playerSessionCapabilityUsesSeparateMarker() {
         assertEquals(Integer.MIN_VALUE + 2, MasterBoundProtocol.PLAYER_SESSION_CAPABILITY_ID);
         assertNotEquals(MasterBoundProtocol.PLAYER_DATA_TRANSACTION_CAPABILITY_ID,

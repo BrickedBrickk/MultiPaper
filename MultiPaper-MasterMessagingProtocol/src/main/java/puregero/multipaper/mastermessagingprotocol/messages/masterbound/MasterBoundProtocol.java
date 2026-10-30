@@ -12,6 +12,8 @@ public class MasterBoundProtocol extends Protocol<MasterBoundMessage> {
      */
     public static final int PLAYER_DATA_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE + 3;
     public static final int PLAYER_SESSION_CAPABILITY_ID = Integer.MIN_VALUE + 2;
+    /** Separate capability for the owner-attested inventory transaction protocol. */
+    public static final int PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID = Integer.MIN_VALUE + 4;
 
     public MasterBoundProtocol() {
         addMessage(MasterBoundDataStreamMessage.class, MasterBoundDataStreamMessage::new);

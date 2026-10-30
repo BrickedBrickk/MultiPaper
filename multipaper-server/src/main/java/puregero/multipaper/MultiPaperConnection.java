@@ -65,6 +65,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
     private volatile boolean channelActive = false;
     private volatile boolean supportsPlayerDataTransactionProtocol = false;
     private volatile boolean supportsPlayerSessionProtocol = false;
+    private volatile boolean supportsPlayerInventoryOwnerTransactionProtocol = false;
     private long lastPingReceived;
     private final Set<MasterBoundMessage> unhandledRequests = ConcurrentHashMap.newKeySet();
     private final Map<String, ExternalServer> serversMap = new ConcurrentHashMap<>();
@@ -106,12 +107,20 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         return getOrCreateServer(myName);
     }
 
+    public boolean supportsPlayerInventoryOwnerTransactionProtocol() {
+        return supportsPlayerInventoryOwnerTransactionProtocol
+                && supportsPlayerDataTransactionProtocol
+                && supportsPlayerSessionProtocol
+                && channelActive;
+    }
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         playerSessionRegistrationState.invalidate();
         channel = (SocketChannel) ctx.channel();
         supportsPlayerDataTransactionProtocol = false;
         supportsPlayerSessionProtocol = false;
+        supportsPlayerInventoryOwnerTransactionProtocol = false;
         LOGGER.info("Connected to " + channel.remoteAddress());
         channel.write(new HelloMessage(myName, thisServersUuid));
 
@@ -177,6 +186,7 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
         channelActive = false;
         supportsPlayerDataTransactionProtocol = false;
         supportsPlayerSessionProtocol = false;
+        supportsPlayerInventoryOwnerTransactionProtocol = false;
         playerSessionRegistrationState.invalidate();
         serverStartMessageTracker.onDisconnect();
         LOGGER.info("Lost connection to " + ((SocketChannel) ctx.channel()).remoteAddress());
@@ -337,8 +347,16 @@ public class MultiPaperConnection extends ServerBoundMessageHandler {
                 send(acknowledgement);
                 registerOnlinePlayerSessions();
             }
+        } else if (message.getTransactionId() == MasterBoundProtocol.PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID) {
+            if (!supportsPlayerInventoryOwnerTransactionProtocol) {
+                supportsPlayerInventoryOwnerTransactionProtocol = true;
+                HelloMessage acknowledgement = new HelloMessage(myName, thisServersUuid);
+                acknowledgement.setTransactionId(MasterBoundProtocol.PLAYER_INVENTORY_OWNER_TRANSACTION_CAPABILITY_ID);
+                send(acknowledgement);
+            }
         } else {
             supportsPlayerDataTransactionProtocol = false;
+            supportsPlayerInventoryOwnerTransactionProtocol = false;
             failPendingPlayerDataTransactions();
         }
     }
