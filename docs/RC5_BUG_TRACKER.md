@@ -1,5 +1,12 @@
 # MultiPaper 26.3 RC5 bug tracker
 
+### Blocked current-source local evaluation bundle — 2026-10-30
+
+- **Status:** Prepared locally as `release-staging/MultiPaper-26.3-RC5-blocked-3bc6f46-20261030.zip`, explicitly labeled `BLOCKED — NOT FOR INSTALLATION OR PUBLICATION`. It is built from product source `3bc6f46f3c6dc006540b5dc3b74b7033a35ccdb2`; current branch tip at packaging is documentation-only `c4b86e67d77cddc34eb7513222fa2ad16a726bea`.
+- **Integrity:** The 20-entry payload SHA-256 manifest verified after clean extraction with zero mismatches, missing, malformed, or unlisted files. Archive size is 82,465,923 bytes; ZIP SHA-256: `E98D7B2B05838CDDC8CCF192081C8D6FC695E4440F8ADA0ED9B19C89B30902D9`; manifest SHA-256: `AA850E651A737BE53024B6E60E643C8D6A08F8BB7345146C0EFB0B1230D70743`. Master and Paperclip JAR digests match the two clean builds in the reproducible-pair report.
+- **Contents/safety:** Contains exact-source Master/Paperclip JARs, operator/rollback docs, component/topology and limitation summaries, sanitized example monitor configs, collector and startup wrappers, beta/backup plans, and build/test evidence. No third-party plugin JARs or full historical tracker/matrix are bundled. The package points to the canonical tracker in the repository. Extracted filename audit found no world/region data, server properties, RCON files, key files, or raw logs; no real monitor config, credential, private key, local plugin database, raw player chat, or world data is included.
+- **Release blockers:** The bundle is not an approved candidate. P0 chest-loss attribution/recovery remains `TESTING`; P0 InvSee++ cross-owner item conservation remains `BLOCKED`. Exact six-component runtime, authenticated Java/Bedrock routes, legacy-client behavior, farm behavior, intended-PC capacity, and the two-week beta remain pending. Details: [`rc5-blocked-local-package-20261030.md`](../performance-results/rc5-blocked-local-package-20261030.md). Do not install or publish.
+
 ### Exact-source two-pass RC5 artifact reproducibility — 2026-10-30
 
 - **Source/status:** Both independent clean detached builds used source `3bc6f46f3c6dc006540b5dc3b74b7033a35ccdb2`, Temurin Java 25.0.3.9, Gradle 9.8, no build/configuration cache or daemon, and one worker. `applyAllPatches` and artifact generation passed in both worktrees. The standalone Master and Paperclip hashes match across passes.
