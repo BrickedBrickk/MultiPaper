@@ -20,7 +20,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 EVENTS = {
     # Concrete MultiPaper integrity warnings are listed before generic error
     # matching so the monitor retains the useful category without raw text.
@@ -187,7 +187,33 @@ def parse_metrics(text: str) -> dict[str, float | None]:
     return out
 
 
-def host_metrics(process_dir: str | None = None) -> dict[str, Any]:
+def java_process_metrics(process_dir: str | None, sampled_processes: set[tuple[int, float | None]]) -> dict[str, Any]:
+    result: dict[str, Any] = {"process_cpu_percent": None, "process_rss_bytes": None}
+    if not process_dir:
+        return result
+    try:
+        import psutil
+        expected = os.path.normcase(os.path.realpath(process_dir))
+        for proc in psutil.process_iter(["name", "cwd", "memory_info", "create_time"]):
+            try:
+                if (proc.info.get("name") or "").lower().startswith("java") and os.path.normcase(os.path.realpath(proc.info.get("cwd") or "")) == expected:
+                    process_key = (int(proc.info.get("pid", proc.pid)), proc.info.get("create_time"))
+                    cpu_percent = proc.cpu_percent(interval=None)
+                    if process_key in sampled_processes:
+                        result["process_cpu_percent"] = cpu_percent
+                    else:
+                        # psutil's first interval-free process sample is only a baseline.
+                        sampled_processes.add(process_key)
+                    result["process_rss_bytes"] = proc.info["memory_info"].rss
+                    break
+            except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
+                continue
+    except ImportError:
+        pass
+    return result
+
+
+def host_metrics(monitor_process: Any | None = None) -> dict[str, Any]:
     result: dict[str, Any] = {"cpu_percent": None, "memory_percent": None, "network_rx_bytes": None, "network_tx_bytes": None,
                               "process_cpu_percent": None, "process_rss_bytes": None, "monitor_cpu_percent": None, "monitor_rss_bytes": None}
     try:
@@ -196,19 +222,10 @@ def host_metrics(process_dir: str | None = None) -> dict[str, Any]:
         net = psutil.net_io_counters()
         result.update(cpu_percent=psutil.cpu_percent(interval=None), memory_percent=vm.percent,
                       memory_used_bytes=vm.used, memory_total_bytes=vm.total,
-                      network_rx_bytes=net.bytes_recv, network_tx_bytes=net.bytes_sent,
-                      monitor_cpu_percent=psutil.Process(os.getpid()).cpu_percent(interval=None),
-                      monitor_rss_bytes=psutil.Process(os.getpid()).memory_info().rss)
-        if process_dir:
-            expected = os.path.normcase(os.path.realpath(process_dir))
-            for proc in psutil.process_iter(["name", "cwd", "memory_info"]):
-                try:
-                    if (proc.info.get("name") or "").lower().startswith("java") and os.path.normcase(os.path.realpath(proc.info.get("cwd") or "")) == expected:
-                        result["process_cpu_percent"] = proc.cpu_percent(interval=None)
-                        result["process_rss_bytes"] = proc.info["memory_info"].rss
-                        break
-                except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
-                    continue
+                      network_rx_bytes=net.bytes_recv, network_tx_bytes=net.bytes_sent)
+        if monitor_process is not None:
+            result.update(monitor_cpu_percent=monitor_process.cpu_percent(interval=None),
+                          monitor_rss_bytes=monitor_process.memory_info().rss)
     except ImportError:
         if sys.platform.startswith("linux"):
             try:
@@ -236,6 +253,15 @@ class Monitor:
         self.keep = int(retention["keep_rotated"])
         self.global_out = BoundedJsonl(self.root / "timeline.jsonl", self.max_bytes, self.keep)
         self.salt = os.urandom(32)
+        self.monitor_process = None
+        try:
+            import psutil
+            self.monitor_process = psutil.Process(os.getpid())
+            # psutil's first interval-free percentage is only a baseline.
+            self.monitor_process.cpu_percent(interval=None)
+            psutil.cpu_percent(interval=None)
+        except ImportError:
+            pass
         # (inode, byte offset, digest of the bytes immediately before that offset).
         # The digest detects copy-truncate/rewrite rotations that retain an inode and
         # grow back to at least the old size before the next poll.
@@ -244,6 +270,7 @@ class Monitor:
         # time baseline per server so sequential samples do not consume one
         # another's byte delta (PC1 commonly has Master, backend, and Geyser).
         self.last_net: dict[str, tuple[float, int, int]] = {}
+        self.process_cpu_baselines: dict[str, set[tuple[int, float | None]]] = {}
         self.session_start = utc_now()
         self.last_summary_day: str | None = None
         self.last_summary_at = 0.0
@@ -301,8 +328,10 @@ class Monitor:
             f.seek(start)
             return hashlib.sha256(f.read(offset - start)).digest()
 
-    def sample_server(self, server: dict[str, Any]) -> dict[str, Any]:
-        metrics: dict[str, Any] = {"time": utc_now(), "server": server["id"], "role": server.get("role", "unknown"), **host_metrics(server.get("process_dir")),
+    def sample_server(self, server: dict[str, Any], host_sample: dict[str, Any] | None = None) -> dict[str, Any]:
+        host_sample = host_metrics(self.monitor_process) if host_sample is None else host_sample
+        process_sample = java_process_metrics(server.get("process_dir"), self.process_cpu_baselines.setdefault(server["id"], set()))
+        metrics: dict[str, Any] = {"time": utc_now(), "server": server["id"], "role": server.get("role", "unknown"), **host_sample, **process_sample,
                                    "tps_1m": None, "mspt_avg_5s": None, "mspt_max_5s": None, "players_online": None, "rcon_available": False}
         r = server.get("rcon", {})
         if r.get("port") and os.environ.get(r.get("password_env", "MULTIPAPER_RCON_PASSWORD")):
@@ -355,9 +384,13 @@ class Monitor:
             else: self.active_alerts.discard(key)
 
     def run_once(self) -> None:
+        # Host and monitor CPU counters are interval measurements. Sample them
+        # once per polling cycle and share that snapshot across local services;
+        # sampling per service would give later entries near-zero intervals.
+        host_sample = host_metrics(self.monitor_process)
         for server in self.cfg["servers"]:
             self.read_logs(server)
-            self.sample_server(server)
+            self.sample_server(server, host_sample)
         today = dt.datetime.now(dt.timezone.utc).date().isoformat()
         now = time.monotonic()
         if today != self.last_summary_day or now - self.last_summary_at >= 300:

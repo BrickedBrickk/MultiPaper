@@ -28,3 +28,14 @@ This is a local synthetic estimate on the Windows development host. It did not m
 ## Boundaries
 
 The collector never stores raw source log lines. It records recognized event categories and a short in-memory-salted player identifier, no chat or IP. RCON commands are limited to `tps`, `mspt`, and `list`, require a protected environment variable, and reject non-loopback destinations. The export is an allowlist of bounded telemetry filenames; config and arbitrary files are excluded. Unavailable internal events remain absent rather than inferred. The Master does not provide Paper TPS/MSPT commands, and ownership/entity/tick-journal/sync-latency events are collected only if the running component emits a matching line.
+## Repeat validation — 2026-10-28
+
+- Ran with CPython 3.11.6: python -m unittest scripts.tests.test_beta_monitor — 6 tests passed.
+- Repeated synthetic overhead check: scripts/Measure-BetaMonitorOverhead.py --iterations 200 --events-per-interval 20 --poll-seconds 10. CPU 3.25 s over 5.153344 s wall time; 16.25 ms CPU per poll; estimated 0.1625% of one core at the assumed 10-second interval; peak RSS 23,412,736 bytes. The test used only a temporary synthetic log/metrics directory and disabled RCON.
+- These repeat results agree with the previous estimate and remain a Windows development-host synthetic measurement. They do not measure live RCON, Debian, Crafty scheduling, target-PC resource use, or actual beta traffic. Deployed-host monitoring overhead gate remains pending.
+
+## Current-checkout repeat — 2026-10-28
+
+- Current Python 3.11.9 run: `python -m unittest scripts.tests.test_beta_monitor -v` passed **7/7**, including bounded rotation, sanitized export/merge, chat/name privacy, same-inode copy-truncate detection, TPS/MSPT parsing, event categories, and sanitized numeric sync-latency extraction.
+- Repeated the synthetic workload with `python scripts/Measure-BetaMonitorOverhead.py --iterations 200 --events-per-interval 20 --poll-seconds 10`: CPU 4.375 s over 6.320827 s wall time; 21.875 ms CPU per poll; estimated 0.2188% of one core at the assumed 10-second interval; RSS 23,937,024 bytes; RCON disabled.
+- As before, this is synthetic Windows development-host evidence, not Debian, Crafty scheduler, live-RCON, target-PC or real-beta overhead. Actual deployment comparison remains a manual beta gate.

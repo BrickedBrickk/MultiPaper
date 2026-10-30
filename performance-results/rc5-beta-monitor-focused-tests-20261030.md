@@ -2,16 +2,18 @@
 
 ## Command and result
 
-Ran the existing focused monitor suite from the repository root:
+Ran the focused monitor suite from the repository root after correcting Java process instance identity tracking:
 
 ```text
 py -3 -m unittest scripts.tests.test_beta_monitor
-Ran 18 tests in 0.208s
+Ran 18 tests in 0.183s
 OK
 ```
 
-Test file SHA-256: `488E11EE72B2AF736A8FDC55791D5E5C597FEE35C1CD2DC44308AD2B02CB62FA`.
-Monitor implementation SHA-256: `353B02E50F591218594735124B67851B4726108D6987268CE8A04A085C657197`.
+Test file SHA-256: `2A65847499CDE49D0FDF99F2A81E04D131EEA451D46B101F1ACC5A55C28FA730`.
+Monitor implementation SHA-256: `873843122CBD26261D2DCE2C12DD42FE5D69E157EF715FDB8F5B808297BAEF25`.
+
+The monitor now explicitly requests each Java process's creation time when enumerating processes, so a reused PID after restart starts a fresh CPU baseline. The regression asserts this attribute is requested; the complete focused suite passes on the corrected source.
 
 ## Scope limits
 

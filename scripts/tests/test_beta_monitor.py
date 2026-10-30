@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from types import SimpleNamespace
 from unittest.mock import patch
 from pathlib import Path
 
@@ -168,6 +169,84 @@ class BetaMonitorTests(unittest.TestCase):
             for sample in (master_sample, backend_sample):
                 self.assertEqual(sample["network_rx_bytes_per_sec"], 40.0)
                 self.assertEqual(sample["network_tx_bytes_per_sec"], 60.0)
+
+    def test_host_and_monitor_cpu_are_sampled_once_per_poll_with_warmed_process(self):
+        class FakeProcess:
+            def __init__(self):
+                self.cpu_values = iter([0.0, 22.5])
+
+            def cpu_percent(self, interval=None):
+                return next(self.cpu_values)
+
+            def memory_info(self):
+                return SimpleNamespace(rss=4096)
+
+        process = FakeProcess()
+        fake_psutil = SimpleNamespace(
+            Process=lambda pid: process,
+            cpu_percent=lambda interval=None: 17.0,
+            virtual_memory=lambda: SimpleNamespace(percent=41.0, used=410, total=1000),
+            net_io_counters=lambda: SimpleNamespace(bytes_recv=100, bytes_sent=200),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict("sys.modules", {"psutil": fake_psutil}):
+            cfg = Path(tmp) / "private.json"
+            cfg.write_text(json.dumps({
+                "output_dir": str(Path(tmp) / "monitor"),
+                "servers": [{"id": "master"}, {"id": "backend1"}],
+            }))
+            m = monitor.Monitor(cfg)
+            self.assertIs(m.monitor_process, process)
+            captured = []
+            with patch.object(m, "read_logs"), patch.object(m, "sample_server", side_effect=lambda server, sample: captured.append(sample)), \
+                    patch.object(m, "write_daily_summary"):
+                m.run_once()
+
+        self.assertEqual(len(captured), 2)
+        self.assertIs(captured[0], captured[1], "all local services share one interval host snapshot")
+        self.assertEqual(captured[0]["cpu_percent"], 17.0)
+        self.assertEqual(captured[0]["monitor_cpu_percent"], 22.5)
+        self.assertEqual(captured[0]["monitor_rss_bytes"], 4096)
+
+    def test_java_process_cpu_first_interval_is_unavailable_then_measured(self):
+        class FakeProcess:
+            info = {
+                "name": "java.exe",
+                "cwd": "C:/Crafty/backend1",
+                "memory_info": SimpleNamespace(rss=8192),
+                "pid": 456,
+                "create_time": 1234.5,
+            }
+            pid = 456
+
+            def __init__(self):
+                self.cpu_values = iter([0.0, 36.0])
+
+            def cpu_percent(self, interval=None):
+                return next(self.cpu_values)
+
+        process = FakeProcess()
+        requested_attributes = []
+
+        def process_iter(attributes):
+            requested_attributes.extend(attributes)
+            return [process]
+
+        fake_psutil = SimpleNamespace(
+            process_iter=process_iter,
+            AccessDenied=PermissionError,
+            NoSuchProcess=ProcessLookupError,
+        )
+        seen = set()
+        with patch.dict("sys.modules", {"psutil": fake_psutil}):
+            first = monitor.java_process_metrics("C:/Crafty/backend1", seen)
+            second = monitor.java_process_metrics("C:/Crafty/backend1", seen)
+
+        self.assertIsNone(first["process_cpu_percent"], "the first psutil value is a baseline, not measured load")
+        self.assertEqual(first["process_rss_bytes"], 8192)
+        self.assertEqual(second["process_cpu_percent"], 36.0)
+        self.assertEqual(second["process_rss_bytes"], 8192)
+        self.assertIn("create_time", requested_attributes, "CPU baseline must distinguish reused PIDs")
 
     def test_log_tail_detects_same_inode_rewrite_after_copy_truncate(self):
         with tempfile.TemporaryDirectory() as tmp:
