@@ -32,7 +32,7 @@ class PlayerInventoryTransactionCoordinatorTest {
                 coordinator.begin(fixture.request).result());
 
         PlayerInventoryTransactionCoordinator.TransactionRequest conflicting = new PlayerInventoryTransactionCoordinator.TransactionRequest(
-                fixture.transactionId, fixture.editorSnapshot, fixture.targetSnapshot, digest(4));
+                fixture.transactionId, fixture.editorSnapshot, fixture.targetSnapshot, digest(4), new byte[]{1}, new byte[]{2});
         assertEquals(PlayerInventoryTransactionCoordinator.BeginStatus.ID_CONFLICT,
                 coordinator.begin(conflicting).result());
     }
@@ -86,7 +86,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void bothExactLiveAttestationsAreRequiredBeforeCommitDecision() {
+    void bothExactLiveAttestationsAreRequiredBeforeCommitDecision() throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         Fixture fixture = new Fixture();
         coordinator.begin(fixture.request);
@@ -104,7 +104,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void committedReservationsRemainUntilBothOwnerAcknowledgements() {
+    void committedReservationsRemainUntilBothOwnerAcknowledgements() throws Exception {
         PreparedRun run = preparedCoordinator(new Fixture());
         PlayerInventoryTransactionCoordinator coordinator = run.coordinator();
         Fixture fixture = run.fixture();
@@ -123,7 +123,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void callerTimeoutCannotReleaseReservationsWithoutDurableNoCommitConfirmation() {
+    void callerTimeoutCannotReleaseReservationsWithoutDurableNoCommitConfirmation() throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         Fixture fixture = new Fixture();
         coordinator.begin(fixture.request);
@@ -137,7 +137,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void onlyConfirmedPreCommitAbortReleasesReservations() {
+    void onlyConfirmedPreCommitAbortReleasesReservations() throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         Fixture fixture = new Fixture();
         coordinator.begin(fixture.request);
@@ -158,7 +158,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void durableCommitCannotBeAbortedAndNonOwnersCannotAcknowledge() {
+    void durableCommitCannotBeAbortedAndNonOwnersCannotAcknowledge() throws Exception {
         PreparedRun run = preparedCoordinator(new Fixture());
         PlayerInventoryTransactionCoordinator coordinator = run.coordinator();
         Fixture fixture = run.fixture();
@@ -187,10 +187,10 @@ class PlayerInventoryTransactionCoordinatorTest {
         UUID player = UUID.randomUUID();
         var samePlayer = new PlayerInventoryTransactionCoordinator.PlayerSnapshot(player, UUID.randomUUID(), 0, digest(1));
         assertThrows(IllegalArgumentException.class, () -> new PlayerInventoryTransactionCoordinator.TransactionRequest(
-                UUID.randomUUID(), samePlayer, samePlayer, digest(2)));
+                UUID.randomUUID(), samePlayer, samePlayer, digest(2), new byte[]{1}, new byte[]{2}));
     }
 
-    private static PreparedRun preparedCoordinator(Fixture fixture) {
+    private static PreparedRun preparedCoordinator(Fixture fixture) throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         coordinator.begin(fixture.request);
         fixture.attestEditor(coordinator);
@@ -205,7 +205,8 @@ class PlayerInventoryTransactionCoordinatorTest {
             UUID transactionId, UUID editorId, UUID targetId, byte[] requestDigest) {
         var editor = new PlayerInventoryTransactionCoordinator.PlayerSnapshot(editorId, UUID.randomUUID(), 10, EDITOR_DIGEST);
         var target = new PlayerInventoryTransactionCoordinator.PlayerSnapshot(targetId, UUID.randomUUID(), 20, TARGET_DIGEST);
-        return new PlayerInventoryTransactionCoordinator.TransactionRequest(transactionId, editor, target, requestDigest);
+        return new PlayerInventoryTransactionCoordinator.TransactionRequest(
+                transactionId, editor, target, requestDigest, new byte[]{1}, new byte[]{2});
     }
 
     private static byte[] digest(int value) {
@@ -225,7 +226,8 @@ class PlayerInventoryTransactionCoordinatorTest {
         private final PlayerInventoryTransactionCoordinator.PlayerSnapshot targetSnapshot =
                 new PlayerInventoryTransactionCoordinator.PlayerSnapshot(targetId, targetSession, 20, TARGET_DIGEST);
         private final PlayerInventoryTransactionCoordinator.TransactionRequest request =
-                new PlayerInventoryTransactionCoordinator.TransactionRequest(transactionId, editorSnapshot, targetSnapshot, REQUEST_DIGEST);
+                new PlayerInventoryTransactionCoordinator.TransactionRequest(
+                        transactionId, editorSnapshot, targetSnapshot, REQUEST_DIGEST, new byte[]{11}, new byte[]{22});
 
         private PlayerInventoryTransactionCoordinator.AttestationStatus attestEditor(
                 PlayerInventoryTransactionCoordinator coordinator) {
