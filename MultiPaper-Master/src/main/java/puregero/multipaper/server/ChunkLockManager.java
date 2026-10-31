@@ -16,6 +16,7 @@ public class ChunkLockManager {
     private static final WriteLockManager locks = new WriteLockManager();
     private static final Map<ChunkKey, ServerConnection> failedWrites = new ConcurrentHashMap<>();
     private static final Map<ChunkKey, Set<ServerConnection>> deferredUnlocks = new ConcurrentHashMap<>();
+    private static final Set<ChunkKey> successfulWritesAwaitingBarrier = ConcurrentHashMap.newKeySet();
 
     static boolean hasFailedWrite(ChunkKey key) {
         if (failedWrites.containsKey(key)) return true;
@@ -51,19 +52,17 @@ public class ChunkLockManager {
         List<ServerConnection> retryingOwners = List.of();
         synchronized (ChunkLock.getChunkLock(key)) {
             if (successful) {
-                try {
-                    FailedChunkWriteStore.clearFailed(key);
-                    failedWrites.remove(key);
-                } catch (java.io.IOException failure) {
-                    // The region write itself completed, but keep reads and
-                    // ownership fail-closed if an earlier quarantine could not
-                    // be durably removed.
-                    failedWrites.put(key, connection);
-                    System.err.println("Could not clear failed region-write marker after successful save for " + key);
-                    failure.printStackTrace();
-                    successful = false;
+                if (locks.isLastPendingWrite(world, cx, cz)) {
+                    successful = clearSuccessfulWriteQuarantine(key, connection);
+                } else {
+                    // Keep an existing durable quarantine until every already
+                    // announced or active write for this chunk has resolved. A
+                    // crash during a later write must not expose the earlier disk
+                    // image after this successful completion clears the marker.
+                    successfulWritesAwaitingBarrier.add(key);
                 }
             } else {
+                successfulWritesAwaitingBarrier.remove(key);
                 failedWrites.put(key, connection);
                 try {
                     FailedChunkWriteStore.markFailed(key);
@@ -90,6 +89,25 @@ public class ChunkLockManager {
         ChunkKey key = new ChunkKey(world, cx, cz);
         synchronized (ChunkLock.getChunkLock(key)) {
             locks.cancelPendingWrite(connection, world, cx, cz);
+            if (!locks.hasPendingWrites(world, cx, cz) && successfulWritesAwaitingBarrier.remove(key)) {
+                clearSuccessfulWriteQuarantine(key, connection);
+            }
+        }
+    }
+
+    private static boolean clearSuccessfulWriteQuarantine(ChunkKey key, ServerConnection connection) {
+        try {
+            FailedChunkWriteStore.clearFailed(key);
+            failedWrites.remove(key);
+            successfulWritesAwaitingBarrier.remove(key);
+            return true;
+        } catch (java.io.IOException failure) {
+            // The region write itself completed, but keep reads and ownership
+            // fail-closed if an earlier quarantine could not be durably removed.
+            if (connection != null) failedWrites.put(key, connection);
+            System.err.println("Could not clear failed region-write marker after successful save for " + key);
+            failure.printStackTrace();
+            return false;
         }
     }
 
@@ -161,8 +179,13 @@ public class ChunkLockManager {
         return locks.releaseAll(connection).whenComplete((ignored, failure) -> {
             Set<ChunkKey> keys = new HashSet<>(deferredUnlocks.keySet());
             keys.addAll(failedWrites.keySet());
+            keys.addAll(successfulWritesAwaitingBarrier);
             for (ChunkKey key : keys) {
                 synchronized (ChunkLock.getChunkLock(key)) {
+                    if (!locks.hasPendingWrites(key.world, key.x, key.z)
+                            && successfulWritesAwaitingBarrier.contains(key)) {
+                        clearSuccessfulWriteQuarantine(key, connection);
+                    }
                     Set<ServerConnection> waiting = deferredUnlocks.get(key);
                     if (waiting != null) {
                         waiting.remove(connection);

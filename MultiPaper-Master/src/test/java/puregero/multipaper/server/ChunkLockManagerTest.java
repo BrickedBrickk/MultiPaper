@@ -97,4 +97,90 @@ class ChunkLockManagerTest {
         assertFalse(storageReadStarted.get(), "Master must not return a chunk while its failed-write marker is ambiguous");
         assertTrue(FailedChunkWriteStore.isFailed(new ChunkKey(world, chunkX, chunkZ)));
     }
+
+    @Test
+    @Timeout(10)
+    void successfulWriteDoesNotClearQuarantineWhileAnotherChunkWriteIsPending() throws Exception {
+        String world = tempDirectory.resolve("overlapping-write-quarantine").toString();
+        int chunkX = 91;
+        int chunkZ = -93;
+        ChunkKey key = new ChunkKey(world, chunkX, chunkZ);
+        FailedChunkWriteStore.markFailed(key);
+
+        ChunkLockManager.writeStarted(null, world, chunkX, chunkZ);
+        ChunkLockManager.writeStarted(null, world, chunkX, chunkZ);
+        try {
+            ChunkLockManager.writeCompleted(null, world, chunkX, chunkZ, true);
+
+            assertTrue(ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ),
+                    "The second overlapping write is still in flight");
+            assertTrue(FailedChunkWriteStore.isFailed(key),
+                    "A crash during the remaining write must not lose the durable stale-read quarantine");
+
+            ChunkLockManager.writeCompleted(null, world, chunkX, chunkZ, true);
+            assertFalse(ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ));
+            assertFalse(FailedChunkWriteStore.isFailed(key),
+                    "The quarantine may clear after every write in the repair sequence has succeeded");
+        } finally {
+            if (ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ)) {
+                ChunkLockManager.writeCompleted(null, world, chunkX, chunkZ, true);
+            }
+            FailedChunkWriteStore.clearFailed(key);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void successfulWriteClearsQuarantineWhenTheRemainingAnnouncementIsCancelled() throws Exception {
+        String world = tempDirectory.resolve("cancelled-announcement-quarantine").toString();
+        int chunkX = 101;
+        int chunkZ = -103;
+        ChunkKey key = new ChunkKey(world, chunkX, chunkZ);
+        FailedChunkWriteStore.markFailed(key);
+
+        ChunkLockManager.lockUntilWrite(null, world, chunkX, chunkZ);
+        ChunkLockManager.writeStarted(null, world, chunkX, chunkZ);
+        ChunkLockManager.lockUntilWrite(null, world, chunkX, chunkZ);
+        try {
+            ChunkLockManager.writeCompleted(null, world, chunkX, chunkZ, true);
+            assertTrue(FailedChunkWriteStore.isFailed(key),
+                    "A later announced save still prevents clearing the quarantine at first-write completion");
+
+            ChunkLockManager.cancelPendingWrite(null, world, chunkX, chunkZ);
+            assertFalse(ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ));
+            assertFalse(FailedChunkWriteStore.isFailed(key),
+                    "The successful replacement is sufficient once every later announcement is cancelled");
+        } finally {
+            if (ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ)) {
+                ChunkLockManager.cancelPendingWrite(null, world, chunkX, chunkZ);
+            }
+            FailedChunkWriteStore.clearFailed(key);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void disconnectClearsRepairedQuarantineAfterReleasingRemainingAnnouncement() throws Exception {
+        String world = tempDirectory.resolve("disconnect-announcement-quarantine").toString();
+        int chunkX = 111;
+        int chunkZ = -113;
+        ChunkKey key = new ChunkKey(world, chunkX, chunkZ);
+        FailedChunkWriteStore.markFailed(key);
+
+        ChunkLockManager.lockUntilWrite(null, world, chunkX, chunkZ);
+        ChunkLockManager.writeStarted(null, world, chunkX, chunkZ);
+        ChunkLockManager.lockUntilWrite(null, world, chunkX, chunkZ);
+        try {
+            ChunkLockManager.writeCompleted(null, world, chunkX, chunkZ, true);
+            assertTrue(FailedChunkWriteStore.isFailed(key));
+
+            ChunkLockManager.releaseAll(null).get(5, TimeUnit.SECONDS);
+            assertFalse(ChunkLockManager.hasPendingWrites(world, chunkX, chunkZ));
+            assertFalse(FailedChunkWriteStore.isFailed(key),
+                    "Disconnect cleanup must clear a successful repair after discarding its unused announcement");
+        } finally {
+            ChunkLockManager.releaseAll(null).get(5, TimeUnit.SECONDS);
+            FailedChunkWriteStore.clearFailed(key);
+        }
+    }
 }

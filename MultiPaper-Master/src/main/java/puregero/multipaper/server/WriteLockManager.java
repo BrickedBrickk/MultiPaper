@@ -141,6 +141,16 @@ final class WriteLockManager {
         return pending.get();
     }
 
+    boolean isLastPendingWrite(String world, int cx, int cz) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        AtomicReference<Boolean> last = new AtomicReference<>(false);
+        locks.computeIfPresent(key, (ignored, state) -> {
+            last.set(state.pendingWrites == 1);
+            return state;
+        });
+        return last.get();
+    }
+
     CompletableFuture<Void> releaseAll(ServerConnection connection) {
         List<CompletableFuture<Void>> activeWrites = new ArrayList<>();
         for (ChunkKey key : locks.keySet()) {
