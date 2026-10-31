@@ -1,0 +1,10 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2476,6 +2476,7 @@ public class ServerGamePacketListenerImpl
+             this.player.getInventory().setSelectedSlot(packet.getSlot());
+             this.player.resetLastActionTime();
+             if (io.papermc.paper.configuration.GlobalConfiguration.get().unsupportedSettings.updateEquipmentOnPlayerActions) this.player.detectEquipmentUpdates(); // Paper - Force update attributes.
++            puregero.multipaper.MultiPaperPlayerHandler.handleSetCarriedItem(this.player, packet); // MultiPaper - keep remote player mirrors' selected slot and equipment in sync
+         } else {
+             LOGGER.warn("{} tried to set an invalid carried item", this.player.getPlainTextName());
+             this.disconnect(Component.literal("Invalid hotbar selection (Hacking?)"), org.bukkit.event.player.PlayerKickEvent.Cause.ILLEGAL_ACTION); // CraftBukkit // Paper - kick event cause

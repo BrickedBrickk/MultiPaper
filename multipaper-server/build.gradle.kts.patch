@@ -313,6 +313,34 @@
 +        if (!sourceFile.readText().contains(guard)) {
 +            throw GradleException("Real-player quit announcement guard was not present after patching ServerGamePacketListenerImpl.java")
 +        }
++
++        val selectedSlotPatch = rootProject.file("multipaper-server/minecraft-patches/sources/0082-MultiPaper-sync-selected-hotbar-slot.patch")
++        val selectedSlotMarker = "puregero.multipaper.MultiPaperPlayerHandler.handleSetCarriedItem(this.player, packet);"
++        if (!sourceFile.readText().contains(selectedSlotMarker)) {
++            val selectedSlotCheck = services.execOperations.exec {
++                workingDir(rootProject.projectDir)
++                commandLine("git", "apply", "--ignore-space-change", "--check", "--directory=$sourceRoot", selectedSlotPatch.absolutePath)
++                isIgnoreExitValue = true
++            }
++            if (selectedSlotCheck.exitValue == 0) {
++                services.execOperations.exec {
++                    workingDir(rootProject.projectDir)
++                    commandLine("git", "apply", "--ignore-space-change", "--whitespace=nowarn", "--directory=$sourceRoot", selectedSlotPatch.absolutePath)
++                }
++            } else {
++                val selectedSlotAlreadyApplied = services.execOperations.exec {
++                    workingDir(rootProject.projectDir)
++                    commandLine("git", "apply", "--ignore-space-change", "--reverse", "--check", "--directory=$sourceRoot", selectedSlotPatch.absolutePath)
++                    isIgnoreExitValue = true
++                }
++                if (selectedSlotAlreadyApplied.exitValue != 0) {
++                    throw GradleException("Could not apply selected hotbar slot synchronization to regenerated ServerGamePacketListenerImpl.java")
++                }
++            }
++        }
++        if (!sourceFile.readText().contains(selectedSlotMarker)) {
++            throw GradleException("Selected hotbar slot synchronization was not present after patching ServerGamePacketListenerImpl.java")
++        }
 +    }
 +}
 +

@@ -18,4 +18,10 @@ public class MultiPaperPlayerHandler {
             MultiPaper.broadcastPacketToExternalServers(player, new PlayerActionPacket(player, packet));
         }
     }
+
+    public static void handleSetCarriedItem(ServerPlayer player, ServerboundSetCarriedItemPacket packet) {
+        if (MultiPaper.isRealPlayer(player)) {
+            MultiPaper.broadcastPacketToExternalServers(player, new PlayerActionPacket(player, packet));
+        }
+    }
 }

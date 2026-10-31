@@ -6,6 +6,8 @@ import net.minecraft.network.protocol.game.ServerGamePacketListener;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import puregero.multipaper.ExternalPlayer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import puregero.multipaper.ExternalServerConnection;
@@ -55,6 +57,9 @@ public class PlayerActionPacket extends ExternalServerPacket {
                 @SuppressWarnings("unchecked")
                 Packet<ServerGamePacketListener> gamePacket = (Packet<ServerGamePacketListener>) action;
                 gamePacket.handle(player.connection);
+                if (player instanceof ExternalPlayer externalPlayer && action instanceof ServerboundSetCarriedItemPacket) {
+                    externalPlayer.syncSelectedSlotEquipmentToLocalViewers();
+                }
             }
         });
     }

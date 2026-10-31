@@ -1,6 +1,7 @@
 package puregero.multipaper;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.PacketSendListener;
@@ -9,10 +10,12 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.level.GameType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -55,6 +58,22 @@ public class ExternalPlayer extends ServerPlayer {
                 && !(packet instanceof ClientboundSetDisplayObjectivePacket)
                 && !(packet instanceof ClientboundSetChunkCacheCenterPacket)
                 && !(packet instanceof ClientboundSetChunkCacheRadiusPacket);
+    }
+
+    static void routeEquipmentUpdateToLocalViewers(ClientboundSetEquipmentPacket packet, @Nullable ChunkMap.TrackedEntity trackedEntity) {
+        // Equipment generated while applying a remote PlayerAction or inventory update belongs
+        // to this mirror's viewers. Sending it back to the owner cannot update viewers on this
+        // backend, and the owner already has the authoritative inventory and selected slot.
+        if (trackedEntity != null) {
+            trackedEntity.sendToTrackingPlayers(packet);
+        }
+    }
+
+    public void syncSelectedSlotEquipmentToLocalViewers() {
+        ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(
+                getId(), List.of(Pair.of(EquipmentSlot.MAINHAND, getMainHandItem())), true);
+        routeEquipmentUpdateToLocalViewers(packet,
+                ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) this).moonrise$getTrackedEntity());
     }
 
     static boolean shouldBroadcastSyncedData(@Nullable GameProfile gameProfile, boolean updatingData) {
@@ -168,6 +187,11 @@ public class ExternalPlayer extends ServerPlayer {
 
         @Override
         public void send(Packet<?> packet, @Nullable ChannelFutureListener packetsendlistener) {
+            if (sendPackets && packet instanceof ClientboundSetEquipmentPacket equipmentPacket) {
+                routeEquipmentUpdateToLocalViewers(equipmentPacket,
+                    ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity) ExternalPlayer.this).moonrise$getTrackedEntity());
+                return;
+            }
             if (sendPackets && shouldForwardPacketToOwningServer(packet)) {
 //                LOGGER.info("Forwarding packet " + packet);
                 externalServerConnection.sendPacket(ExternalPlayer.this, packet);
