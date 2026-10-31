@@ -183,6 +183,10 @@ public class TestServerClient extends ServerBoundMessageHandler {
         return ((InetSocketAddress) channel.localAddress()).getAddress().getHostAddress();
     }
 
+    public boolean isConnected() {
+        return channel.isActive();
+    }
+
     @Override
     public void handle(SetSecretMessage message) {
         secretFuture.complete(message.secret);

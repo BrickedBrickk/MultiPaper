@@ -35,7 +35,14 @@ public class ReadChunkHandler {
         };
 
         if (message.path.equals("region")) {
-            ChunkLockManager.waitForLock(message.world, message.cx, message.cz, callback);
+            ChunkLockManager.readWhenSafe(message.world, message.cx, message.cz, callback, () -> {
+                System.err.println("Refusing region read after a failed authoritative chunk save: world="
+                        + message.world + " chunk=" + message.cx + "," + message.cz
+                        + " requester=" + connection.getBungeeCordName());
+                // The current protocol has no typed failed-read reply. Do not let
+                // normal chunk loading consume a stale persisted snapshot.
+                connection.getChannel().close();
+            });
         } else if (message.path.equals("entities")) {
             EntitiesLockManager.waitForLock(message.world, message.cx, message.cz, callback);
         } else {

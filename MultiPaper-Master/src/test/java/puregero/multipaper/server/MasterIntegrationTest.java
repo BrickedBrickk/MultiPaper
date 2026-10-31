@@ -547,7 +547,7 @@ class MasterIntegrationTest {
 
     @Test
     @Order(20)
-    void failedChunkWriteIsNotAcknowledgedAndPreservesThePreviousChunk() throws Exception {
+    void failedChunkWritePreservesPreviousDiskImageButRefusesStaleRead() throws Exception {
         String world = "write-failure-world";
         int chunkX = 17;
         int chunkZ = -21;
@@ -566,14 +566,26 @@ class MasterIntegrationTest {
         ServerBoundMessage failedReply = serverB.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, replacementData));
         assertTrue(failedReply instanceof BooleanMessageReply, "A failed write should return a boolean reply");
         assertFalse(((BooleanMessageReply) failedReply).result, "A failed disk write must not be acknowledged as successful");
+        assertTrue(FailedChunkWriteStore.isFailed(new ChunkKey(world, chunkX, chunkZ)),
+                "Master must durably quarantine a chunk after its authoritative replacement fails");
 
         RegionFileCache.closeAll();
-        ServerBoundMessage readReply = serverB.request(new ReadChunkMessage(world, "region", chunkX, chunkZ));
-        assertTrue(readReply instanceof DataMessageReply, "The previous chunk data should remain readable");
-        assertArrayEquals(previousData, ((DataMessageReply) readReply).data,
-                "A failed replacement must leave the last acknowledged chest NBT intact");
-        assertEquals(17, readChestItemCount(((DataMessageReply) readReply).data),
-                "The previously persisted chest inventory must remain exact after a failed save");
+        byte[] previousDiskImage = RegionFileCache.getChunkDeflatedDataAsync(Path.of(world, "region").toFile(), chunkX, chunkZ)
+                .get(5, TimeUnit.SECONDS);
+        assertArrayEquals(previousData, previousDiskImage,
+                "The failed write must not overwrite the previous Master region-file image");
+        assertEquals(17, readChestItemCount(previousDiskImage), "The previous on-disk chest must retain its exact 17 diamonds");
+
+        TestServerClient staleReader = TestServerClient.connect(port, "failed-chunk-stale-reader");
+        try {
+            staleReader.send(new ReadChunkMessage(world, "region", chunkX, chunkZ));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (staleReader.isConnected() && System.nanoTime() < deadline) Thread.sleep(10);
+            assertFalse(staleReader.isConnected(),
+                    "Master must not expose the old chest image as current after a failed authoritative save");
+        } finally {
+            staleReader.close();
+        }
         RegionFileCache.closeAll();
     }
 
@@ -1781,6 +1793,8 @@ class MasterIntegrationTest {
         BooleanMessageReply failed = (BooleanMessageReply) serverA.request(
                 new WriteChunkMessage(world, "region", chunkX, chunkZ, failedReplacement));
         assertFalse(failed.result, "The final replacement must be rejected when Master storage fails");
+        assertTrue(FailedChunkWriteStore.isFailed(new ChunkKey(world, chunkX, chunkZ)),
+                "A failed authoritative save must leave a durable quarantine marker");
 
         ServerConnection currentOwner = ChunkSubscriptionManager.getOwner(world, chunkX, chunkZ);
         assertEquals("server-a", currentOwner == null ? null : currentOwner.getBungeeCordName(),
@@ -1797,6 +1811,8 @@ class MasterIntegrationTest {
         assertTrue(((BooleanMessageReply) serverA.request(
                 new WriteChunkMessage(world, "region", chunkX, chunkZ, failedReplacement))).result,
                 "The final chest snapshot should be accepted after the isolated storage fault is cleared");
+        assertFalse(FailedChunkWriteStore.isFailed(new ChunkKey(world, chunkX, chunkZ)),
+                "A successful retry must clear the durable quarantine only after the new chunk save succeeds");
         assertEquals("server-b", pollUntilOwner(serverB, chunkX, chunkZ, "server-b").owner,
                 "A successful retry should resume the deferred ownership transfer");
         byte[] recoveredChest = ((DataMessageReply) serverB.request(
@@ -1809,7 +1825,7 @@ class MasterIntegrationTest {
     @Test
     @Order(41)
     @Timeout(30)
-    void disconnectClearsFailedChunkWriteWithoutDeferredUnlock() throws Exception {
+    void disconnectPreservesFailedChunkQuarantineWithoutDeferredUnlock() throws Exception {
         String world = Files.createTempDirectory("multipaper-failed-write-disconnect-").toString();
         int chunkX = 43;
         int chunkZ = -51;
@@ -1827,6 +1843,7 @@ class MasterIntegrationTest {
                     new WriteChunkMessage(world, "region", chunkX, chunkZ, chestChunk(5)));
             assertFalse(failed.result);
             assertTrue(ChunkLockManager.hasFailedWrite(key), "The failed save should be tracked while its owner is connected");
+            assertTrue(FailedChunkWriteStore.isFailed(key), "The failed save marker must be durable before disconnect cleanup");
 
             failedOwner.close();
             long deadline = System.currentTimeMillis() + 5_000;
@@ -1837,10 +1854,60 @@ class MasterIntegrationTest {
             }
             assertFalse(ServerConnection.getConnections().stream()
                     .anyMatch(connection -> "failed-write-owner".equals(connection.getBungeeCordName())));
-            assertFalse(ChunkLockManager.hasFailedWrite(key),
-                    "Disconnect cleanup must remove failed-write entries even when no unlock was deferred");
+            assertTrue(ChunkLockManager.hasFailedWrite(key),
+                    "Disconnect must not forget that persisted storage may be stale after a failed save");
         } finally {
             failedOwner.close();
+            RegionFileCache.closeAll();
+        }
+    }
+
+    @Test
+    @Order(43)
+    @Timeout(30)
+    void forcedReadFailsClosedInsteadOfReturningPreviousChestAfterFailedFinalSave() throws Exception {
+        String world = Files.createTempDirectory("multipaper-forced-read-failed-save-").toString();
+        int chunkX = 59;
+        int chunkZ = -61;
+        byte[] lastPersistedChest = chestChunk(17);
+        byte[] failedCurrentChest = chestChunk(29);
+        TestServerClient reader = TestServerClient.connect(port, "failed-save-force-reader");
+        try {
+            serverA.send(new LockChunkMessage(world, chunkX, chunkZ));
+            assertEquals("server-a", pollUntilOwner(serverA, chunkX, chunkZ, "server-a").owner);
+            assertTrue(((BooleanMessageReply) serverA.request(new WriteChunkMessage(
+                    world, "region", chunkX, chunkZ, lastPersistedChest))).result);
+
+            serverA.send(new WillSaveChunkLaterMessage(world, chunkX, chunkZ));
+            serverA.request(new PingMessage());
+            RegionFileCache.getRegionFile(Path.of(world, "region").toFile(), chunkX, chunkZ).close();
+            assertFalse(((BooleanMessageReply) serverA.request(new WriteChunkMessage(
+                    world, "region", chunkX, chunkZ, failedCurrentChest))).result);
+            assertTrue(ChunkLockManager.hasFailedWrite(new ChunkKey(world, chunkX, chunkZ)));
+            RegionFileCache.closeAll(); // Restore Master read access without clearing the recorded failed save.
+
+            ForceReadChunkMessage request = new ForceReadChunkMessage(world, "region", chunkX, chunkZ);
+            CompletableFuture<ServerBoundMessage> forcedReadReply = reader.setCallbackFuture(request, 5, TimeUnit.SECONDS);
+            reader.send(request);
+            long closeDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (reader.isConnected() && !forcedReadReply.isDone() && System.nanoTime() < closeDeadline) {
+                Thread.sleep(10);
+            }
+            ServerBoundMessage result = null;
+            try {
+                result = forcedReadReply.getNow(null);
+            } catch (java.util.concurrent.CompletionException closedAfterFailure) {
+                // Closing the requester is the fail-closed error signal supported by the current protocol.
+            }
+            boolean returnedStaleChest = result instanceof DataMessageReply reply
+                    && readChestItemCount(reply.data) == 17;
+            assertFalse(returnedStaleChest,
+                    "Master returned the stale 17-diamond image after the authoritative 29-diamond save failed");
+            assertFalse(reader.isConnected(),
+                    "A no-holder read must fail closed when Master knows the latest authoritative save failed; "
+                            + "serving the previous image would silently replace live chest contents");
+        } finally {
+            reader.close();
             RegionFileCache.closeAll();
         }
     }

@@ -3,6 +3,7 @@ package puregero.multipaper.server;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import puregero.multipaper.mastermessagingprotocol.ChunkKey;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadChunkMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadLevelMessage;
 import puregero.multipaper.mastermessagingprotocol.messages.masterbound.ReadPlayerMessage;
@@ -49,6 +50,7 @@ import java.util.zip.InflaterInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MasterProcessRestartPersistenceTest {
@@ -227,6 +229,78 @@ class MasterProcessRestartPersistenceTest {
         } finally {
             closeClient(nextOwner);
             stopIfRunning(recoveredMaster);
+        }
+    }
+
+    @Test
+    @Timeout(120)
+    void failedChestWriteQuarantineSurvivesMasterJarRestartAndRejectsStaleRead() throws Exception {
+        int masterPort = findFreePort();
+        int proxyPort = findFreePort();
+        assertTrue(masterPort != proxyPort, "Master and proxy need distinct ports");
+        Path masterDirectory = tempDir.resolve("failed-chest-quarantine-restart-master");
+        Files.createDirectories(masterDirectory);
+        String world = tempDir.resolve("failed-chest-quarantine-restart-world").toAbsolutePath().toString();
+        int chunkX = 37;
+        int chunkZ = -41;
+        ChunkKey key = new ChunkKey(world, chunkX, chunkZ);
+        byte[] previousChest = chestChunk(chunkX, chunkZ, 17);
+
+        Process firstMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient firstOwner = null;
+        try {
+            awaitListening(firstMaster, masterPort);
+            firstOwner = TestServerClient.connect(masterPort, "failed-chest-first-owner");
+            firstOwner.send(new SubscribeChunkMessage(world, chunkX, chunkZ));
+            firstOwner.send(new LockChunkMessage(world, chunkX, chunkZ));
+            awaitChunkOwner(firstOwner, chunkX, chunkZ, "failed-chest-first-owner");
+            assertAcknowledged(firstOwner.request(new WriteChunkMessage(world, "region", chunkX, chunkZ, previousChest)),
+                    "previous populated chest chunk");
+            assertEquals(17, readChestItemCount(readData(firstOwner.request(
+                    new ForceReadChunkMessage(world, "region", chunkX, chunkZ)), "First Master", "previous chest")));
+
+            firstOwner.close();
+            firstOwner = null;
+            requestGracefulExit(firstMaster);
+            assertTrue(firstMaster.waitFor(15, TimeUnit.SECONDS), "First Master did not stop cleanly");
+            assertEquals(0, firstMaster.exitValue(), "First Master should stop successfully");
+        } finally {
+            closeClient(firstOwner);
+            stopIfRunning(firstMaster);
+        }
+
+        // The isolated failed-save integration test exercises creation of this
+        // durable record through WriteChunkHandler. Here, model that on-disk state
+        // at a process boundary and verify a fresh Master does not return the old NBT.
+        FailedChunkWriteStore.markFailed(key);
+        assertTrue(FailedChunkWriteStore.isFailed(key));
+
+        Process restartedMaster = startMaster(masterDirectory, masterPort, proxyPort);
+        TestServerClient reader = null;
+        try {
+            awaitListening(restartedMaster, masterPort);
+            reader = TestServerClient.connect(masterPort, "failed-chest-restart-reader-normal");
+            reader.send(new ReadChunkMessage(world, "region", chunkX, chunkZ));
+            long normalReadDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (reader.isConnected() && System.nanoTime() < normalReadDeadline) Thread.sleep(10);
+            assertFalse(reader.isConnected(),
+                    "A restarted Master must fail closed on an ordinary chunk read instead of returning stale chest NBT");
+            reader.close();
+            reader = TestServerClient.connect(masterPort, "failed-chest-restart-reader-forced");
+            reader.send(new ForceReadChunkMessage(world, "region", chunkX, chunkZ));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (reader.isConnected() && System.nanoTime() < deadline) Thread.sleep(10);
+            assertFalse(reader.isConnected(),
+                    "A restarted Master must fail closed instead of returning stale persisted chest NBT");
+
+            reader.close();
+            reader = null;
+            requestGracefulExit(restartedMaster);
+            assertTrue(restartedMaster.waitFor(15, TimeUnit.SECONDS), "Restarted Master did not stop cleanly");
+            assertEquals(0, restartedMaster.exitValue(), "Restarted Master should stop successfully");
+        } finally {
+            closeClient(reader);
+            stopIfRunning(restartedMaster);
         }
     }
 

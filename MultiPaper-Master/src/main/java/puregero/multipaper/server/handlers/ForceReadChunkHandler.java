@@ -36,7 +36,14 @@ public class ForceReadChunkHandler {
         };
 
         if (message.path.equals("region")) {
-            ChunkLockManager.waitForLock(message.world, message.cx, message.cz, read);
+            ChunkLockManager.readWhenSafe(message.world, message.cx, message.cz, read, () -> {
+                System.err.println("Refusing forced region read after a failed authoritative chunk save: world="
+                        + message.world + " chunk=" + message.cx + "," + message.cz
+                        + " requester=" + connection.getBungeeCordName());
+                // No failure reply exists in the current protocol. Closing the
+                // requester is safer than returning a stale chunk as authoritative.
+                connection.getChannel().close();
+            });
         } else if (message.path.equals("entities")) {
             EntitiesLockManager.waitForLock(message.world, message.cx, message.cz, read);
         } else {

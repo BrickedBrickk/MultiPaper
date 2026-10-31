@@ -18,7 +18,14 @@ public class ChunkLockManager {
     private static final Map<ChunkKey, Set<ServerConnection>> deferredUnlocks = new ConcurrentHashMap<>();
 
     static boolean hasFailedWrite(ChunkKey key) {
-        return failedWrites.containsKey(key);
+        if (failedWrites.containsKey(key)) return true;
+        try {
+            return FailedChunkWriteStore.isFailed(key);
+        } catch (java.io.IOException failure) {
+            System.err.println("Could not read failed region-write marker for " + key + "; treating chunk storage as quarantined");
+            failure.printStackTrace();
+            return true;
+        }
     }
 
     static boolean hasPendingWrites(String world, int cx, int cz) {
@@ -44,9 +51,27 @@ public class ChunkLockManager {
         List<ServerConnection> retryingOwners = List.of();
         synchronized (ChunkLock.getChunkLock(key)) {
             if (successful) {
-                failedWrites.remove(key);
+                try {
+                    FailedChunkWriteStore.clearFailed(key);
+                    failedWrites.remove(key);
+                } catch (java.io.IOException failure) {
+                    // The region write itself completed, but keep reads and
+                    // ownership fail-closed if an earlier quarantine could not
+                    // be durably removed.
+                    failedWrites.put(key, connection);
+                    System.err.println("Could not clear failed region-write marker after successful save for " + key);
+                    failure.printStackTrace();
+                    successful = false;
+                }
             } else {
                 failedWrites.put(key, connection);
+                try {
+                    FailedChunkWriteStore.markFailed(key);
+                } catch (java.io.IOException markerFailure) {
+                    System.err.println("Could not durably quarantine failed region save for " + key
+                            + "; the chunk remains quarantined in Master memory only");
+                    markerFailure.printStackTrace();
+                }
             }
             locks.writeCompleted(connection, world, cx, cz);
             if (successful) {
@@ -70,6 +95,34 @@ public class ChunkLockManager {
 
     public static void waitForLock(String world, int cx, int cz, Runnable callback) {
         locks.waitForLock(world, cx, cz, callback);
+    }
+
+    /**
+     * Schedules an authoritative region read only after all announced writes drain.
+     * The empty-barrier check and read enqueue share the chunk lock with write
+     * announcements, so a late save cannot overtake the read. If a previous owner
+     * save failed, the caller must fail closed instead of serving an older snapshot.
+     */
+    public static void readWhenSafe(String world, int cx, int cz, Runnable read, Runnable failedWrite) {
+        ChunkKey key = new ChunkKey(world, cx, cz);
+        locks.waitForLock(world, cx, cz, () -> {
+            boolean retryAfterLateWrite;
+            boolean storageIsStale;
+            synchronized (ChunkLock.getChunkLock(key)) {
+                retryAfterLateWrite = locks.hasPendingWrites(world, cx, cz);
+                storageIsStale = !retryAfterLateWrite && hasFailedWrite(key);
+                if (!retryAfterLateWrite && !storageIsStale) {
+                    // Enqueue the region read before releasing the lock shared with
+                    // write announcements and owner-authorized write submission.
+                    read.run();
+                }
+            }
+            if (retryAfterLateWrite) {
+                readWhenSafe(world, cx, cz, read, failedWrite);
+            } else if (storageIsStale) {
+                failedWrite.run();
+            }
+        });
     }
 
     public static CompletableFuture<Void> waitForLockAsync(String world, int cx, int cz) {
@@ -115,7 +168,11 @@ public class ChunkLockManager {
                         waiting.remove(connection);
                         if (waiting.isEmpty()) deferredUnlocks.remove(key);
                     }
-                    failedWrites.remove(key, connection);
+                    // Keep the chunk quarantined after its writer disconnects. The
+                    // persisted region file may still contain the previous chest
+                    // image, so forgetting the failed save here would let a later
+                    // owner read stale contents as authoritative. A successful
+                    // write for this chunk clears the marker in writeCompleted.
                 }
             }
         });
