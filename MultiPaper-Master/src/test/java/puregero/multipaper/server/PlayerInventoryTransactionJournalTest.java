@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +82,51 @@ class PlayerInventoryTransactionJournalTest {
         assertEquals(PlayerInventoryTransactionCoordinator.Status.APPLIED, afterBothAcks.status(fixture.transactionId));
         assertNull(afterBothAcks.reservationOwner(fixture.editorId));
         assertNull(afterBothAcks.reservationOwner(fixture.targetId));
+    }
+
+    @Test
+    void randomizedApplyOrderAndMasterRestartsPreserveCommittedAfterImagesUntilBothOwnersAck() throws Exception {
+        Random random = new Random(0x4d504954L);
+
+        for (int iteration = 0; iteration < 32; iteration++) {
+            Fixture fixture = new Fixture();
+            PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator(
+                    new PlayerInventoryTransactionJournal(tempDirectory));
+            assertEquals(PlayerInventoryTransactionCoordinator.BeginStatus.STARTED,
+                    coordinator.begin(fixture.request).result());
+            coordinator.attest(fixture.transactionId, fixture.editorId, fixture.editorSession, 7, fixture.editorBeforeDigest);
+            coordinator.attest(fixture.transactionId, fixture.targetId, fixture.targetSession, 9, fixture.targetBeforeDigest);
+            assertEquals(PlayerInventoryTransactionCoordinator.DecisionStatus.COMMIT_RECORDED,
+                    coordinator.recordDurableCommitDecision(fixture.transactionId));
+
+            // Simulate Master restarts around each durable owner acknowledgement.
+            coordinator = new PlayerInventoryTransactionCoordinator(new PlayerInventoryTransactionJournal(tempDirectory));
+            UUID firstOwner = random.nextBoolean() ? fixture.editorId : fixture.targetId;
+            UUID secondOwner = firstOwner.equals(fixture.editorId) ? fixture.targetId : fixture.editorId;
+            assertEquals(PlayerInventoryTransactionCoordinator.ApplyStatus.WAITING_FOR_OTHER_OWNER,
+                    coordinator.acknowledgeApplied(fixture.transactionId, firstOwner));
+
+            coordinator = new PlayerInventoryTransactionCoordinator(new PlayerInventoryTransactionJournal(tempDirectory));
+            assertEquals(fixture.transactionId, coordinator.reservationOwner(fixture.editorId));
+            assertEquals(fixture.transactionId, coordinator.reservationOwner(fixture.targetId));
+            PlayerInventoryTransactionJournal.CommitRecord afterFirstRestart =
+                    new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId);
+            assertArrayEquals(fixture.editorAfter, afterFirstRestart.request().editorAfterImage());
+            assertArrayEquals(fixture.targetAfter, afterFirstRestart.request().targetAfterImage());
+            assertEquals(firstOwner, afterFirstRestart.isApplied(fixture.editorId) ? fixture.editorId : fixture.targetId);
+
+            assertEquals(PlayerInventoryTransactionCoordinator.ApplyStatus.APPLIED,
+                    coordinator.acknowledgeApplied(fixture.transactionId, secondOwner));
+            coordinator = new PlayerInventoryTransactionCoordinator(new PlayerInventoryTransactionJournal(tempDirectory));
+            assertEquals(PlayerInventoryTransactionCoordinator.Status.APPLIED, coordinator.status(fixture.transactionId));
+            assertNull(coordinator.reservationOwner(fixture.editorId));
+            assertNull(coordinator.reservationOwner(fixture.targetId));
+            PlayerInventoryTransactionJournal.CommitRecord completed =
+                    new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId);
+            assertTrue(completed.allOwnersApplied());
+            assertArrayEquals(fixture.editorAfter, completed.request().editorAfterImage());
+            assertArrayEquals(fixture.targetAfter, completed.request().targetAfterImage());
+        }
     }
 
     @Test
