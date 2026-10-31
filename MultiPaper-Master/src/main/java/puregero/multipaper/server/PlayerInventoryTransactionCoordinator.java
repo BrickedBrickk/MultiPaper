@@ -36,6 +36,10 @@ public final class PlayerInventoryTransactionCoordinator {
             Transaction transaction = new Transaction(record.request());
             if (record.aborted()) {
                 transaction.status = Status.ABORTED;
+            } else if (record.preparing()) {
+                // Owner attestations are intentionally volatile. Reconnect owners
+                // must attest the exact live sessions and snapshots again.
+                transaction.status = Status.PREPARING;
             } else {
                 transaction.attested.add(record.request().editor().playerId());
                 transaction.attested.add(record.request().target().playerId());
@@ -48,13 +52,13 @@ public final class PlayerInventoryTransactionCoordinator {
                 transaction.status = record.allOwnersApplied() ? Status.APPLIED : Status.COMMIT_DECIDED;
             }
             transactions.put(record.request().transactionId(), transaction);
-            if (transaction.status == Status.COMMIT_DECIDED) {
+            if (transaction.status == Status.PREPARING || transaction.status == Status.COMMIT_DECIDED) {
                 reserveRecovered(transaction);
             }
         }
     }
 
-    public synchronized BeginResult begin(TransactionRequest request) {
+    public synchronized BeginResult begin(TransactionRequest request) throws IOException {
         Objects.requireNonNull(request, "request");
         Transaction existing = transactions.get(request.transactionId());
         if (existing != null) {
@@ -72,10 +76,55 @@ public final class PlayerInventoryTransactionCoordinator {
         }
 
         Transaction transaction = new Transaction(request);
+        boolean started = true;
+        if (journal != null) {
+            PlayerInventoryTransactionJournal.PrepareResult prepare = journal.recordPrepare(request);
+            switch (prepare) {
+                case ID_CONFLICT -> {
+                    return new BeginResult(BeginStatus.ID_CONFLICT, null, null);
+                }
+                case ABORTED -> {
+                    transaction.status = Status.ABORTED;
+                    started = false;
+                }
+                case ALREADY_COMMITTED -> {
+                    restoreCommittedRecord(transaction, journal.get(request.transactionId()));
+                    started = false;
+                }
+                case ALREADY_PREPARED -> started = false;
+                case PREPARED -> { }
+            }
+        }
         transactions.put(request.transactionId(), transaction);
-        reservations.put(request.editor().playerId(), request.transactionId());
-        reservations.put(request.target().playerId(), request.transactionId());
-        return new BeginResult(BeginStatus.STARTED, transaction.status, null);
+        if (transaction.status == Status.PREPARING || transaction.status == Status.COMMIT_DECIDED) {
+            reservations.put(request.editor().playerId(), request.transactionId());
+            reservations.put(request.target().playerId(), request.transactionId());
+        }
+        return new BeginResult(started ? BeginStatus.STARTED : BeginStatus.REPLAY, transaction.status, null);
+    }
+
+    private static void restoreCommittedRecord(Transaction transaction,
+                                               PlayerInventoryTransactionJournal.CommitRecord record) throws IOException {
+        if (record == null || !record.request().sameAs(transaction.request)) {
+            throw new IOException("Inventory transaction journal changed while restoring " + transaction.request.transactionId());
+        }
+        if (record.aborted()) {
+            transaction.status = Status.ABORTED;
+            return;
+        }
+        if (record.preparing()) {
+            transaction.status = Status.PREPARING;
+            return;
+        }
+        transaction.attested.add(transaction.request.editor().playerId());
+        transaction.attested.add(transaction.request.target().playerId());
+        if (record.isApplied(transaction.request.editor().playerId())) {
+            transaction.applied.add(transaction.request.editor().playerId());
+        }
+        if (record.isApplied(transaction.request.target().playerId())) {
+            transaction.applied.add(transaction.request.target().playerId());
+        }
+        transaction.status = record.allOwnersApplied() ? Status.APPLIED : Status.COMMIT_DECIDED;
     }
 
     /** Records an exact live-owner before-image attestation. A mismatch stays reserved. */

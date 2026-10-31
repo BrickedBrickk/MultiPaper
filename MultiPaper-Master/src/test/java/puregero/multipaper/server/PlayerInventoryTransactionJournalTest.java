@@ -3,9 +3,12 @@ package puregero.multipaper.server;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -43,6 +46,108 @@ class PlayerInventoryTransactionJournalTest {
         assertArrayEquals(fixture.editorAfter, record.request().editorAfterImage());
         assertArrayEquals(fixture.targetAfter, record.request().targetAfterImage());
         assertEquals(0, record.appliedMask());
+    }
+
+    @Test
+    void prepareRecordSurvivesMasterRestartAndRequiresFreshOwnerAttestations() throws Exception {
+        Fixture fixture = new Fixture();
+        PlayerInventoryTransactionJournal journal = new PlayerInventoryTransactionJournal(tempDirectory);
+        PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator(journal);
+
+        assertEquals(PlayerInventoryTransactionCoordinator.BeginStatus.STARTED,
+                coordinator.begin(fixture.request).result());
+        assertTrue(Files.exists(tempDirectory.resolve(fixture.transactionId + ".itx")),
+                "The prepare request must be durable before begin returns");
+        assertEquals(PlayerInventoryTransactionJournal.PrepareResult.ALREADY_PREPARED,
+                journal.recordPrepare(fixture.request));
+        assertEquals(PlayerInventoryTransactionJournal.PrepareResult.ID_CONFLICT,
+                journal.recordPrepare(fixture.request(fixture.transactionId, new byte[]{99}, fixture.targetAfter)));
+
+        PlayerInventoryTransactionCoordinator recovered = new PlayerInventoryTransactionCoordinator(
+                new PlayerInventoryTransactionJournal(tempDirectory));
+        assertEquals(PlayerInventoryTransactionCoordinator.Status.PREPARING,
+                recovered.status(fixture.transactionId));
+        assertEquals(fixture.transactionId, recovered.reservationOwner(fixture.editorId));
+        assertEquals(fixture.transactionId, recovered.reservationOwner(fixture.targetId));
+        assertEquals(PlayerInventoryTransactionCoordinator.BeginStatus.REPLAY,
+                recovered.begin(fixture.request).result());
+
+        assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.WAITING_FOR_OTHER_PARTICIPANT,
+                recovered.attest(fixture.transactionId, fixture.editorId, fixture.editorSession, 7, fixture.editorBeforeDigest));
+        assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.PREPARED,
+                recovered.attest(fixture.transactionId, fixture.targetId, fixture.targetSession, 9, fixture.targetBeforeDigest));
+        assertEquals(PlayerInventoryTransactionCoordinator.DecisionStatus.COMMIT_RECORDED,
+                recovered.recordDurableCommitDecision(fixture.transactionId));
+        assertFalse(new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId).preparing());
+    }
+
+    @Test
+    void failedPreparePersistenceDoesNotCreateTransactionOrReserveParticipants() throws Exception {
+        Fixture fixture = new Fixture();
+        Path notDirectory = tempDirectory.resolve("not-a-directory");
+        Files.writeString(notDirectory, "file");
+        PlayerInventoryTransactionJournal journal = new PlayerInventoryTransactionJournal(notDirectory.resolve("journal"));
+        PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator(journal);
+
+        assertThrows(IOException.class, () -> coordinator.begin(fixture.request));
+        assertNull(coordinator.reservationOwner(fixture.editorId));
+        assertNull(coordinator.reservationOwner(fixture.targetId));
+        assertThrows(IllegalArgumentException.class, () -> coordinator.status(fixture.transactionId));
+    }
+
+    @Test
+    void durableAbortReleasesRecoveredPrepareReservationAndSurvivesRestart() throws Exception {
+        Fixture fixture = new Fixture();
+        PlayerInventoryTransactionJournal journal = new PlayerInventoryTransactionJournal(tempDirectory);
+        PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator(journal);
+        coordinator.begin(fixture.request);
+        PlayerInventoryTransactionCoordinator recovered = new PlayerInventoryTransactionCoordinator(
+                new PlayerInventoryTransactionJournal(tempDirectory));
+
+        assertEquals(PlayerInventoryTransactionCoordinator.AbortStatus.ABORTED,
+                recovered.abortBeforeDecision(fixture.transactionId, true));
+        assertNull(recovered.reservationOwner(fixture.editorId));
+        assertNull(recovered.reservationOwner(fixture.targetId));
+        PlayerInventoryTransactionCoordinator afterAbortRestart = new PlayerInventoryTransactionCoordinator(
+                new PlayerInventoryTransactionJournal(tempDirectory));
+        assertEquals(PlayerInventoryTransactionCoordinator.Status.ABORTED,
+                afterAbortRestart.status(fixture.transactionId));
+        assertNull(afterAbortRestart.reservationOwner(fixture.editorId));
+        assertNull(afterAbortRestart.reservationOwner(fixture.targetId));
+    }
+
+    @Test
+    void versionTwoCommitRecordsRemainReadableAfterJournalUpgrade() throws Exception {
+        Fixture fixture = new Fixture();
+        ByteArrayOutputStream payloadBytes = new ByteArrayOutputStream();
+        try (DataOutputStream output = new DataOutputStream(payloadBytes)) {
+            output.writeInt(0x4d504954);
+            output.writeInt(2);
+            writeUuid(output, fixture.transactionId);
+            writeSnapshot(output, fixture.editorId, fixture.editorSession, 7, fixture.editorBeforeDigest);
+            writeSnapshot(output, fixture.targetId, fixture.targetSession, 9, fixture.targetBeforeDigest);
+            output.write(digest(3));
+            writeImage(output, fixture.editorAfter);
+            writeImage(output, fixture.targetAfter);
+            output.writeByte(1); // Version 2: committed
+            output.writeByte(0); // No owner acknowledgements yet
+        }
+        byte[] payload = payloadBytes.toByteArray();
+        ByteArrayOutputStream recordBytes = new ByteArrayOutputStream();
+        recordBytes.write(payload);
+        recordBytes.write(MessageDigest.getInstance("SHA-256").digest(payload));
+        Files.write(tempDirectory.resolve(fixture.transactionId + ".itx"), recordBytes.toByteArray());
+
+        PlayerInventoryTransactionJournal.CommitRecord record =
+                new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId);
+        assertFalse(record.preparing());
+        assertFalse(record.aborted());
+        assertArrayEquals(fixture.editorAfter, record.request().editorAfterImage());
+        assertArrayEquals(fixture.targetAfter, record.request().targetAfterImage());
+        PlayerInventoryTransactionCoordinator recovered = new PlayerInventoryTransactionCoordinator(
+                new PlayerInventoryTransactionJournal(tempDirectory));
+        assertEquals(PlayerInventoryTransactionCoordinator.Status.COMMIT_DECIDED,
+                recovered.status(fixture.transactionId));
     }
 
     @Test
@@ -142,7 +247,9 @@ class PlayerInventoryTransactionJournalTest {
         coordinator.begin(fixture.request);
         assertEquals(PlayerInventoryTransactionCoordinator.DecisionStatus.NOT_PREPARED,
                 coordinator.recordDurableCommitDecision(fixture.transactionId));
-        assertNull(journal.get(fixture.transactionId));
+        assertTrue(journal.get(fixture.transactionId).preparing());
+        assertEquals(PlayerInventoryTransactionJournal.AckResult.NO_COMMIT,
+                journal.markApplied(fixture.transactionId, fixture.editorId));
     }
 
     @Test
@@ -254,6 +361,24 @@ class PlayerInventoryTransactionJournalTest {
         byte[] digest = new byte[32];
         java.util.Arrays.fill(digest, (byte) fill);
         return digest;
+    }
+
+    private static void writeUuid(DataOutputStream output, UUID uuid) throws IOException {
+        output.writeLong(uuid.getMostSignificantBits());
+        output.writeLong(uuid.getLeastSignificantBits());
+    }
+
+    private static void writeSnapshot(DataOutputStream output, UUID playerId, UUID sessionId, long revision,
+                                      byte[] digest) throws IOException {
+        writeUuid(output, playerId);
+        writeUuid(output, sessionId);
+        output.writeLong(revision);
+        output.write(digest);
+    }
+
+    private static void writeImage(DataOutputStream output, byte[] image) throws IOException {
+        output.writeInt(image.length);
+        output.write(image);
     }
 
     private static final class Fixture {

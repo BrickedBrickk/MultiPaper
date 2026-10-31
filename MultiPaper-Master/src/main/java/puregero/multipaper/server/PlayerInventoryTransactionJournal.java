@@ -21,7 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Durable commit decisions and owner-apply acknowledgements for inventory transactions. */
 public final class PlayerInventoryTransactionJournal {
     private static final int MAGIC = 0x4d504954; // MPIT
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
+    private static final int LEGACY_VERSION = 2;
     private static final int DIGEST_BYTES = 32;
     private static final int MAX_AFTER_IMAGE_BYTES = 8 * 1024 * 1024;
     private static final long MAX_RECORD_BYTES = MAX_AFTER_IMAGE_BYTES * 2L + 256;
@@ -35,16 +36,42 @@ public final class PlayerInventoryTransactionJournal {
         this.lock = DIRECTORY_LOCKS.computeIfAbsent(this.directory, ignored -> new Object());
     }
 
+    /** Persists a prepare request before an owner may reserve or attest its live inventory. */
+    public PrepareResult recordPrepare(PlayerInventoryTransactionCoordinator.TransactionRequest request) throws IOException {
+        Objects.requireNonNull(request, "request");
+        synchronized (lock) {
+            CommitRecord existing = read(request.transactionId());
+            if (existing != null) {
+                if (!existing.request().sameAs(request)) {
+                    return PrepareResult.ID_CONFLICT;
+                }
+                if (existing.aborted()) {
+                    return PrepareResult.ABORTED;
+                }
+                return existing.preparing() ? PrepareResult.ALREADY_PREPARED : PrepareResult.ALREADY_COMMITTED;
+            }
+            write(new CommitRecord(request, 0, false, true));
+            return PrepareResult.PREPARED;
+        }
+    }
+
     /** Atomically records the complete decision before either participant applies it. */
     public RecordResult recordCommit(PlayerInventoryTransactionCoordinator.TransactionRequest request) throws IOException {
         Objects.requireNonNull(request, "request");
         synchronized (lock) {
             CommitRecord existing = read(request.transactionId());
             if (existing != null) {
-                if (existing.aborted()) {
-                    return existing.request().sameAs(request) ? RecordResult.ABORTED : RecordResult.ID_CONFLICT;
+                if (!existing.request().sameAs(request)) {
+                    return RecordResult.ID_CONFLICT;
                 }
-                return existing.request().sameAs(request) ? RecordResult.ALREADY_RECORDED : RecordResult.ID_CONFLICT;
+                if (existing.aborted()) {
+                    return RecordResult.ABORTED;
+                }
+                if (existing.preparing()) {
+                    write(new CommitRecord(request, 0, false, false));
+                    return RecordResult.RECORDED;
+                }
+                return RecordResult.ALREADY_RECORDED;
             }
             write(new CommitRecord(request, 0, false));
             return RecordResult.RECORDED;
@@ -60,7 +87,14 @@ public final class PlayerInventoryTransactionJournal {
                 if (!existing.request().sameAs(request)) {
                     return AbortResult.ID_CONFLICT;
                 }
-                return existing.aborted() ? AbortResult.ALREADY_ABORTED : AbortResult.COMMIT_ALREADY_RECORDED;
+                if (existing.aborted()) {
+                    return AbortResult.ALREADY_ABORTED;
+                }
+                if (!existing.preparing()) {
+                    return AbortResult.COMMIT_ALREADY_RECORDED;
+                }
+                write(new CommitRecord(request, 0, true, false));
+                return AbortResult.ABORTED;
             }
             write(new CommitRecord(request, 0, true));
             return AbortResult.ABORTED;
@@ -76,7 +110,7 @@ public final class PlayerInventoryTransactionJournal {
             if (record == null) {
                 return AckResult.NO_COMMIT;
             }
-            if (record.aborted()) {
+            if (record.aborted() || record.preparing()) {
                 return AckResult.NO_COMMIT;
             }
             int bit = record.request().editor().playerId().equals(playerId) ? 1
@@ -128,7 +162,7 @@ public final class PlayerInventoryTransactionJournal {
     }
 
     public List<CommitRecord> loadCommitted() throws IOException {
-        return loadAll().stream().filter(record -> !record.aborted()).toList();
+        return loadAll().stream().filter(record -> !record.aborted() && !record.preparing()).toList();
     }
 
     private CommitRecord read(UUID transactionId) throws IOException {
@@ -167,7 +201,7 @@ public final class PlayerInventoryTransactionJournal {
             output.write(request.requestDigest());
             writeAfterImage(output, request.editorAfterImage());
             writeAfterImage(output, request.targetAfterImage());
-            output.writeByte(record.aborted() ? 0 : 1);
+            output.writeByte(record.preparing() ? 0 : record.aborted() ? 1 : 2);
             output.writeByte(record.appliedMask());
         }
         byte[] payload = payloadBytes.toByteArray();
@@ -194,7 +228,8 @@ public final class PlayerInventoryTransactionJournal {
             if (input.readInt() != MAGIC) {
                 throw new IOException("Invalid inventory transaction record magic");
             }
-            if (input.readInt() != VERSION) {
+            int version = input.readInt();
+            if (version != VERSION && version != LEGACY_VERSION) {
                 throw new IOException("Unsupported inventory transaction record version");
             }
             UUID transactionId = readUuid(input);
@@ -208,13 +243,28 @@ public final class PlayerInventoryTransactionJournal {
             byte[] targetAfterImage = readAfterImage(input);
             int decision = input.readUnsignedByte();
             int appliedMask = input.readUnsignedByte();
-            if (decision > 1 || appliedMask > 3 || decision == 0 && appliedMask != 0 || input.available() != 0) {
+            boolean preparing;
+            boolean aborted;
+            if (version == LEGACY_VERSION) {
+                if (decision > 1) {
+                    throw new IOException("Invalid legacy inventory transaction decision");
+                }
+                aborted = decision == 0;
+                preparing = false;
+            } else {
+                if (decision > 2) {
+                    throw new IOException("Invalid inventory transaction decision");
+                }
+                preparing = decision == 0;
+                aborted = decision == 1;
+            }
+            if (appliedMask > 3 || (preparing || aborted) && appliedMask != 0 || input.available() != 0) {
                 throw new IOException("Invalid inventory transaction apply state or trailing bytes");
             }
             PlayerInventoryTransactionCoordinator.TransactionRequest request =
                     new PlayerInventoryTransactionCoordinator.TransactionRequest(
                             transactionId, editor, target, requestDigest, editorAfterImage, targetAfterImage);
-            return new CommitRecord(request, appliedMask, decision == 0);
+            return new CommitRecord(request, appliedMask, aborted, preparing);
         } catch (java.io.EOFException truncated) {
             throw new IOException("Truncated inventory transaction record", truncated);
         } catch (IllegalArgumentException invalid) {
@@ -278,6 +328,14 @@ public final class PlayerInventoryTransactionJournal {
         ID_CONFLICT
     }
 
+    public enum PrepareResult {
+        PREPARED,
+        ALREADY_PREPARED,
+        ALREADY_COMMITTED,
+        ABORTED,
+        ID_CONFLICT
+    }
+
     public enum AbortResult {
         ABORTED,
         ALREADY_ABORTED,
@@ -293,14 +351,22 @@ public final class PlayerInventoryTransactionJournal {
         NOT_A_PARTICIPANT
     }
 
-    public record CommitRecord(PlayerInventoryTransactionCoordinator.TransactionRequest request, int appliedMask, boolean aborted) {
+    public record CommitRecord(PlayerInventoryTransactionCoordinator.TransactionRequest request, int appliedMask,
+                               boolean aborted, boolean preparing) {
+        public CommitRecord(PlayerInventoryTransactionCoordinator.TransactionRequest request, int appliedMask, boolean aborted) {
+            this(request, appliedMask, aborted, false);
+        }
+
         public CommitRecord {
             Objects.requireNonNull(request, "request");
             if (appliedMask < 0 || appliedMask > 3) {
                 throw new IllegalArgumentException("appliedMask must be between 0 and 3");
             }
-            if (aborted && appliedMask != 0) {
-                throw new IllegalArgumentException("An aborted transaction cannot have owner apply acknowledgements");
+            if ((aborted || preparing) && appliedMask != 0) {
+                throw new IllegalArgumentException("A non-committed transaction cannot have owner apply acknowledgements");
+            }
+            if (aborted && preparing) {
+                throw new IllegalArgumentException("An inventory transaction cannot be both prepared and aborted");
             }
         }
 

@@ -22,7 +22,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     private static final byte[] REQUEST_DIGEST = digest(3);
 
     @Test
-    void beginIsIdempotentAndRejectsTransactionIdReuseWithDifferentRequest() {
+    void beginIsIdempotentAndRejectsTransactionIdReuseWithDifferentRequest() throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         Fixture fixture = new Fixture();
 
@@ -73,7 +73,7 @@ class PlayerInventoryTransactionCoordinatorTest {
     }
 
     @Test
-    void staleAttestationDoesNotPrepareOrReleaseEitherReservation() {
+    void staleAttestationDoesNotPrepareOrReleaseEitherReservation() throws Exception {
         PlayerInventoryTransactionCoordinator coordinator = new PlayerInventoryTransactionCoordinator();
         Fixture fixture = new Fixture();
         coordinator.begin(fixture.request);
