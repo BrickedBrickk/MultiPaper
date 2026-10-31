@@ -139,6 +139,23 @@ public final class PlayerInventoryTransactionCoordinator {
         boolean exact = expected.sessionId.equals(sessionId)
                 && expected.revision == revision
                 && Arrays.equals(expected.snapshotDigest, snapshotDigest);
+        if (!exact && transaction.status == Status.PREPARING && journal != null
+                && !expected.sessionId.equals(sessionId)
+                && Arrays.equals(expected.snapshotDigest, snapshotDigest)) {
+            PlayerSnapshot reconnected = new PlayerSnapshot(playerId, sessionId, revision, snapshotDigest);
+            TransactionRequest refreshed = transaction.request.withSnapshot(reconnected);
+            PlayerInventoryTransactionJournal.PrepareResult result;
+            try {
+                result = journal.refreshPreparingSnapshot(refreshed, playerId);
+            } catch (IOException failure) {
+                throw new java.io.UncheckedIOException("Could not durably refresh inventory owner session for " + transactionId, failure);
+            }
+            if (result == PlayerInventoryTransactionJournal.PrepareResult.REFRESHED) {
+                transaction.request = refreshed;
+                expected = reconnected;
+                exact = true;
+            }
+        }
         if (!exact) {
             return AttestationStatus.STALE;
         }
@@ -422,6 +439,36 @@ public final class PlayerInventoryTransactionCoordinator {
             return targetAfterImage.clone();
         }
 
+        private TransactionRequest withSnapshot(PlayerSnapshot snapshot) {
+            if (editor.playerId.equals(snapshot.playerId)) {
+                return new TransactionRequest(transactionId, snapshot, target, requestDigest, editorAfterImage, targetAfterImage);
+            }
+            if (target.playerId.equals(snapshot.playerId)) {
+                return new TransactionRequest(transactionId, editor, snapshot, requestDigest, editorAfterImage, targetAfterImage);
+            }
+            throw new IllegalArgumentException("Player is not a transaction participant: " + snapshot.playerId);
+        }
+
+        boolean canRefreshSnapshotFrom(TransactionRequest other, UUID participantId) {
+            if (!transactionId.equals(other.transactionId)
+                    || !Arrays.equals(requestDigest, other.requestDigest)
+                    || !Arrays.equals(editorAfterImage, other.editorAfterImage)
+                    || !Arrays.equals(targetAfterImage, other.targetAfterImage)) {
+                return false;
+            }
+            if (editor.playerId.equals(participantId)) {
+                return editor.playerId.equals(other.editor.playerId)
+                        && target.sameAs(other.target)
+                        && Arrays.equals(editor.snapshotDigest, other.editor.snapshotDigest);
+            }
+            if (target.playerId.equals(participantId)) {
+                return target.playerId.equals(other.target.playerId)
+                        && editor.sameAs(other.editor)
+                        && Arrays.equals(target.snapshotDigest, other.target.snapshotDigest);
+            }
+            return false;
+        }
+
         private PlayerSnapshot snapshotFor(UUID playerId) {
             if (editor.playerId.equals(playerId)) {
                 return editor;
@@ -463,7 +510,7 @@ public final class PlayerInventoryTransactionCoordinator {
     }
 
     private static final class Transaction {
-        private final TransactionRequest request;
+        private TransactionRequest request;
         private final Set<UUID> attested = new HashSet<>();
         private final Set<UUID> applied = new HashSet<>();
         private Status status = Status.PREPARING;

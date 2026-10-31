@@ -55,6 +55,24 @@ public final class PlayerInventoryTransactionJournal {
         }
     }
 
+    /** Updates a participant's session epoch only for the same durable, undecided transaction and before-image. */
+    public PrepareResult refreshPreparingSnapshot(PlayerInventoryTransactionCoordinator.TransactionRequest request,
+                                                   UUID participantId) throws IOException {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(participantId, "participantId");
+        synchronized (lock) {
+            CommitRecord existing = read(request.transactionId());
+            if (existing == null || !existing.request().canRefreshSnapshotFrom(request, participantId)) {
+                return PrepareResult.ID_CONFLICT;
+            }
+            if (existing.aborted()) return PrepareResult.ABORTED;
+            if (!existing.preparing()) return PrepareResult.ALREADY_COMMITTED;
+            if (existing.request().sameAs(request)) return PrepareResult.ALREADY_PREPARED;
+            write(new CommitRecord(request, 0, false, true));
+            return PrepareResult.REFRESHED;
+        }
+    }
+
     /** Atomically records the complete decision before either participant applies it. */
     public RecordResult recordCommit(PlayerInventoryTransactionCoordinator.TransactionRequest request) throws IOException {
         Objects.requireNonNull(request, "request");
@@ -331,6 +349,7 @@ public final class PlayerInventoryTransactionJournal {
     public enum PrepareResult {
         PREPARED,
         ALREADY_PREPARED,
+        REFRESHED,
         ALREADY_COMMITTED,
         ABORTED,
         ID_CONFLICT

@@ -72,13 +72,35 @@ class PlayerInventoryTransactionJournalTest {
         assertEquals(PlayerInventoryTransactionCoordinator.BeginStatus.REPLAY,
                 recovered.begin(fixture.request).result());
 
+        UUID reconnectedEditorSession = UUID.randomUUID();
+        UUID reconnectedTargetSession = UUID.randomUUID();
+        UUID staleEditorSession = UUID.randomUUID();
+        assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.STALE,
+                recovered.attest(fixture.transactionId, fixture.editorId, staleEditorSession, 2, digest(99)));
+        assertEquals(fixture.editorSession,
+                new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId).request().editor().sessionId(),
+                "A changed before-image must not replace the journaled session or join the prepared transaction");
         assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.WAITING_FOR_OTHER_PARTICIPANT,
-                recovered.attest(fixture.transactionId, fixture.editorId, fixture.editorSession, 7, fixture.editorBeforeDigest));
+                recovered.attest(fixture.transactionId, fixture.editorId, reconnectedEditorSession, 2, fixture.editorBeforeDigest));
+        assertEquals(reconnectedEditorSession,
+                new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId).request().editor().sessionId());
+        recovered = new PlayerInventoryTransactionCoordinator(new PlayerInventoryTransactionJournal(tempDirectory));
+        assertEquals(PlayerInventoryTransactionCoordinator.Status.PREPARING, recovered.status(fixture.transactionId));
+        assertEquals(fixture.transactionId, recovered.reservationOwner(fixture.editorId));
+        assertEquals(fixture.transactionId, recovered.reservationOwner(fixture.targetId));
+        assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.WAITING_FOR_OTHER_PARTICIPANT,
+                recovered.attest(fixture.transactionId, fixture.editorId, reconnectedEditorSession, 2, fixture.editorBeforeDigest),
+                "A second Master restart must discard volatile attestations but retain the refreshed session binding");
         assertEquals(PlayerInventoryTransactionCoordinator.AttestationStatus.PREPARED,
-                recovered.attest(fixture.transactionId, fixture.targetId, fixture.targetSession, 9, fixture.targetBeforeDigest));
+                recovered.attest(fixture.transactionId, fixture.targetId, reconnectedTargetSession, 3, fixture.targetBeforeDigest));
         assertEquals(PlayerInventoryTransactionCoordinator.DecisionStatus.COMMIT_RECORDED,
                 recovered.recordDurableCommitDecision(fixture.transactionId));
-        assertFalse(new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId).preparing());
+        PlayerInventoryTransactionJournal.CommitRecord committed = new PlayerInventoryTransactionJournal(tempDirectory).get(fixture.transactionId);
+        assertFalse(committed.preparing());
+        assertEquals(reconnectedEditorSession, committed.request().editor().sessionId());
+        assertEquals(2, committed.request().editor().revision());
+        assertEquals(reconnectedTargetSession, committed.request().target().sessionId());
+        assertEquals(3, committed.request().target().revision());
     }
 
     @Test
